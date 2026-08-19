@@ -1,0 +1,169 @@
+//! The intermediate block tree between pulldown-cmark events and layout.
+//!
+//! Layout cannot run straight off the event stream: tables must be measured
+//! before they are emitted, nested lists and quotes need indent context, GFM
+//! alerts need lookahead into a blockquote's first paragraph, and heading slugs
+//! need document-wide deduplication. Parsing once into this tree also means a
+//! resize re-runs layout only — the parse is cached for the document's life.
+
+use std::ops::Range;
+
+pub use crate::theme::AlertKind;
+
+/// One block-level element, with the byte range of the markdown source it came
+/// from. Source ranges are what let the viewer keep the reading position stable
+/// across re-layout: remember the top line's range, re-lay, seek back to it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Block {
+    pub kind: BlockKind,
+    /// Byte range in the original markdown source.
+    pub span: Range<usize>,
+}
+
+/// Block-level structure. Container variants own their children so layout can
+/// recurse with accumulated indent.
+#[derive(Debug, Clone, PartialEq)]
+pub enum BlockKind {
+    Heading {
+        /// 1-6.
+        level: u8,
+        /// Slug for anchors, deduplicated document-wide (`intro`, `intro-1`).
+        id: String,
+        content: Vec<Inline>,
+    },
+    Paragraph(Vec<Inline>),
+    CodeBlock {
+        /// Fence info string's first word, if any (`rust`, `jsonc`).
+        language: Option<String>,
+        /// Raw text, exactly as written; trailing newline trimmed.
+        text: String,
+    },
+    BlockQuote {
+        /// `Some` when the quote's first paragraph starts with a GFM alert
+        /// marker such as `[!NOTE]`; the marker itself is stripped.
+        alert: Option<AlertKind>,
+        children: Vec<Block>,
+    },
+    List {
+        /// `Some(start)` for ordered lists, `None` for bullet lists.
+        start: Option<u64>,
+        items: Vec<ListItem>,
+    },
+    Table {
+        alignments: Vec<Alignment>,
+        /// Header row; one `Vec<Inline>` per cell.
+        header: Vec<Vec<Inline>>,
+        rows: Vec<Vec<Vec<Inline>>>,
+    },
+    /// Thematic break (`---`, `***`).
+    Rule,
+    /// Raw HTML block, kept verbatim and rendered as muted literal text.
+    Html(String),
+    /// A footnote definition (`[^1]: …`); rendered at its source position.
+    FootnoteDefinition {
+        label: String,
+        children: Vec<Block>,
+    },
+}
+
+/// One list item. Task state comes from GFM task list markers.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ListItem {
+    /// `Some(done)` when the item is a task (`- [x]` / `- [ ]`).
+    pub task: Option<bool>,
+    pub children: Vec<Block>,
+}
+
+/// Table column alignment from the delimiter row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Alignment {
+    #[default]
+    Left,
+    Center,
+    Right,
+}
+
+/// Inline (span-level) content. Emphasis variants nest.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Inline {
+    Text(String),
+    Code(String),
+    Emphasis(Vec<Inline>),
+    Strong(Vec<Inline>),
+    Strikethrough(Vec<Inline>),
+    Link {
+        /// Destination as written; resolution against a base happens at open
+        /// time, not parse time.
+        dest: String,
+        content: Vec<Inline>,
+    },
+    Image {
+        dest: String,
+        /// Alt text, rendered as the placeholder.
+        alt: Vec<Inline>,
+    },
+    /// `[^label]` reference marker.
+    FootnoteReference(String),
+    /// Newline that renders as a space (`CommonMark` soft break).
+    SoftBreak,
+    /// Forced line break (trailing spaces or backslash).
+    HardBreak,
+}
+
+impl Inline {
+    /// Flatten to plain text, recursively — used for slugs, TOC labels, and
+    /// table column measurement pre-passes.
+    #[must_use]
+    pub fn plain_text(content: &[Inline]) -> String {
+        let mut out = String::new();
+        Self::collect_plain(content, &mut out);
+        out
+    }
+
+    fn collect_plain(content: &[Inline], out: &mut String) {
+        for inline in content {
+            match inline {
+                Inline::Text(t) | Inline::Code(t) => out.push_str(t),
+                Inline::Emphasis(c) | Inline::Strong(c) | Inline::Strikethrough(c) => {
+                    Self::collect_plain(c, out);
+                }
+                Inline::Link { content, .. } => Self::collect_plain(content, out),
+                Inline::Image { alt, .. } => Self::collect_plain(alt, out),
+                Inline::FootnoteReference(label) => {
+                    out.push('[');
+                    out.push_str(label);
+                    out.push(']');
+                }
+                Inline::SoftBreak | Inline::HardBreak => out.push(' '),
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plain_text_flattens_nesting() {
+        let content = vec![
+            Inline::Text("a ".into()),
+            Inline::Strong(vec![
+                Inline::Text("b ".into()),
+                Inline::Emphasis(vec![Inline::Text("c".into())]),
+            ]),
+            Inline::SoftBreak,
+            Inline::Code("d".into()),
+        ];
+        assert_eq!(Inline::plain_text(&content), "a b c d");
+    }
+
+    #[test]
+    fn plain_text_uses_link_text_not_dest() {
+        let content = vec![Inline::Link {
+            dest: "https://example.com".into(),
+            content: vec![Inline::Text("label".into())],
+        }];
+        assert_eq!(Inline::plain_text(&content), "label");
+    }
+}
