@@ -1,4 +1,0 @@
-# T
-
-alpha
-beta

@@ -1,2 +1,0 @@
-paper        built-in
-slate        built-in
