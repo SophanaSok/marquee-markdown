@@ -24,7 +24,11 @@ jobs:
           - os: macos-latest
             name: aarch64-macos
             target: aarch64-apple-darwin
-          - os: macos-13
+          # Cross-compiled on the Apple Silicon runner rather than built on an
+          # Intel one: the macos-13 runners are being retired and can sit
+          # queued for half an hour. Both toolchains ship with Xcode, so this
+          # is a target flag rather than a different machine.
+          - os: macos-latest
             name: x86_64-macos
             target: x86_64-apple-darwin
           - os: windows-latest
@@ -42,7 +46,12 @@ jobs:
       # drift from the flags it actually accepts.
       # Generated under both names: completions registered for a name the
       # reader does not type simply never fire.
+      #
+      # Skipped where the binary was cross-compiled, since it cannot be run on
+      # the machine that built it. Those archives carry the binary alone; the
+      # man page and completions can be produced by the installed program.
       - name: Generate man pages and completions
+        if: matrix.name != 'x86_64-macos'
         shell: bash
         run: |
           dir="target/${{ matrix.target }}/release"
@@ -65,7 +74,11 @@ jobs:
           cp "target/${{ matrix.target }}/release/marquee-markdown" "$name/"
           cp "target/${{ matrix.target }}/release/mmd" "$name/"
           cp README.md LICENSE CHANGELOG.md "$name/"
-          cp -r dist/man dist/completions "$name/"
+          # An `&&` list would be the last command in the script, and a false
+          # test would fail the step under `bash -e`.
+          if [ -d dist/man ]; then
+            cp -r dist/man dist/completions "$name/"
+          fi
           tar czf "$name.tar.gz" "$name"
 
       - name: Package (windows)
