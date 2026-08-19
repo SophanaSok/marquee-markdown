@@ -7,6 +7,10 @@ What is here, and what fills in the blanks.
 | `homebrew/marquee-markdown.rb` | `brew bump-formula-pr`, from the release checksums |
 | `scoop/marquee-markdown.json` | the version and hash from `checksums.txt` |
 
+Neither a Homebrew tap nor a Scoop bucket exists yet; these are the manifests
+to put in one. The Scoop manifest carries the real hash for 0.1.0 and can
+auto-update from the checksums file attached to each release.
+
 Debian and RPM metadata live in `Cargo.toml` under `[package.metadata.deb]` and
 `[package.metadata.generate-rpm]`; the release workflow builds both with
 `cargo deb` and `cargo generate-rpm` and attaches them to the release.

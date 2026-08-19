@@ -7,7 +7,7 @@
   "architecture": {
     "64bit": {
       "url": "https://github.com/SophanaSok/marquee-markdown/releases/download/v0.1.0/marquee-markdown-v0.1.0-x86_64-windows.zip",
-      "hash": "replace-with-the-sha256-from-checksums.txt",
+      "hash": "fb846df8d47a7d32b5edc32e74d9b62a7ff6e2695a0d3641c10ffc9248654a1a",
       "extract_dir": "marquee-markdown-v0.1.0-x86_64-windows"
     }
   },
