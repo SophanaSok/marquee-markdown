@@ -50,7 +50,7 @@ pub fn highlight(text: &str, language: Option<&str>, theme: &Theme) -> Vec<Vec<(
 
     let syntect_theme = &theme_set().themes[theme.syntax_theme_name()];
     let mut highlighter = HighlightLines::new(syntax, syntect_theme);
-    let surface = theme.palette.surface;
+    let surface = theme.palette.surface.color();
 
     lines
         .iter()
@@ -120,7 +120,7 @@ mod tests {
         let t = theme();
         let out = highlight("fn main() { let x = 1; }", Some("rust"), &t);
         for (style, _) in out[0].iter() {
-            assert_eq!(style.bg, Some(t.palette.surface));
+            assert_eq!(style.bg, Some(t.palette.surface.color()));
         }
     }
 

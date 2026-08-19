@@ -36,12 +36,12 @@ fn main() -> std::io::Result<()> {
     let gutter = term_width.saturating_sub(width) / 2;
 
     for line in &doc.lines {
-        write!(out, "{}", sgr(theme.palette.bg, None))?;
+        write!(out, "{}", sgr(theme.palette.bg.color(), None))?;
         write!(out, "{}", " ".repeat(usize::from(gutter)))?;
         for span in &line.spans {
             write!(out, "{}{}", span_sgr(span), span.content)?;
         }
-        write!(out, "{}", sgr(theme.palette.bg, None))?;
+        write!(out, "{}", sgr(theme.palette.bg.color(), None))?;
         writeln!(out, "{}\x1b[0m", " ".repeat(usize::from(gutter)))?;
     }
     Ok(())

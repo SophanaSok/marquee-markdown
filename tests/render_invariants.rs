@@ -191,8 +191,14 @@ fn tables_frame_when_words_fit_and_stack_as_cards_when_they_do_not() {
     );
 
     let wide = render_text(source, &theme, 80);
-    assert!(wide.contains('\u{250c}'), "wide table should be framed:\n{wide}");
-    assert!(wide.contains('\u{2502}'), "wide table missing verticals:\n{wide}");
+    assert!(
+        wide.contains('\u{250c}'),
+        "wide table should be framed:\n{wide}"
+    );
+    assert!(
+        wide.contains('\u{2502}'),
+        "wide table missing verticals:\n{wide}"
+    );
 
     let narrow = render_text(source, &theme, 30);
     assert!(

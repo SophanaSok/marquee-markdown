@@ -19,6 +19,7 @@
 //! assert!(doc.lines.iter().all(|l| l.width() == 40));
 //! ```
 
+pub mod ansi;
 pub mod block;
 pub mod doc;
 pub mod frag;

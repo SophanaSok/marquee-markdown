@@ -222,7 +222,7 @@ mod tests {
         assert_eq!(out[0].kind, FragKind::Word);
         assert_eq!(out[1].kind, FragKind::Glue);
         assert_eq!(out[2].kind, FragKind::Glue);
-        let surface = theme().palette.surface;
+        let surface = theme().palette.surface.color();
         assert!(out.iter().all(|f| f.style.bg == Some(surface)));
     }
 
@@ -235,7 +235,7 @@ mod tests {
         let link_frag = &out[0];
         assert!(link_frag.style.add_modifier.contains(Modifier::BOLD));
         assert!(link_frag.style.add_modifier.contains(Modifier::UNDERLINED));
-        assert_eq!(link_frag.style.fg, Some(theme().palette.accent));
+        assert_eq!(link_frag.style.fg, Some(theme().palette.accent.color()));
     }
 
     #[test]
