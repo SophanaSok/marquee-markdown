@@ -25,8 +25,15 @@ pub enum Event {
     Resize(u16, u16),
     /// Text was pasted in one go.
     Paste(String),
-    /// The directory walk reported in.
-    Scan(Scan),
+    /// The directory walk reported in. The generation says *which* walk: a
+    /// rescan starts a new one, and batches from the walk it replaced must
+    /// not repopulate a list that was just cleared.
+    Scan {
+        /// Which walk this report belongs to.
+        generation: u64,
+        /// What it found.
+        scan: Scan,
+    },
     /// The document changed on disk.
     Reload,
 }
@@ -179,8 +186,12 @@ mod tests {
     #[test]
     fn a_walk_report_reaches_the_loop_through_the_same_queue_as_a_key() {
         let (mut events, sender) = Events::new();
-        sender.send(Event::Scan(Scan::Done)).expect("send");
-        assert_eq!(events.next().unwrap(), Some(Event::Scan(Scan::Done)));
+        let done = Event::Scan {
+            generation: 0,
+            scan: Scan::Done,
+        };
+        sender.send(done.clone()).expect("send");
+        assert_eq!(events.next().unwrap(), Some(done));
     }
 
     #[test]
@@ -200,7 +211,12 @@ mod tests {
     fn draining_takes_everything_waiting_and_stops() {
         let (mut events, sender) = Events::new();
         for _ in 0..3 {
-            sender.send(Event::Scan(Scan::Done)).expect("send");
+            sender
+                .send(Event::Scan {
+                    generation: 0,
+                    scan: Scan::Done,
+                })
+                .expect("send");
         }
         let mut batch = Vec::new();
         events.drain(&mut batch).expect("drain");

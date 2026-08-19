@@ -17,7 +17,7 @@ use std::str::FromStr;
 
 use ratatui::style::{Modifier, Style};
 
-pub use palette::{Alerts, Appearance, Palette, Rgb, ThemeFile};
+pub use palette::{Alerts, Appearance, Icons, Palette, Rgb, ThemeFile};
 
 /// Which palette to draw with.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -63,12 +63,14 @@ impl ThemeVariant {
                 appearance: Appearance::Light,
                 syntax: "InspiredGitHub".to_owned(),
                 palette: PAPER,
+                icons: Icons::default(),
             },
             Self::Slate => ThemeFile {
                 name: "slate".to_owned(),
                 appearance: Appearance::Dark,
                 syntax: "base16-eighties.dark".to_owned(),
                 palette: SLATE,
+                icons: Icons::default(),
             },
         }
     }
@@ -81,6 +83,7 @@ impl From<ThemeFile> for Theme {
             appearance: file.appearance,
             syntax: file.syntax,
             palette: file.palette,
+            icons: file.icons,
             plain: false,
         }
     }
@@ -170,6 +173,8 @@ pub struct Theme {
     /// Bundled syntect theme used for code blocks.
     pub syntax: String,
     pub palette: Palette,
+    /// Glyphs for callout heads and image placeholders.
+    pub icons: Icons,
     /// Set when styling is disabled entirely (piped output).
     pub plain: bool,
 }
@@ -318,6 +323,29 @@ impl Theme {
             .bg(self.palette.bg.color())
             .fg(fg)
             .add_modifier(Modifier::BOLD)
+    }
+
+    /// The glyph at the head of a callout of this kind.
+    ///
+    /// On the theme rather than on [`AlertKind`], because glyph choice is a
+    /// font question and fonts are the theme's business: the defaults render
+    /// in any monospace font, and a Nerd Font set is one `[icons]` block in a
+    /// theme file.
+    #[must_use]
+    pub fn alert_icon(&self, kind: AlertKind) -> &str {
+        match kind {
+            AlertKind::Note => &self.icons.note,
+            AlertKind::Tip => &self.icons.tip,
+            AlertKind::Important => &self.icons.important,
+            AlertKind::Warning => &self.icons.warning,
+            AlertKind::Caution => &self.icons.caution,
+        }
+    }
+
+    /// The placeholder drawn in front of an image's alt text.
+    #[must_use]
+    pub fn image_icon(&self) -> &str {
+        &self.icons.image
     }
 
     /// Link text. The URL itself is emitted as an OSC 8 hyperlink where the
@@ -519,19 +547,19 @@ pub enum AlertKind {
 }
 
 impl AlertKind {
-    /// Nerd Font glyph shown at the head of the callout.
-    #[must_use]
-    pub const fn icon(self) -> char {
-        match self {
-            Self::Note => '\u{f05a}',
-            Self::Tip => '\u{f0eb}',
-            Self::Important => '\u{f06a}',
-            Self::Warning => '\u{f071}',
-            Self::Caution => '\u{f06d}',
-        }
-    }
+    /// Every kind, for iteration in tests.
+    pub const ALL: [Self; 5] = [
+        Self::Note,
+        Self::Tip,
+        Self::Important,
+        Self::Warning,
+        Self::Caution,
+    ];
 
     /// Title rendered beside the icon.
+    ///
+    /// The icon itself comes from the theme ([`Theme::alert_icon`]): glyph
+    /// choice is a font question, and fonts are the theme's business.
     #[must_use]
     pub const fn title(self) -> &'static str {
         match self {
@@ -654,5 +682,37 @@ mod tests {
             assert!(!seen.contains(&fg), "{kind:?} reuses another alert color");
             seen.push(fg);
         }
+    }
+
+    #[test]
+    fn every_default_icon_is_one_cell_wide() {
+        // The callout head is truncated to the column with exact width math;
+        // an icon the width tables and the terminal disagree about would make
+        // the head ragged. The Nerd Font PUA glyphs also measure 1, so a
+        // theme swapping them in stays within the same budget.
+        let icons = Icons::default();
+        for (name, icon) in [
+            ("note", &icons.note),
+            ("tip", &icons.tip),
+            ("important", &icons.important),
+            ("warning", &icons.warning),
+            ("caution", &icons.caution),
+            ("image", &icons.image),
+        ] {
+            assert_eq!(
+                crate::render::measure::width(icon),
+                1,
+                "{name} icon {icon:?} is not one cell"
+            );
+        }
+    }
+
+    #[test]
+    fn a_theme_answers_an_icon_for_every_alert_kind() {
+        let theme = Theme::new(ThemeVariant::Slate);
+        for kind in AlertKind::ALL {
+            assert!(!theme.alert_icon(kind).is_empty(), "{kind:?}");
+        }
+        assert!(!theme.image_icon().is_empty());
     }
 }

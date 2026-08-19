@@ -235,11 +235,16 @@ first screenful is there immediately and a large tree fills in behind it.
 | `g` `G` · `home` `end` | first file, last file |
 | `enter` | read this file |
 | `/` | filter the list |
+| `r` | rescan the directory |
+| `.` | show / hide hidden and ignored files |
 | `esc` | clear the filter |
 | `q` · `ctrl+c` | quit |
 
 `esc` in a document goes back to the list, so the browser is where a reading
-session lives rather than somewhere you pass through once.
+session lives rather than somewhere you pass through once. The list is a
+snapshot; `r` walks the directory again — keeping your filter and, when the
+file still exists, your place — and `.` widens or narrows the walk to hidden
+and git-ignored files on the spot.
 
 Two of those keys are inconsistent with the document: `f`/`d` page a whole
 screen here and half a screen when reading, and `h`/`l` page here but scroll

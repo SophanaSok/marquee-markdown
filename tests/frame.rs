@@ -149,6 +149,15 @@ fn every_cell_is_painted_with_the_help_overlay_open() {
 }
 
 #[test]
+fn a_scrolled_key_reference_stays_painted_on_a_short_terminal() {
+    let mut app = fixture();
+    app.overlay = Some(marquee_markdown::app::Overlay::Help);
+    app.help_scroll = 10;
+    let buf = frame(&mut app, 60, 12);
+    assert_fully_painted(&buf, "scrolled help at 60x12");
+}
+
+#[test]
 fn every_cell_is_painted_in_both_themes() {
     for variant in [ThemeVariant::Paper, ThemeVariant::Slate] {
         let mut app = fixture();

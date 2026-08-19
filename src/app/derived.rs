@@ -24,6 +24,7 @@ pub fn sync(app: &mut App) {
 
     sync_toc(app);
     sync_browser(app);
+    sync_help(app);
 
     // Matches are line indices, so a re-layout invalidates every one of them.
     // They are re-found here rather than remapped separately, which is what
@@ -52,6 +53,22 @@ fn sync_browser(app: &mut App) {
         browser.refresh(&query);
         browser.clamp(height);
     }
+}
+
+/// Keep the key reference's scroll inside its rows.
+///
+/// The offset is only moved in `update`; the clamp lives here because it
+/// needs the terminal height and the row count, both of which can change
+/// under an open overlay (a resize, or focus moving between panes).
+fn sync_help(app: &mut App) {
+    if app.overlay != Some(crate::app::state::Overlay::Help) {
+        return;
+    }
+    let rows = app.keymap.help_rows(app.pane_mode()).len();
+    let terminal = app.panes.body.height + app.panes.status.height;
+    let visible = usize::from(terminal.saturating_sub(2)).min(rows);
+    let max = rows.saturating_sub(visible);
+    app.help_scroll = app.help_scroll.min(u16::try_from(max).unwrap_or(u16::MAX));
 }
 
 /// Rebuild what the contents pane shows, and keep the cursor somewhere real.

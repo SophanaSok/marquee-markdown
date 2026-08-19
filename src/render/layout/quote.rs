@@ -27,7 +27,7 @@ pub(super) fn emit(
         // column so a narrow terminal cannot overflow the line.
         let avail = ctx.available_width();
         let text = crate::render::measure::truncate(
-            &format!("{} {}", kind.icon(), kind.title()),
+            &format!("{} {}", ctx.theme.alert_icon(kind), kind.title()),
             avail,
             "\u{2026}",
         );

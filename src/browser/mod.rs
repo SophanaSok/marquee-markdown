@@ -33,6 +33,13 @@ pub struct Browser {
     /// against it is what makes filtering idempotent, so it can be called
     /// every frame without doing the work every frame.
     applied: Option<(String, usize)>,
+    /// Which walk the list belongs to. A rescan bumps it, and reports from
+    /// the walk it replaced are dropped rather than repopulating a list that
+    /// was just cleared.
+    generation: u64,
+    /// The file the cursor was on when a rescan began; re-selected as soon
+    /// as the new walk finds it again.
+    reselect: Option<PathBuf>,
 }
 
 impl Browser {
@@ -44,6 +51,37 @@ impl Browser {
             scanning: true,
             ..Self::default()
         }
+    }
+
+    /// Which walk the list belongs to.
+    #[must_use]
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    /// Throw the list away and get ready for a fresh walk.
+    ///
+    /// The filter survives, and the file the cursor was on is remembered so
+    /// it is re-selected the moment the new walk finds it — a rescan should
+    /// feel like the list updating, not like starting over. `applied` is
+    /// cleared explicitly: its `(query, count)` guard would otherwise treat a
+    /// rescan that lands on the same count as nothing having changed.
+    pub fn begin_rescan(&mut self) {
+        self.reselect = self.selected().map(|entry| entry.path.clone());
+        self.entries.clear();
+        self.matches.clear();
+        self.cursor = 0;
+        self.scanning = true;
+        self.applied = None;
+        self.generation += 1;
+    }
+
+    /// The walk finished.
+    pub fn finish_scan(&mut self) {
+        self.scanning = false;
+        // If the file the cursor was on never reappeared, it is gone; the
+        // cursor has already fallen back to the top.
+        self.reselect = None;
     }
 
     /// Take a batch of results from the walk.
@@ -115,6 +153,15 @@ impl Browser {
         walk::sort(&mut self.entries);
         self.matches = filter::matching(query, self.entries.iter().map(|e| e.display.as_str()));
         self.applied = Some(state);
+        // A rescan in progress re-selects the remembered file the moment it
+        // reappears; otherwise the cursor follows the selection it had.
+        if let Some(waiting) = self.reselect.clone()
+            && let Some(position) = self.position_of(&waiting)
+        {
+            self.cursor = position;
+            self.reselect = None;
+            return;
+        }
         self.cursor = selected
             .and_then(|path| self.position_of(&path))
             .unwrap_or(0);
@@ -301,5 +348,45 @@ mod tests {
         browser.to_last();
         browser.clamp(40);
         assert_eq!(browser.offset, 0);
+    }
+
+    #[test]
+    fn a_rescan_clears_the_list_but_keeps_the_selection_by_path() {
+        let mut browser = browser();
+        browser.move_cursor(1);
+        let path = browser.selected().unwrap().path.clone();
+
+        browser.begin_rescan();
+        assert!(browser.is_empty());
+        assert!(browser.scanning);
+        assert_eq!(browser.generation(), 1);
+
+        // The new walk finds the same file again (among others).
+        browser.extend([entry("docs/THEMING.md", 20), entry("new-arrival.md", 5)]);
+        browser.refresh("");
+        assert_eq!(browser.selected().unwrap().path, path);
+    }
+
+    #[test]
+    fn a_rescan_that_loses_the_selected_file_falls_back_to_the_top() {
+        let mut browser = browser();
+        browser.move_cursor(2);
+        browser.begin_rescan();
+        browser.extend([entry("docs/ROADMAP.md", 10)]);
+        browser.refresh("");
+        browser.finish_scan();
+        assert_eq!(browser.cursor(), 0);
+        assert!(!browser.scanning);
+    }
+
+    #[test]
+    fn a_rescan_landing_on_the_same_count_still_refreshes() {
+        // The (query, count) idempotence guard must not eat a rescan whose
+        // new list happens to be the same size as the old one.
+        let mut browser = browser();
+        browser.begin_rescan();
+        browser.extend([entry("a.md", 1), entry("b.md", 2), entry("c.md", 3)]);
+        browser.refresh("");
+        assert_eq!(shown(&browser), vec!["a.md", "b.md", "c.md"]);
     }
 }

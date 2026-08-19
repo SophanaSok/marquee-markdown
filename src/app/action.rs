@@ -87,6 +87,10 @@ pub enum Action {
     BrowserOpen,
     /// Begin filtering the file list.
     FilterStart,
+    /// Walk the directory again, picking up files created since.
+    BrowserRescan,
+    /// Show or hide hidden and git-ignored files, rescanning to apply it.
+    BrowserToggleHidden,
     /// Re-read the document from disk.
     Reload,
     /// Step to the next link.
@@ -139,6 +143,8 @@ impl Action {
         Self::BrowserBottom,
         Self::BrowserOpen,
         Self::FilterStart,
+        Self::BrowserRescan,
+        Self::BrowserToggleHidden,
         Self::PromptAccept,
         Self::PromptBackspace,
         Self::PromptClear,
@@ -198,6 +204,8 @@ impl Action {
             Self::BrowserBottom => "browser-bottom",
             Self::BrowserOpen => "browser-open",
             Self::FilterStart => "filter-start",
+            Self::BrowserRescan => "browser-rescan",
+            Self::BrowserToggleHidden => "browser-toggle-hidden",
             Self::Reload => "reload",
             Self::LinkNext => "link-next",
             Self::LinkPrevious => "link-previous",
@@ -251,6 +259,8 @@ impl Action {
             Self::BrowserBottom => "last file",
             Self::BrowserOpen => "read this file",
             Self::FilterStart => "filter the list",
+            Self::BrowserRescan => "rescan the directory",
+            Self::BrowserToggleHidden => "show / hide hidden files",
             Self::Reload => "reload from disk",
             Self::LinkNext => "next link",
             Self::LinkPrevious => "previous link",
@@ -341,6 +351,8 @@ mod tests {
             | Action::BrowserBottom
             | Action::BrowserOpen
             | Action::FilterStart
+            | Action::BrowserRescan
+            | Action::BrowserToggleHidden
             | Action::Reload
             | Action::LinkNext
             | Action::LinkPrevious
@@ -358,7 +370,7 @@ mod tests {
         // Suspending is a unix idea, and the action does not exist elsewhere
         // rather than existing and doing nothing — the key reference is
         // generated from what is bound, so an inert entry would be a lie.
-        let expected = if cfg!(unix) { 45 } else { 44 };
+        let expected = if cfg!(unix) { 47 } else { 46 };
         assert_eq!(Action::ALL.len(), expected, "Action::ALL is out of date");
     }
 

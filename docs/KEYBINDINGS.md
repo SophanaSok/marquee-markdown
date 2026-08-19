@@ -53,6 +53,8 @@ here can be pasted into `[keys.<mode>]`.
 | `G` `end` | `browser-bottom` | last file |
 | `enter` | `browser-open` | read this file |
 | `/` | `filter-start` | filter the list |
+| `r` | `browser-rescan` | rescan the directory |
+| `.` | `browser-toggle-hidden` | show / hide hidden files |
 | `T` | `toggle-theme` | switch light / dark |
 | `?` | `toggle-help` | toggle this help |
 | `esc` | `escape` | close overlay |
@@ -91,6 +93,14 @@ here can be pasted into `[keys.<mode>]`.
 
 | Key | Action | |
 | --- | --- | --- |
+| `j` `down` | `line-down` | down a line |
+| `k` `up` | `line-up` | up a line |
+| `d` | `half-page-down` | down half a page |
+| `u` | `half-page-up` | up half a page |
+| `f` `space` `pgdn` | `page-down` | down a page |
+| `b` `pgup` | `page-up` | up a page |
+| `g` `home` | `top` | go to top |
+| `G` `end` | `bottom` | go to bottom |
 | `?` | `toggle-help` | toggle this help |
 | `esc` `q` | `escape` | close overlay |
 | `ctrl+c` | `quit` | quit |

@@ -126,6 +126,53 @@ fn keys_pressed_behind_the_help_overlay_do_not_reach_the_document() {
     assert!(after.overlay.is_none(), "the overlay did not close");
 }
 
+/// A terminal too short for the whole key reference, so it has to scroll.
+fn run_short(script: &str) -> App {
+    let mut app = App::new(
+        Source::from_text(&document(), None, "doc.md".into(), Base::Cwd),
+        Theme::new(ThemeVariant::Slate),
+        Options::default(),
+    );
+    let mut terminal = Terminal::new(TestBackend::new(60, 12)).expect("test terminal");
+    let mut events = ScriptedEvents::new(keys(script));
+    drive(&mut app, &mut terminal, &mut events).expect("the loop runs");
+    app
+}
+
+#[test]
+fn the_key_reference_scrolls_when_it_does_not_fit() {
+    let app = run_short("?jjj");
+    assert_eq!(app.help_scroll, 3);
+    // And the document did not move underneath it.
+    assert_eq!(app.view.top, 0);
+}
+
+#[test]
+fn the_key_reference_stops_at_its_last_row() {
+    let app = run_short("?G");
+    let rows = app.keymap.help_rows(app.pane_mode()).len();
+    let visible = usize::from(app.panes.body.height + app.panes.status.height) - 2;
+    assert_eq!(usize::from(app.help_scroll), rows - visible.min(rows));
+    // Scrolling past the end holds there rather than wrapping.
+    assert_eq!(run_short("?Gj").help_scroll, app.help_scroll);
+    assert_eq!(run_short("?Gg").help_scroll, 0);
+}
+
+#[test]
+fn reopening_the_key_reference_starts_at_the_top() {
+    let app = run_short("?jjj??");
+    assert_eq!(app.help_scroll, 0);
+    assert!(app.overlay.is_some());
+}
+
+#[test]
+fn a_reference_that_fits_does_not_scroll_at_all() {
+    // The default 80x24 harness is tall enough for some modes; use the
+    // browser, whose reference is short.
+    let (_dir, app) = browsing(FILES, "?jjjj");
+    assert_eq!(app.help_scroll, 0, "scrolled a reference that fits");
+}
+
 #[test]
 fn escape_does_not_quit_when_there_is_nothing_to_close() {
     let app = run(&document(), "<esc><esc><esc>");
@@ -367,9 +414,18 @@ fn browsing(files: &[&str], script: &str) -> (tempfile::TempDir, App) {
     );
     let mut terminal = Terminal::new(TestBackend::new(80, 24)).expect("test terminal");
     let mut events = ScriptedEvents::new(
-        [Event::Scan(Scan::Found(entries)), Event::Scan(Scan::Done)]
-            .into_iter()
-            .chain(keys(script)),
+        [
+            Event::Scan {
+                generation: 0,
+                scan: Scan::Found(entries),
+            },
+            Event::Scan {
+                generation: 0,
+                scan: Scan::Done,
+            },
+        ]
+        .into_iter()
+        .chain(keys(script)),
     );
     drive(&mut app, &mut terminal, &mut events).expect("the loop runs");
     (dir, app)
@@ -722,4 +778,120 @@ fn a_reload_that_fails_leaves_the_reader_reading() {
         app.message
     );
     assert!(!app.doc.doc().lines.is_empty(), "the document was lost");
+}
+
+#[test]
+fn a_rescan_clears_the_list_and_the_new_walk_repopulates_it() {
+    use marquee_markdown::browser::{Entry, Scan};
+
+    let (dir, mut app) = browsing(FILES, "jj");
+    assert!(
+        app.summary().contains("cursor=docs/THEMING.md"),
+        "{}",
+        app.summary()
+    );
+
+    // Press r, then feed what the *new* walk (generation 1) finds — the old
+    // selection among them, plus a file created since.
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).expect("test terminal");
+    let refound = vec![
+        Entry {
+            path: dir.path().join("docs/THEMING.md"),
+            display: "docs/THEMING.md".into(),
+            modified: None,
+        },
+        Entry {
+            path: dir.path().join("BRAND-NEW.md"),
+            display: "BRAND-NEW.md".into(),
+            modified: None,
+        },
+    ];
+    let mut events = ScriptedEvents::new(keys("r").into_iter().chain([
+        Event::Scan {
+            generation: 1,
+            scan: Scan::Found(refound),
+        },
+        Event::Scan {
+            generation: 1,
+            scan: Scan::Done,
+        },
+    ]));
+    drive(&mut app, &mut terminal, &mut events).expect("the loop runs");
+
+    assert!(app.summary().contains("files=2"), "{}", app.summary());
+    // The cursor followed the file it was on, not a row number.
+    assert!(
+        app.summary().contains("cursor=docs/THEMING.md"),
+        "{}",
+        app.summary()
+    );
+    let browser = app.browser.as_ref().unwrap();
+    assert!(!browser.scanning);
+}
+
+#[test]
+fn reports_from_a_superseded_walk_are_dropped() {
+    use marquee_markdown::browser::{Entry, Scan};
+
+    let (dir, mut app) = browsing(FILES, "");
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).expect("test terminal");
+    // Rescan (generation becomes 1), then a straggling batch from the old
+    // walk (generation 0) arrives. It must not repopulate the cleared list.
+    let stale = vec![Entry {
+        path: dir.path().join("README.md"),
+        display: "README.md".into(),
+        modified: None,
+    }];
+    let mut events = ScriptedEvents::new(keys("r").into_iter().chain([
+        Event::Scan {
+            generation: 0,
+            scan: Scan::Found(stale),
+        },
+        Event::Scan {
+            generation: 0,
+            scan: Scan::Done,
+        },
+    ]));
+    drive(&mut app, &mut terminal, &mut events).expect("the loop runs");
+
+    assert!(app.summary().contains("files=0"), "{}", app.summary());
+    // And the stale Done did not end the scan the reader is waiting on.
+    assert!(app.browser.as_ref().unwrap().scanning);
+}
+
+#[test]
+fn toggling_hidden_files_flips_the_flag_and_rescans() {
+    let (_dir, app) = browsing(FILES, ".");
+    assert!(app.options.all, "the flag did not flip");
+    assert!(app.browser.as_ref().unwrap().scanning, "no rescan began");
+    assert!(
+        app.message.is_some(),
+        "nothing told the reader what changed"
+    );
+    let (_dir2, app) = browsing(FILES, "..");
+    assert!(!app.options.all, "the flag did not flip back");
+}
+
+#[test]
+fn a_rescan_survives_headlessly_with_no_event_queue() {
+    // app.events is None in tests; the state changes must still happen and
+    // nothing may panic or spawn.
+    let (_dir, app) = browsing(FILES, "r");
+    assert!(app.summary().contains("files=0"), "{}", app.summary());
+    assert!(app.browser.as_ref().unwrap().scanning);
+    assert_eq!(app.browser.as_ref().unwrap().generation(), 1);
+}
+
+#[test]
+fn a_rescan_keeps_the_filter() {
+    use marquee_markdown::browser::Scan;
+    let (_dir, mut app) = browsing(FILES, "/docs\n");
+    assert!(app.summary().contains("filter=docs"), "{}", app.summary());
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).expect("test terminal");
+    let mut events = ScriptedEvents::new(keys("r").into_iter().chain([Event::Scan {
+        generation: 1,
+        scan: Scan::Done,
+    }]));
+    drive(&mut app, &mut terminal, &mut events).expect("the loop runs");
+    assert!(app.summary().contains("filter=docs"), "{}", app.summary());
 }

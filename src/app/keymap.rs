@@ -305,6 +305,10 @@ const DEFAULTS: &[(Mode, &str, Action)] = &[
     (Mode::Browser, "end", Action::BrowserBottom),
     (Mode::Browser, "enter", Action::BrowserOpen),
     (Mode::Browser, "/", Action::FilterStart),
+    // `r` rhymes with the document's reload; `.` is what file pickers use
+    // for hidden files.
+    (Mode::Browser, "r", Action::BrowserRescan),
+    (Mode::Browser, ".", Action::BrowserToggleHidden),
     (Mode::Browser, "T", Action::ToggleTheme),
     (Mode::Browser, "?", Action::ToggleHelp),
     (Mode::Browser, "esc", Action::Escape),
@@ -341,6 +345,24 @@ const DEFAULTS: &[(Mode, &str, Action)] = &[
     (Mode::Prompt, "ctrl+u", Action::PromptClear),
     (Mode::Prompt, "esc", Action::Escape),
     (Mode::Prompt, "ctrl+c", Action::Quit),
+    // The reference is taller than a short terminal, so it takes the same
+    // movement keys as the document; while it is open they move it, not the
+    // page behind it.
+    (Mode::Help, "j", Action::LineDown),
+    (Mode::Help, "down", Action::LineDown),
+    (Mode::Help, "k", Action::LineUp),
+    (Mode::Help, "up", Action::LineUp),
+    (Mode::Help, "d", Action::HalfPageDown),
+    (Mode::Help, "u", Action::HalfPageUp),
+    (Mode::Help, "f", Action::PageDown),
+    (Mode::Help, "space", Action::PageDown),
+    (Mode::Help, "pgdn", Action::PageDown),
+    (Mode::Help, "b", Action::PageUp),
+    (Mode::Help, "pgup", Action::PageUp),
+    (Mode::Help, "g", Action::Top),
+    (Mode::Help, "home", Action::Top),
+    (Mode::Help, "G", Action::Bottom),
+    (Mode::Help, "end", Action::Bottom),
     (Mode::Help, "?", Action::ToggleHelp),
     (Mode::Help, "esc", Action::Escape),
     (Mode::Help, "q", Action::Escape),

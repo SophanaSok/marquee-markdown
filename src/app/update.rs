@@ -26,7 +26,7 @@ pub fn handle(app: &mut App, event: Event) {
         }
         Event::Paste(text) => paste(app, text),
         Event::Mouse(mouse) => mouse_event(app, mouse),
-        Event::Scan(scan) => scan_reported(app, scan),
+        Event::Scan { generation, scan } => scan_reported(app, generation, scan),
         // The document changed on disk. Silent when it worked: a reader
         // editing in another window does not need to be told each time they
         // save, only when it failed.
@@ -39,6 +39,12 @@ pub fn handle(app: &mut App, event: Event) {
 
 /// Apply one action.
 pub fn apply(app: &mut App, action: Action) {
+    // While the key reference is open, the movement keys move *it* — a page
+    // of bindings that silently scrolled the document underneath would be
+    // worse than one that ignored the keys.
+    if app.overlay == Some(Overlay::Help) && scroll_help(app, action) {
+        return;
+    }
     let extent = app.extent();
     match action {
         Action::Quit => app.should_quit = true,
@@ -46,7 +52,12 @@ pub fn apply(app: &mut App, action: Action) {
         Action::ToggleHelp => {
             app.overlay = match app.overlay {
                 Some(Overlay::Help) => None,
-                None => Some(Overlay::Help),
+                None => {
+                    // A fresh open starts at the top; a reader who scrolled
+                    // last time was looking for something else then.
+                    app.help_scroll = 0;
+                    Some(Overlay::Help)
+                }
             }
         }
         Action::ToggleTheme => {
@@ -99,6 +110,19 @@ pub fn apply(app: &mut App, action: Action) {
         Action::BrowserBottom => with_browser(app, crate::browser::Browser::to_last),
         Action::BrowserOpen => open_selected_file(app),
         Action::Reload => reload(app, true),
+        Action::BrowserRescan => rescan(app),
+        Action::BrowserToggleHidden => {
+            app.options.all = !app.options.all;
+            app.message = Some(
+                if app.options.all {
+                    "also showing hidden and ignored files"
+                } else {
+                    "hiding hidden and ignored files"
+                }
+                .to_owned(),
+            );
+            rescan(app);
+        }
         Action::LinkNext => step_link(app, 1),
         Action::LinkPrevious => step_link(app, -1),
         Action::LinkOpen => open_link(app),
@@ -247,14 +271,66 @@ fn reload(app: &mut App, announce: bool) {
 }
 
 /// Take a batch of results from the directory walk.
-fn scan_reported(app: &mut App, scan: crate::browser::Scan) {
+///
+/// Reports from a superseded walk are dropped: a rescan clears the list, and
+/// a straggling batch from the old walk repopulating it would silently mix
+/// two scans — including files the new flags say to hide.
+fn scan_reported(app: &mut App, generation: u64, scan: crate::browser::Scan) {
     let Some(browser) = app.browser.as_mut() else {
         return;
     };
+    if generation != browser.generation() {
+        return;
+    }
     match scan {
         crate::browser::Scan::Found(entries) => browser.extend(entries),
-        crate::browser::Scan::Done => browser.scanning = false,
+        crate::browser::Scan::Done => browser.finish_scan(),
     }
+}
+
+/// Start a walk of the browsed directory, reporting into the event queue.
+///
+/// The one spawn path for the initial scan and every rescan. Headless runs
+/// have no queue (`app.events` is `None`), so tests exercise the state
+/// changes and feed `Event::Scan` themselves, thread-free.
+pub fn respawn_walk(app: &App) {
+    let (Some(browser), Some(sender)) = (app.browser.as_ref(), app.events.clone()) else {
+        return;
+    };
+    let generation = browser.generation();
+    crate::browser::walk::spawn(browser.root.clone(), app.options.all, move |scan| {
+        sender.send(Event::Scan { generation, scan }).is_ok()
+    });
+}
+
+/// Throw the list away and walk again.
+fn rescan(app: &mut App) {
+    if let Some(browser) = app.browser.as_mut() {
+        browser.begin_rescan();
+    }
+    respawn_walk(app);
+}
+
+/// Move the key reference, if `action` is a movement. The offset is clamped
+/// in `derived::sync`, which knows the terminal height; here it only has to
+/// move, and saturate at the top.
+fn scroll_help(app: &mut App, action: Action) -> bool {
+    // A page of the overlay, without knowing its exact height: the clamp in
+    // sync trims any overshoot the same frame.
+    let page = app.panes.body.height.max(2) / 2;
+    let scroll = &mut app.help_scroll;
+    match action {
+        Action::LineDown => *scroll = scroll.saturating_add(1),
+        Action::LineUp => *scroll = scroll.saturating_sub(1),
+        Action::HalfPageDown => *scroll = scroll.saturating_add(page / 2),
+        Action::HalfPageUp => *scroll = scroll.saturating_sub(page / 2),
+        Action::PageDown => *scroll = scroll.saturating_add(page),
+        Action::PageUp => *scroll = scroll.saturating_sub(page),
+        Action::Top => *scroll = 0,
+        Action::Bottom => *scroll = u16::MAX, // clamped to the last row by sync
+        _ => return false,
+    }
+    true
 }
 
 /// Step back out of whatever is innermost.

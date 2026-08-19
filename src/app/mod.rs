@@ -28,7 +28,6 @@ use std::path::PathBuf;
 use anyhow::Result;
 use ratatui::layout::Rect;
 
-use crate::browser;
 use crate::render::LayoutOptions;
 use crate::source::Source;
 use crate::theme::Theme;
@@ -42,7 +41,7 @@ pub use state::{App, Options, Overlay, Screen};
 pub fn run(source: Source, theme: Theme, options: Options, keymap: keymap::Keymap) -> Result<()> {
     let mut app = App::new(source, theme, options);
     app.keymap = keymap;
-    take_over(app, options, |_| {})
+    take_over(app, options)
 }
 
 /// Open the file browser over `root`.
@@ -53,31 +52,26 @@ pub fn run(source: Source, theme: Theme, options: Options, keymap: keymap::Keyma
 /// # Errors
 /// Returns an error when the terminal cannot be taken over or drawing fails.
 pub fn browse(root: PathBuf, theme: Theme, options: Options, keymap: keymap::Keymap) -> Result<()> {
-    let all = options.all;
-    let mut app = App::browsing(root.clone(), theme, options);
+    let mut app = App::browsing(root, theme, options);
     app.keymap = keymap;
-    take_over(app, options, move |sender| {
-        browser::walk::spawn(root, all, move |scan| {
-            sender.send(event::Event::Scan(scan)).is_ok()
-        });
-    })
+    take_over(app, options)
 }
 
 /// Take over the terminal and run `app` until it quits.
 ///
 /// `start` is handed the event sender so background work can be started with
 /// somewhere to report to.
-fn take_over(
-    mut app: App,
-    options: Options,
-    start: impl FnOnce(std::sync::mpsc::Sender<event::Event>),
-) -> Result<()> {
+fn take_over(mut app: App, options: Options) -> Result<()> {
     terminal::install_panic_hook();
     let mut screen = terminal::Screen::enter(options.mouse)?;
     let (mut events, sender) = event::Events::new();
-    app.events = Some(sender.clone());
+    app.events = Some(sender);
     app.start_watching();
-    start(sender);
+    // The initial scan takes the same path a rescan does, so there is one
+    // spawn site rather than two that can drift.
+    if app.screen == Screen::Browser {
+        update::respawn_walk(&app);
+    }
     drive(&mut app, screen.terminal(), &mut events)
 }
 

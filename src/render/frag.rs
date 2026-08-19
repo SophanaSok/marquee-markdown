@@ -157,7 +157,12 @@ fn walk(
                 // Terminal-safe placeholder: alt text as a link to the image.
                 let idx = links.intern(dest);
                 let style = theme.link().patch(style_only_modifiers(style));
-                out.push(Frag::new("\u{f03e} ", style, Some(idx), FragKind::Word));
+                out.push(Frag::new(
+                    format!("{} ", theme.image_icon()),
+                    style,
+                    Some(idx),
+                    FragKind::Word,
+                ));
                 walk(alt, style, Some(idx), theme, links, breaks, out);
             }
             Inline::FootnoteReference(label) => {

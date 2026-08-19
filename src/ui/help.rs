@@ -39,11 +39,26 @@ pub fn draw(frame: &mut Frame, app: &App) {
     }
 
     let theme = &app.theme;
+    // When the reference is taller than the panel, the title says where the
+    // reader is in it — the overlay lists the pane's bindings, not its own,
+    // so the title is the one place that can say "this scrolls".
+    let visible = usize::from(area.height.saturating_sub(2));
+    let offset = usize::from(app.help_scroll).min(rows.len().saturating_sub(visible));
+    let title = if visible < rows.len() {
+        format!(
+            " keys \u{b7} {}\u{2013}{} of {} \u{b7} j/k ",
+            offset + 1,
+            (offset + visible).min(rows.len()),
+            rows.len()
+        )
+    } else {
+        " keys ".to_owned()
+    };
     let block = Block::bordered()
         .border_type(BorderType::Rounded)
         .border_style(theme.overlay_border())
         .style(theme.overlay_body())
-        .title(Span::styled(" keys ", theme.overlay_title()));
+        .title(Span::styled(title, theme.overlay_title()));
     let inner = block.inner(area);
 
     let lines: Vec<Line<'static>> = rows
@@ -61,7 +76,12 @@ pub fn draw(frame: &mut Frame, app: &App) {
 
     frame.render_widget(Clear, area);
     frame.render_widget(block, area);
-    frame.render_widget(Paragraph::new(lines).style(theme.overlay_body()), inner);
+    frame.render_widget(
+        Paragraph::new(lines)
+            .style(theme.overlay_body())
+            .scroll((u16::try_from(offset).unwrap_or(u16::MAX), 0)),
+        inner,
+    );
 }
 
 /// The rows to show: the document bindings, since those are what the reader is

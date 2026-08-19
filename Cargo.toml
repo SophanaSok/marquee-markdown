@@ -1,6 +1,10 @@
 [package]
 name = "marquee-markdown"
 version = "0.1.0"
+# Two binaries ship (`mmd` is the short alias), so `cargo run` needs telling
+# which one is meant — without this, the documented
+# `cargo run -- keys > docs/KEYBINDINGS.md` truncates the file and then fails.
+default-run = "marquee-markdown"
 edition = "2024"
 rust-version = "1.88"
 description = "A TUI markdown reader that renders documents like Claude artifacts, with a table-of-contents panel"

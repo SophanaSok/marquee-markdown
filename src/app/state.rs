@@ -158,6 +158,9 @@ pub struct App {
     pub keymap: Keymap,
     /// What is layered over the document, if anything.
     pub overlay: Option<Overlay>,
+    /// First visible row of the key reference, when it is open and taller
+    /// than the terminal. Derived-clamped each frame; reset when it opens.
+    pub help_scroll: u16,
     /// Pane geometry, recomputed once per iteration before drawing.
     pub panes: Panes,
     /// Which screen is on show.
@@ -213,6 +216,7 @@ impl App {
             alternate,
             keymap: Keymap::defaults(),
             overlay: None,
+            help_scroll: 0,
             panes: Panes::default(),
             screen: Screen::Document,
             browser: None,

@@ -113,6 +113,37 @@ pub struct Palette {
     pub alerts: Alerts,
 }
 
+/// The glyphs drawn for callout heads and image placeholders.
+///
+/// Strings rather than chars, so a multi-codepoint glyph is representable.
+/// The defaults are standard Unicode symbols that render in any monospace
+/// font; a Nerd Font set is one `[icons]` block away in a theme file, and the
+/// README shows it.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default)]
+pub struct Icons {
+    pub note: String,
+    pub tip: String,
+    pub important: String,
+    pub warning: String,
+    pub caution: String,
+    /// Placeholder in front of an image's alt text.
+    pub image: String,
+}
+
+impl Default for Icons {
+    fn default() -> Self {
+        Self {
+            note: "\u{24d8}".to_owned(),      // ⓘ
+            tip: "\u{2726}".to_owned(),       // ✦
+            important: "\u{203c}".to_owned(), // ‼
+            warning: "\u{26a0}".to_owned(),   // ⚠
+            caution: "\u{2716}".to_owned(),   // ✖
+            image: "\u{25a3}".to_owned(),     // ▣
+        }
+    }
+}
+
 /// A theme as written in a file.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ThemeFile {
@@ -121,6 +152,9 @@ pub struct ThemeFile {
     /// Bundled syntect theme used for code blocks.
     pub syntax: String,
     pub palette: Palette,
+    /// Optional; a file that says nothing gets glyphs any font can draw.
+    #[serde(default)]
+    pub icons: Icons,
 }
 
 #[cfg(test)]
@@ -159,10 +193,69 @@ mod tests {
             appearance: Appearance::Dark,
             syntax: "base16-eighties.dark".into(),
             palette: super::super::SLATE,
+            icons: Icons {
+                note: "\u{f05a}".into(), // a Nerd Font glyph survives the trip
+                ..Icons::default()
+            },
         };
         let text = toml::to_string(&file).expect("serialize");
         let back: ThemeFile = toml::from_str(&text).expect("deserialize");
         assert_eq!(back, file);
+    }
+
+    #[test]
+    fn a_theme_file_that_says_nothing_about_icons_gets_the_defaults() {
+        // Every theme written before icons existed keeps parsing, and gets
+        // glyphs any monospace font can draw.
+        let text = r##"
+name = "old"
+appearance = "dark"
+syntax = "x"
+[palette]
+bg = "#262624"
+surface = "#1f1e1d"
+fg = "#f5f4ef"
+muted = "#87867f"
+accent = "#d97757"
+accent_soft = "#d4a27f"
+border = "#3d3d3a"
+[palette.alerts]
+note = "#5a7d9a"
+tip = "#5c8a5c"
+important = "#8a6a9a"
+warning = "#b8862b"
+caution = "#b4483c"
+"##;
+        let file: ThemeFile = toml::from_str(text).expect("parse");
+        assert_eq!(file.icons, Icons::default());
+    }
+
+    #[test]
+    fn a_partial_icons_table_fills_the_rest_with_defaults() {
+        let text = r##"
+name = "partial"
+appearance = "dark"
+syntax = "x"
+[palette]
+bg = "#262624"
+surface = "#1f1e1d"
+fg = "#f5f4ef"
+muted = "#87867f"
+accent = "#d97757"
+accent_soft = "#d4a27f"
+border = "#3d3d3a"
+[palette.alerts]
+note = "#5a7d9a"
+tip = "#5c8a5c"
+important = "#8a6a9a"
+warning = "#b8862b"
+caution = "#b4483c"
+[icons]
+note = "N"
+"##;
+        let file: ThemeFile = toml::from_str(text).expect("parse");
+        assert_eq!(file.icons.note, "N");
+        assert_eq!(file.icons.warning, Icons::default().warning);
     }
 
     #[test]
