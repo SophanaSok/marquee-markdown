@@ -134,7 +134,10 @@ fn open_selected_file(app: &mut App) {
         app.message = Some("nothing to open".to_owned());
         return;
     };
-    match crate::source::resolve(&crate::source::SourceSpec::File(path.clone())) {
+    // A browser only ever offers local files, so nothing here reaches the
+    // network; the fetcher is inert until something asks it for a URL.
+    let fetcher = crate::source::HttpFetcher::new();
+    match crate::source::resolve(&crate::source::SourceSpec::File(path.clone()), &fetcher) {
         Ok(source) => app.read(source),
         // A file that vanished mid-scan, or one that is not readable, is not
         // worth ending the session over.

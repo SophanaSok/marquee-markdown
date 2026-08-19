@@ -5,9 +5,8 @@ A terminal markdown reader with the functionality of
 Claude artifacts do — a centered reading column on a painted page, typographic
 headings, sealed code cards — with a table-of-contents panel for navigation.
 
-> **Status: pre-release.** The rendering engine, the full-screen reader, the
-> contents pane, search, and the file browser all work today. Remote sources
-> (URLs and `owner/repo` shorthands) are not built yet; see
+> **Status: pre-release.** Everything below works today. Still to come: live
+> reload, opening links, copying, and a configuration file — see
 > [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## What it looks different from
@@ -45,6 +44,10 @@ marquee-markdown docs/              # render a directory's README
 marquee-markdown -                  # read standard input
 cat notes.md | marquee-markdown     # same
 marquee-markdown src/main.rs        # source files render as highlighted code
+
+marquee-markdown github.com/charmbracelet/glow   # a repository's README
+marquee-markdown gitlab://gitlab-org/gitlab      # the same, spelled as a scheme
+marquee-markdown https://example.com/doc.md      # any URL
 
 marquee-markdown -t doc.md          # full-screen reader
 marquee-markdown -w 80 doc.md       # fixed width (0 disables wrapping)
@@ -147,6 +150,28 @@ Resizing the terminal or switching theme re-lays out the document and keeps
 your place: the position is carried by source offset, not by line number, so a
 narrower column does not teleport you. Search hits are re-found at the same
 time, so the highlight never points at a stale line.
+
+## Remote documents
+
+A repository shorthand resolves through the forge's API to the raw README, so
+what you get is the file rather than a screenful of the page around it:
+
+```sh
+marquee-markdown github.com/charmbracelet/glow
+marquee-markdown github://charmbracelet/glow      # same thing
+marquee-markdown gitlab://gitlab-org/gitlab
+marquee-markdown https://example.com/notes/guide.md
+```
+
+The extension in a URL is trusted ahead of the `Content-Type` header, because
+plenty of servers hand out markdown as `text/plain` or even `text/html`, and a
+`.md` in the path is a stronger statement of intent than a header nobody
+thought about. A URL with no extension served as HTML is shown as highlighted
+markup rather than run through the markdown renderer, which would only produce
+noise.
+
+Fetched documents are capped at 8 MiB and time out after 20 seconds, so a
+mistyped URL cannot leave you with an unresponsive terminal.
 
 ## Themes
 

@@ -9,7 +9,8 @@ Until 1.0 the `render` module's public API may change within minor versions.
 ## [Unreleased]
 
 Pre-release. The rendering engine, the full-screen reader, the contents pane,
-search, and the file browser are complete; remote sources are not built yet.
+search, the file browser, and remote sources are all complete. What remains is
+the polish phase: live reload, link following, copying, and configuration.
 
 ### Added
 
@@ -113,6 +114,25 @@ search, and the file browser are complete; remote sources are not built yet.
   browser but scroll sideways in a document. Anyone with the muscle memory
   would find a silent correction more surprising than the quirk.
 
+#### Remote sources
+
+- `marquee-markdown github.com/owner/repo`, `github://owner/repo`,
+  `gitlab://owner/repo`, and any `http(s)://` URL.
+- Repository shorthands resolve through the forge's API to the *raw* README,
+  rather than fetching the page around it. GitLab's `readme_url` points at the
+  page showing the file, so it is rewritten to the raw path; GitHub answers 403
+  without a `User-Agent`, so one is always sent.
+- The extension in a URL is trusted ahead of the `Content-Type` header, since
+  servers routinely hand out markdown as `text/plain` or `text/html`. A URL
+  with no extension served as HTML is shown as highlighted markup rather than
+  run through the markdown renderer.
+- Relative links resolve against where the body actually came from, after
+  redirects, rather than against what was asked for.
+- Bodies are capped at 8 MiB and requests time out after 20 seconds.
+- Fetching is behind a `Fetcher` trait with a `FakeFetcher` beside it, so every
+  remote path is unit-tested with no network. Live checks against the real
+  forges exist as `#[ignore]`d tests in `tests/network.rs`.
+
 #### Theming
 
 - Two Claude palettes, `paper` (light) and `slate` (dark), compiled in as
@@ -139,6 +159,10 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
 ### Known gaps
 
 - `-p` exits with a clear message rather than doing something unexpected.
+- A fetch failure at startup exits with a message. Once links can be followed
+  from inside the reader, failures will belong in the status bar instead.
+- A fetched document cannot be reloaded or opened in an editor, because it has
+  no path on this machine.
 - The browser scans once at startup: files created while it is open do not
   appear until it is restarted.
 - `-a` is read at startup and cannot be toggled from inside the browser.
@@ -147,8 +171,6 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
   `enter` is pressed.
 - The key reference does not scroll, so on a terminal shorter than about 22
   rows the last few bindings are cut off.
-- URL and forge (`github.com/owner/repo`) sources report that they are not
-  implemented yet.
 - `--config` is parsed but no configuration file is read yet.
 - `-n` (`--preserve-new-lines`) is parsed but not yet honored.
 - Resizing re-lays out on every event; a large document dragged by a window

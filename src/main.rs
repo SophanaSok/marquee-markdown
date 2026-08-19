@@ -5,7 +5,7 @@ use clap::{CommandFactory, Parser};
 
 use marquee_markdown::app;
 use marquee_markdown::cli::{self, Cli, Command, RunMode};
-use marquee_markdown::source::{self, RealFs};
+use marquee_markdown::source::{self, HttpFetcher, RealFs};
 use marquee_markdown::theme::registry;
 use marquee_markdown::{oneshot, util};
 
@@ -51,7 +51,7 @@ fn run() -> Result<()> {
 
     match mode {
         RunMode::OneShot => {
-            let source = source::resolve(&spec)?;
+            let source = source::resolve(&spec, &HttpFetcher::new())?;
             let settings = oneshot::Settings::detect(cli.width, cli.line_numbers);
             let stdout = std::io::stdout();
             let mut out = stdout.lock();
@@ -59,7 +59,7 @@ fn run() -> Result<()> {
             Ok(())
         }
         RunMode::Tui => {
-            let source = source::resolve(&spec)?;
+            let source = source::resolve(&spec, &HttpFetcher::new())?;
             app::run(source, theme, options(&cli))
         }
         RunMode::Browser => {

@@ -1,15 +1,18 @@
 //! Turning a command-line argument into markdown text to render.
 
 pub mod classify;
+pub mod fetch;
 pub mod frontmatter;
 pub mod kind;
 pub mod local;
+pub mod remote;
 
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 
 pub use classify::{Forge, FsProbe, RealFs, SourceSpec, classify};
+pub use fetch::{Fetcher, HttpFetcher};
 pub use kind::FileKind;
 
 /// Where relative links and images in a document resolve against.
@@ -49,6 +52,28 @@ impl Source {
     #[must_use]
     pub fn from_text(text: &str, path: Option<PathBuf>, display_name: String, base: Base) -> Self {
         let file_kind = path.as_deref().map_or(FileKind::Markdown, kind::of_path);
+        Self::build(text, file_kind, path, display_name, base)
+    }
+
+    /// Build a source that did not come from a file, so its kind has already
+    /// been worked out from where it did come from.
+    #[must_use]
+    pub fn from_remote(text: &str, file_kind: FileKind, display_name: String, base: Base) -> Self {
+        // No path: a fetched document cannot be reloaded from disk or opened
+        // in an editor, and claiming otherwise would be a lie the rest of the
+        // application acts on.
+        Self::build(text, file_kind, None, display_name, base)
+    }
+
+    /// The shared post-processing every source goes through, whatever it came
+    /// from: strip frontmatter from markdown, fence anything else.
+    fn build(
+        text: &str,
+        file_kind: FileKind,
+        path: Option<PathBuf>,
+        display_name: String,
+        base: Base,
+    ) -> Self {
         match file_kind {
             FileKind::Markdown => {
                 let (front, body) = frontmatter::split(text);
@@ -75,9 +100,13 @@ impl Source {
 
 /// Read the document a specification refers to.
 ///
-/// Network-backed specifications are not handled yet; they return a clear
-/// error rather than silently doing nothing.
-pub fn resolve(spec: &SourceSpec) -> Result<Source> {
+/// The fetcher is injected rather than constructed here so the remote paths
+/// can be exercised without a network. Local specifications never touch it,
+/// and [`HttpFetcher`] does not connect until asked.
+///
+/// # Errors
+/// Returns an error when the document cannot be read or fetched.
+pub fn resolve(spec: &SourceSpec, fetcher: &dyn Fetcher) -> Result<Source> {
     match spec {
         SourceSpec::Stdin => {
             let text = local::read_stdin()?;
@@ -110,15 +139,8 @@ pub fn resolve(spec: &SourceSpec) -> Result<Source> {
                 base_of(&path),
             ))
         }
-        SourceSpec::Url(url) => {
-            anyhow::bail!("fetching {url} is not supported yet")
-        }
-        SourceSpec::Forge { forge, owner, repo } => {
-            anyhow::bail!(
-                "fetching {}/{owner}/{repo} is not supported yet",
-                forge.host()
-            )
-        }
+        SourceSpec::Url(url) => remote::url(url, fetcher),
+        SourceSpec::Forge { forge, owner, repo } => remote::forge(*forge, owner, repo, fetcher),
         SourceSpec::BrowseCwd => {
             anyhow::bail!("no markdown source given")
         }
@@ -140,6 +162,12 @@ fn base_of(path: &Path) -> Base {
 
 #[cfg(test)]
 mod tests {
+    /// A fetcher that answers nothing: the local paths must never call it, and
+    /// a test that starts to would fail with a 404 rather than reach out.
+    fn no_network() -> fetch::FakeFetcher {
+        fetch::FakeFetcher::new()
+    }
+
     use super::*;
 
     #[test]
@@ -197,24 +225,42 @@ mod tests {
     fn resolving_a_directory_finds_its_readme() {
         let dir = tempfile::tempdir().expect("tempdir");
         std::fs::write(dir.path().join("README.md"), "# Hello\n").expect("write");
-        let src = resolve(&SourceSpec::Dir(dir.path().to_path_buf())).expect("resolve");
+        let src =
+            resolve(&SourceSpec::Dir(dir.path().to_path_buf()), &no_network()).expect("resolve");
         assert_eq!(src.text, "# Hello\n");
         assert_eq!(src.display_name, "README.md");
     }
 
     #[test]
     fn resolving_a_missing_file_reports_the_path() {
-        let err = resolve(&SourceSpec::File("no/such/file.md".into()))
+        let err = resolve(&SourceSpec::File("no/such/file.md".into()), &no_network())
             .unwrap_err()
             .to_string();
         assert!(err.contains("no/such/file.md"), "{err}");
     }
 
     #[test]
-    fn network_sources_fail_clearly_until_implemented() {
-        let err = resolve(&SourceSpec::Url("https://example.com".into()))
-            .unwrap_err()
-            .to_string();
-        assert!(err.contains("not supported yet"), "{err}");
+    fn a_url_goes_through_the_fetcher_and_nowhere_else() {
+        let fetcher = fetch::FakeFetcher::new().with(
+            "https://example.com/doc.md",
+            "text/markdown",
+            "# Remote\n",
+        );
+        let src = resolve(
+            &SourceSpec::Url("https://example.com/doc.md".into()),
+            &fetcher,
+        )
+        .expect("resolve");
+        assert!(src.text.contains("# Remote"));
+        assert_eq!(fetcher.requests().len(), 1);
+    }
+
+    #[test]
+    fn a_local_source_never_touches_the_fetcher() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        std::fs::write(dir.path().join("README.md"), "# Local\n").expect("write");
+        let fetcher = no_network();
+        resolve(&SourceSpec::Dir(dir.path().to_path_buf()), &fetcher).expect("resolve");
+        assert!(fetcher.requests().is_empty(), "a local read reached out");
     }
 }

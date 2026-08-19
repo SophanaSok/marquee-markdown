@@ -83,6 +83,8 @@ then either a ratatui buffer (reader) or ANSI bytes (`ansi.rs`).
 ```
 cli/         clap derive with the full glow flag surface; pure run-mode dispatch.
 source/      classify (pure, behind FsProbe) + resolve (I/O); frontmatter; kind.
+  fetch.rs     The Fetcher seam: HttpFetcher for real, FakeFetcher for tests.
+  remote.rs    URLs and the two forge APIs, written against Fetcher.
 theme/       Palettes, the TOML theme format, and the theme registry.
 util/        Terminal detection, width rules.
 oneshot.rs   Non-interactive render to stdout.
@@ -168,8 +170,12 @@ whose text contains escapes.
 - `#![forbid(unsafe_code)]` on the library.
 - Small, focused modules; one concern each.
 - Inline `#[cfg(test)] mod tests` in every module.
-- Prefer traits for real variation seams (`FsProbe`, and `Fetcher` when the
-  network lands) so tests need no filesystem and CI needs no network.
+- Prefer traits for real variation seams (`FsProbe`, `Fetcher`) so tests need
+  no filesystem and CI needs no network. **No test in `cargo test` may touch
+  the network.** Live checks against the real forges live in
+  `tests/network.rs` behind `#[ignore]`; run them with
+  `cargo test --test network -- --ignored` after changing anything in
+  `source/remote.rs`, because a fake cannot notice an API changing shape.
 - **UI render must be pure**: derive widgets from state, no mutation in draw.
   This matters most for the reader — see the roadmap's note on why a
   scroll-tracking table of contents tends to break it.

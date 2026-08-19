@@ -20,6 +20,13 @@ const LAYERS: &[Layer] = &[
                  rather than archaeological",
     },
     Layer {
+        dir: "src/source",
+        forbidden: &["crate::app", "crate::ui", "crate::browser"],
+        reason: "resolving an argument into a document is upstream of anything \
+                 on screen; keeping it there is what lets classification and \
+                 fetching be tested with no filesystem and no network",
+    },
+    Layer {
         dir: "src/browser",
         forbidden: &["crate::app", "crate::ui"],
         reason: "the browser models a directory of files, not a screen; keeping \

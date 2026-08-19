@@ -18,8 +18,8 @@ scroll-tracking table-of-contents sidebar and in-document search.
 | **P2** Document reader | Terminal guard + panic hook, event loop, view/anchor/render cache, pager keys via `Action`, status bar, keymap-rendered help, `-t` | 3 | **Done** (resize debounce open) |
 | **P3** TOC + search | Outline tree, active-section derivation, focus model, filter/collapse/auto-hide, `/` `n` `N` | 3 | **Done** (no TOC filter) |
 | **P4** Browser | Streaming gitignore-aware walk, paging, fuzzy filter with Unicode normalization, humanized modtimes, `-a` | 3 | **Done** (no rescan) |
-| **P5** Remote sources | `Fetcher` trait, http(s), `github://`/`gitlab://`, bare-host README API | 2 | Next |
-| **P6** Parity polish | Live reload, `e` at scroll line, `c` copy, `-p` pager, `-m` mouse, `ctrl+z`, link following, `y`, theme cycling | 2 | |
+| **P5** Remote sources | `Fetcher` trait, http(s), `github://`/`gitlab://`, bare-host README API | 2 | **Done** |
+| **P6** Parity polish | Live reload, `e` at scroll line, `c` copy, `-p` pager, `ctrl+z`, link following, `y` | 2 | Next |
 | **P7** Config + keymaps | TOML schema, `MARQUEE_` env layer, precedence, user keymap merge, `config` subcommand | 2 | |
 | **P8** Release | `packaging/`, deb/rpm, release workflow, `docs/ARCHITECTURE.md`, crates.io | 2 | |
 
@@ -33,28 +33,41 @@ Themes load from TOML. Output degrades correctly when redirected.
 status bar, a key reference rendered from the live keymap, light/dark switching,
 and a resize that keeps your place instead of teleporting you.
 
-406 tests; `cargo clippy --all-targets -- -D warnings` and `cargo doc --no-deps`
+425 tests, plus four `#[ignore]`d live checks against the real forges;
+`cargo clippy --all-targets -- -D warnings` and `cargo doc --no-deps`
 clean.
 
-## Immediate next steps (P5)
+## Immediate next steps (P6)
 
-Remote sources: the last piece of glow parity that reaches outside the machine.
+Parity polish. Each of these is small on its own; the order below puts the ones
+that touch the event loop first, while it is still fresh.
 
-1. `source/fetch.rs` — a `Fetcher` trait first, with the real `reqwest` client
-   behind it and a `FakeFetcher` with canned responses for tests. Everything
-   else in this phase should be testable with no network, the way `classify` is
-   testable with no filesystem. CI must never need the network.
-2. Plain `http(s)://` fetching, with the content type deciding whether the body
-   is markdown or a code file.
-3. The forge shorthands. Two details already established and worth not
-   rediscovering: GitHub's API returns 403 without a `User-Agent`, and GitLab's
-   `readme_url` needs `/-/blob/` rewritten to `/-/raw/`.
-4. `Base::Url` so relative links and images in a fetched document resolve
-   against where it came from.
-5. Failures must land in the status bar, not as an exit: a reader who mistypes
-   a repository name should stay in the reader.
+1. **Live reload.** A `notify` watcher on `Source::path`, debounced through
+   `notify-debouncer-full`, posting into the same queue the walk uses. Reload
+   goes through `DocCache`, which means re-parsing — the one thing
+   `ensure_rendered` does not currently do. Give it a `reload` that swaps the
+   block tree and then takes the same remapping path, or the scroll position
+   and the search hits will diverge from each other.
+2. **A resize debounce** (~80 ms), which is the outstanding line-index risk and
+   naturally belongs with the same timer machinery.
+3. **Link following.** `tab` cycles the links on screen, `enter` opens, `y`
+   yanks. `RenderedDoc` already records link column ranges per line, so this is
+   a selection model over data that exists, not new layout.
+4. **Copy** — `c` for the document, `y` for the link under the cursor. OSC 52
+   first so it works over SSH and inside tmux, `arboard` only as a fallback,
+   and a clipboard failure must never escape the event loop: `arboard` links
+   X11/Wayland and can hang on a headless session.
+5. **`e` to edit** at the current line, `$VISUAL` then `$EDITOR` then `vi`
+   (`notepad` on Windows), restoring the terminal around the child process.
+6. **`-p`**, which is the one remaining flag that does nothing.
+7. **`ctrl+z`**, unix only. It must be absent from the keymap on Windows rather
+   than present and inert, or the key reference stops being true.
 
-## What P2 to P4 built, and why it is shaped that way
+Fetch failures should move to the status bar as part of step 3: once a link can
+be followed from inside the reader, a mistyped or dead URL must not end the
+session.
+
+## What P2 to P5 built, and why it is shaped that way
 
 - `app/terminal.rs` — an RAII alternate-screen/raw-mode guard, plus a panic
   hook that restores the terminal *before* the message is printed. Without the
@@ -92,6 +105,10 @@ Remote sources: the last piece of glow parity that reaches outside the machine.
   lets search highlight without re-laying anything out.
 - `render/tui.rs` — the buffer serializer, paired with `render/ansi.rs`. One
   layout engine, two destinations.
+- `source/fetch.rs` — the `Fetcher` seam, with `FakeFetcher` beside it in the
+  library rather than behind `#[cfg(test)]`, so integration tests and
+  downstream users can exercise the remote paths too. `HttpFetcher` builds its
+  client on first use, so the local path pays nothing for it.
 - `browser/` — the walk, the filter and the selection, none of which know
   about a terminal. The walk reports in batches through a callback, so the
   browser does not depend on the application's event type either.
@@ -136,8 +153,10 @@ the design:
 - **Input goes through the `Action` enum** and the help overlay is a keymap
   renderer, both since P2. Undoing either turns P7 into a rewrite of the event
   loop.
-- **`classify` already takes `FsProbe`** so P5 does not have to retrofit a seam
-  under tests that already exist. Add `Fetcher` the same way.
+- **`classify` takes `FsProbe` and `resolve` takes `Fetcher`.** Neither is
+  optional: they are what let source resolution be tested with no filesystem
+  and no network, and CI must never need either. Live checks live in
+  `tests/network.rs` behind `#[ignore]`.
 - **The theme loader is the only path to a `Theme`**, including built-ins, so
   user themes never become a second-class code path. Keep it that way.
 
