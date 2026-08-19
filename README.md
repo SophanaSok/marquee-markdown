@@ -1,16 +1,53 @@
-# marquee-markdown
+<h1 align="center">marquee-markdown</h1>
 
-A terminal markdown reader with the functionality of
-[`glow`](https://github.com/charmbracelet/glow), rendering documents the way
-Claude artifacts do — a centered reading column on a painted page, typographic
-headings, sealed code cards — with a table-of-contents panel for navigation.
+<p align="center">
+  A terminal markdown reader with the functionality of
+  <a href="https://github.com/charmbracelet/glow"><code>glow</code></a>,
+  rendering documents the way Claude artifacts do —<br>
+  a centered reading column on a painted page, typographic headings, sealed
+  code cards — with a table-of-contents panel for navigation.
+</p>
 
-> **Status: pre-release.** Everything below works today. See
+<p align="center">
+  <a href="https://github.com/SophanaSok/marquee-markdown/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/SophanaSok/marquee-markdown/actions/workflows/ci.yml/badge.svg"></a>
+  <img alt="Rust 1.88+" src="https://img.shields.io/badge/rust-1.88%2B-b7410e">
+  <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
+  <img alt="Linux, macOS, Windows" src="https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-lightgrey">
+</p>
+
+<p align="center">
+  <img src="docs/screenshot.svg" alt="marquee-markdown reading a document, with the contents pane on the left" width="100%">
+</p>
+
+<p align="center"><sub>
+  Real output, not a mock-up — regenerate it with
+  <code>python3 scripts/screenshot.py</code>.
+</sub></p>
+
+> **Status: pre-release.** Everything documented here works today. There has
+> been no tagged release yet, so for now install from source. See
 > [docs/ROADMAP.md](docs/ROADMAP.md) for what is left before 1.0.
 
-## What it looks different from
+## What it does
 
-Rendering the same document through glow 3.0.0 shows what this fixes:
+- **Reads markdown properly.** Headings become typography rather than hash
+  marks, code blocks become sealed cards, tables get box drawing, and GFM
+  callouts get an icon and a hue.
+- **A contents pane that tracks where you are**, with folding — the thing
+  `glow` has no equivalent of, and the reason this exists.
+- **Search inside a document** with `/`, `n` and `N`, highlighted in place.
+- **A file browser** that streams as it walks, with a fuzzy filter.
+- **Reads what you point it at**: a file, a directory, standard input, a URL,
+  or `github.com/owner/repo`.
+- **Reloads when you save**, and `e` opens your editor at the line on screen.
+- **Everything is configurable and every key is rebindable**, from one TOML
+  file.
+- **Themes are data**, so a new palette needs no Rust and no recompile.
+
+## Why not glow
+
+`glow` is good, and this keeps its flags and its keys so muscle memory carries
+over. But rendering the same document through glow 3.0.0 shows what this fixes:
 
 | glow | marquee-markdown |
 | --- | --- |
@@ -25,19 +62,65 @@ Rendering the same document through glow 3.0.0 shows what this fixes:
 | No outline, no in-document search | a scroll-tracking contents pane, and `/` `n` `N` |
 | Keys hardcoded, cannot be rebound | every key resolves through a rebindable action table |
 
+The last two rows are the ones that made this worth building. The rest are
+rendering details that add up.
+
 ## Install
 
-Requires Rust 1.88 or newer — the code uses let-chains, which that release
-stabilized for the 2024 edition. No C toolchain is needed: syntax highlighting
-uses a pure-Rust regex backend, so the project builds anywhere Rust does.
+### From source
+
+Works today, and needs Rust 1.88 or newer — the code uses let-chains, which
+that release stabilized for the 2024 edition. Nothing else: syntax highlighting
+uses a pure-Rust regex backend on purpose, so there is no C toolchain and no
+system library to find.
 
 ```sh
+git clone https://github.com/SophanaSok/marquee-markdown
+cd marquee-markdown
 cargo install --path .
 ```
 
-## Usage
+That installs two commands: **`marquee-markdown`** and **`mmd`**, which are the
+same program under a shorter name.
+
+### Once released
+
+Not available yet — there has been no tagged release. When there is:
 
 ```sh
+cargo install marquee-markdown              # from crates.io
+brew install marquee-markdown               # macOS and Linux
+scoop install marquee-markdown              # Windows
+```
+
+Prebuilt binaries, `.deb` and `.rpm` packages, man pages and shell completions
+will be attached to each [GitHub
+release](https://github.com/SophanaSok/marquee-markdown/releases).
+
+### Fonts
+
+Any monospace font works. A [Nerd Font](https://www.nerdfonts.com/) additionally
+gives you the icons on callouts and images; without one those show as a missing
+glyph, and everything else is unaffected.
+
+## Contents
+
+[Usage](#usage) · [Reading](#reading) · [Browsing](#browsing) ·
+[Editing, reloading, copying](#editing-reloading-and-copying) ·
+[Remote documents](#remote-documents) · [Configuration](#configuration) ·
+[Themes](#themes) · [As a library](#using-the-renderer-as-a-library) ·
+[Contributing](#contributing)
+
+## Usage
+
+Everything below works with `mmd` too — it is the same program under a shorter
+name, which is the one you will actually type.
+
+```sh
+mmd                                 # browse the markdown here
+mmd README.md                       # render a file
+mmd -t README.md                    # ...in the full-screen reader
+
 marquee-markdown                    # browse the markdown here
 marquee-markdown README.md          # render a file
 marquee-markdown docs/              # render a directory's README
@@ -63,8 +146,12 @@ marquee-markdown completion fish    # shell completions
 ```
 
 Output degrades on its own: piping or redirecting drops color, gutters, and
-hyperlinks, so `marquee-markdown doc.md > out.txt` contains just the text.
+hyperlinks, so `marquee-markdown doc.md > out.txt` contains just the text, and
+closing the pipe early (`… | head`) stops quietly rather than erroring.
 `NO_COLOR` is honored.
+
+Every flag `glow` takes is accepted and means the same thing:
+`-a -l -m -n -p -s -t -w`.
 
 ## Reading
 

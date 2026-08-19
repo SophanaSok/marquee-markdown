@@ -257,6 +257,9 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
 
 ### Known gaps
 
+- Callout and image icons are Nerd Font glyphs; a terminal without one shows a
+  missing-glyph box. They should be part of the theme format.
+
 - A fetch failure at startup exits with a message rather than opening the
   reader with an explanation in the status bar.
 - Opening a link hands off to the system handler; a link that is relative to a

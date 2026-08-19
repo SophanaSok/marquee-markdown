@@ -214,6 +214,21 @@ the design:
    community theme can pair itself with a suitable syntax theme; picking good
    defaults for new palettes is real color-tuning work, not a config line.
 
+## Known rough edges
+
+Small, real, and worth an issue from anyone who hits them:
+
+- **Callout and image icons need a Nerd Font.** They are Nerd Font glyphs
+  chosen in `AlertKind::icon`, so a terminal without one shows a missing-glyph
+  box. The right fix is to make them part of the theme format, which is where
+  everything else visual already lives.
+- **The key reference does not scroll**, so below about 22 rows it clips its
+  last few entries. `marquee-markdown keys` shows all of them.
+- **The browser scans once**, so a file created while it is open does not
+  appear until it is reopened.
+- **Search matches the rendered text**, so a phrase broken across a soft wrap
+  does not match.
+
 ## Deferred deliberately
 
 - **Images.** The target terminal (foot) has sixel, but Alacritty has nothing
