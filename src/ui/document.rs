@@ -20,7 +20,12 @@ pub fn draw(frame: &mut Frame, app: &App) {
     // The link the reader stepped to wins over a search hit underneath it:
     // they moved to it deliberately, and losing sight of it would make the
     // step look like it did nothing.
-    let overlay = Layered(&[&links, &search]);
+    //
+    // Bound to a local rather than written inline: the temporary array would
+    // otherwise be dropped at the end of the statement, which newer compilers
+    // forgive and the minimum supported one does not.
+    let layers: [&dyn crate::render::overlay::Overlay; 2] = [&links, &search];
+    let overlay = Layered(&layers);
     tui::render(
         frame.buffer_mut(),
         app.panes.body,

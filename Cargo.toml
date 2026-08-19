@@ -44,7 +44,19 @@ reqwest = { version = "0.13.4", default-features = false, features = ["blocking"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0"
 smallvec = "1.15.2"
-syntect = { version = "5.3.0", default-features = false, features = ["default-fancy"] }
+# Exactly what is used and nothing else. `default-fancy` would additionally
+# pull in plist and yaml loading, HTML output, dump *creation*, and syntect's
+# own bundled syntaxes — the syntaxes come from two-face instead. Dropping them
+# takes `plist` and `quick-xml` out of the tree entirely, along with their
+# advisories, and takes several megabytes off the binary.
+#
+# `regex-fancy` rather than the default oniguruma: pure Rust, so no C toolchain
+# and no MSVC on Windows.
+syntect = { version = "5.3.0", default-features = false, features = [
+    "parsing",
+    "default-themes",
+    "regex-fancy",
+] }
 textwrap = "0.16.2"
 toml = "1.1.4"
 two-face = { version = "0.5.2", default-features = false, features = ["syntect-fancy"] }

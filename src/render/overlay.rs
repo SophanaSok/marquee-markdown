@@ -272,7 +272,8 @@ mod tests {
         }
         let first = At(1);
         let second = At(7);
-        let layered = Layered(&[&first, &second]);
+        let layers: [&dyn Overlay; 2] = [&first, &second];
+        let layered = Layered(&layers);
         let mut out = Vec::new();
         layered.patches(0, &mut out);
         assert_eq!(out.len(), 2);

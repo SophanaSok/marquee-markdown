@@ -243,6 +243,13 @@ configuration file with rebindable keys.
   fallible path, so closing a pipe means what it is supposed to mean.
 - `docs/` was excluded from the published crate while a test read a file from
   it, so `cargo test` on the published package would not have compiled.
+- Two advisories against `quick-xml`, reached through `plist` through
+  `syntect`. Neither is reachable from this program — syntax and theme data
+  come from binary dumps, not XML — but rather than argue that, `syntect` is
+  now built with exactly the features used, which takes `plist` and
+  `quick-xml` out of the dependency tree altogether.
+- The file browser's paths are spelled with the platform's own separator; the
+  tests asserting them assumed `/` and failed on Windows.
 
 Behaviors that differ from `glow`, verified against glow 3.0.0:
 

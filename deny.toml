@@ -6,6 +6,13 @@
 
 [advisories]
 version = 2
+ignore = [
+    # bincode 1.x is unmaintained, and reaches us only through syntect, which
+    # uses it to load its bundled theme dumps. There is no newer syntect that
+    # drops it, and no version of this crate's own code that avoids it while
+    # still highlighting anything. Revisit when syntect moves.
+    { id = "RUSTSEC-2025-0141", reason = "bincode 1.x via syntect; no upgrade path" },
+]
 
 [bans]
 multiple-versions = "allow"
@@ -27,6 +34,9 @@ allow = [
     "Unlicense",
     "BSL-1.0",
     "OpenSSL",
+    # webpki-root-certs: a bundle of certificates rather than code, published
+    # under a data licence.
+    "CDLA-Permissive-2.0",
 ]
 
 [sources]

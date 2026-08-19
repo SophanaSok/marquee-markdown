@@ -172,19 +172,32 @@ mod tests {
         names
     }
 
+    /// A relative path spelled the way this platform spells one.
+    ///
+    /// Entries carry native separators, because that is what a reader on the
+    /// platform expects to see and to type into the filter. Writing `/` into
+    /// the expectations only looks right on the platform the test was written
+    /// on.
+    fn native(path: &str) -> String {
+        path.replace('/', std::path::MAIN_SEPARATOR_STR)
+    }
+
     #[test]
     fn only_markdown_files_are_listed() {
         let dir = tree();
         let (entries, _) = collect(dir.path(), false);
-        assert_eq!(names(&entries), vec!["README.md", "docs/GUIDE.markdown"]);
+        assert_eq!(
+            names(&entries),
+            vec!["README.md".to_owned(), native("docs/GUIDE.markdown")]
+        );
     }
 
     #[test]
     fn hidden_and_ignored_files_are_left_out_until_asked_for() {
         let dir = tree();
         let (entries, _) = collect(dir.path(), true);
-        assert!(names(&entries).contains(&".hidden/secret.md".to_owned()));
-        assert!(names(&entries).contains(&"target/built.md".to_owned()));
+        assert!(names(&entries).contains(&native(".hidden/secret.md")));
+        assert!(names(&entries).contains(&native("target/built.md")));
     }
 
     #[test]
@@ -195,7 +208,7 @@ mod tests {
             .iter()
             .find(|entry| entry.display.contains("GUIDE"))
             .expect("the guide");
-        assert_eq!(guide.display, "docs/GUIDE.markdown");
+        assert_eq!(guide.display, native("docs/GUIDE.markdown"));
         assert!(guide.path.is_absolute() || guide.path.starts_with(dir.path()));
         assert!(guide.path.exists(), "the path cannot be opened");
     }

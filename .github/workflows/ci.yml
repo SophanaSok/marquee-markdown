@@ -71,8 +71,11 @@ jobs:
           # The short alias is the same program, and names itself correctly:
           # completions registered for the wrong name never fire.
           target/release/mmd --version
-          target/release/mmd completion bash | head -1 | grep -q _mmd
-          target/release/mmd man | head -20 | grep -q 'TH mmd'
+          # Captured rather than piped into `grep -q`: under `pipefail`, grep
+          # exits on the first match and the writer upstream dies of SIGPIPE,
+          # failing the pipeline for a test that actually passed.
+          test "$(target/release/mmd completion bash | head -1)" = "_mmd() {"
+          target/release/mmd man > mmd.1 && grep -q 'TH mmd' mmd.1
           test "$("$BIN" -w 60 README.md)" = "$(target/release/mmd -w 60 README.md)"
 
           # Rendering a file, and the width flag being honored exactly.
@@ -97,16 +100,16 @@ jobs:
           "$BIN" -n -w 40 n.md | grep -q '^alpha  *$'
           ! "$BIN" -w 40 n.md | grep -q '^alpha  *$'
 
-          # The generated surfaces still generate.
-          "$BIN" man | head -3
-          "$BIN" completion bash | head -3
-          "$BIN" themes | grep -q slate
-          "$BIN" keys | grep -q line-down
-          "$BIN" config | grep -q '\[general\]'
+          # The generated surfaces still generate. Written to files first for
+          # the same SIGPIPE reason.
+          "$BIN" man > man.1 && test -s man.1
+          "$BIN" completion bash > completion.bash && test -s completion.bash
+          "$BIN" themes > themes.txt && grep -q slate themes.txt
+          "$BIN" keys > keys.md && grep -q line-down keys.md
+          "$BIN" config > config.toml && grep -q '\[general\]' config.toml
 
           # The effective configuration round-trips as a configuration file.
-          "$BIN" config > round-trip.toml
-          "$BIN" --config round-trip.toml config > /dev/null
+          "$BIN" --config config.toml config > /dev/null
 
   msrv:
     name: MSRV
