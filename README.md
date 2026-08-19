@@ -145,6 +145,11 @@ marquee-markdown man                # man page to stdout
 marquee-markdown completion fish    # shell completions
 ```
 
+Standard input is read when nothing else is named, or when `-` asks for it. A
+named source always wins — unlike glow, where a redirected stdin silently
+replaces the file you asked for, which is fine when you typed the pipe and
+wrong in a cron job.
+
 Output degrades on its own: piping or redirecting drops color, gutters, and
 hyperlinks, so `marquee-markdown doc.md > out.txt` contains just the text, and
 closing the pipe early (`… | head`) stops quietly rather than erroring.

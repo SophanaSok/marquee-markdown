@@ -71,15 +71,24 @@ impl FsProbe for RealFs {
 
 /// Classify a positional argument.
 ///
-/// Piped standard input wins over any argument, matching glow: `cat x.md |
-/// prog other.md` reads the pipe.
+/// A named source always wins. Standard input is read when it is the only
+/// thing on offer — no argument and something piped in — or when `-` asks for
+/// it explicitly.
+///
+/// This is a deliberate divergence from glow, which lets piped input win over
+/// an argument. That rule is fine when a person types the pipe, and quietly
+/// wrong everywhere else: a cron job, a CI step, an editor shelling out, or
+/// anything run with its input redirected gets a document it did not ask for,
+/// with nothing on screen to say so. `marquee-markdown notes.md < other.md`
+/// rendering `other.md` is not a convenience worth that.
 #[must_use]
 pub fn classify(arg: Option<&str>, stdin_is_pipe: bool, fs: &dyn FsProbe) -> SourceSpec {
-    if stdin_is_pipe {
-        return SourceSpec::Stdin;
-    }
     let Some(arg) = arg else {
-        return SourceSpec::BrowseCwd;
+        return if stdin_is_pipe {
+            SourceSpec::Stdin
+        } else {
+            SourceSpec::BrowseCwd
+        };
     };
     if arg == "-" {
         return SourceSpec::Stdin;
@@ -146,12 +155,37 @@ mod tests {
     }
 
     #[test]
-    fn piped_stdin_beats_any_argument() {
+    fn a_named_source_beats_whatever_is_on_standard_input() {
+        // The bug this prevents is silent: with input redirected — a cron job,
+        // a CI step, an editor shelling out — the named file was ignored and
+        // something else rendered in its place, with nothing to say so.
         assert_eq!(
             classify(Some("README.md"), true, &NO_DIRS),
-            SourceSpec::Stdin
+            SourceSpec::File("README.md".into())
         );
+        assert_eq!(
+            classify(Some("docs"), true, &FakeFs(&["docs"])),
+            SourceSpec::Dir("docs".into())
+        );
+        assert_eq!(
+            classify(Some("github.com/o/r"), true, &NO_DIRS),
+            SourceSpec::Forge {
+                forge: Forge::GitHub,
+                owner: "o".into(),
+                repo: "r".into()
+            }
+        );
+    }
+
+    #[test]
+    fn standard_input_is_read_when_it_is_the_only_thing_on_offer() {
         assert_eq!(classify(None, true, &NO_DIRS), SourceSpec::Stdin);
+    }
+
+    #[test]
+    fn a_dash_asks_for_standard_input_whatever_else_is_true() {
+        assert_eq!(classify(Some("-"), true, &NO_DIRS), SourceSpec::Stdin);
+        assert_eq!(classify(Some("-"), false, &NO_DIRS), SourceSpec::Stdin);
     }
 
     #[test]

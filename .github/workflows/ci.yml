@@ -89,16 +89,29 @@ jobs:
           grep -q 'TH mmd' mmd.1
           test "$("$BIN" -w 60 README.md)" = "$(target/release/mmd -w 60 README.md)"
 
-          # Rendering a file, and the width flag being honored exactly.
-          # Characters, not bytes: the invariant is a column count.
+          # Rendering a file. The content check is the point: this ran with
+          # standard input redirected, which used to make the named file be
+          # ignored in favour of whatever was on stdin — rendering nothing
+          # here, and passing a comparison of two empty strings.
           "$BIN" -w 60 README.md > wide.txt
           head -5 wide.txt
+          grep -q marquee wide.txt
+          test "$(wc -l < wide.txt)" -gt 20
+          # Characters, not bytes: the invariant is a column count.
           test "$(head -1 wide.txt | wc -m)" -eq 61
 
-          # Piped standard input. This path once read an empty document
+          # A named source wins over whatever standard input happens to be.
+          "$BIN" -w 60 README.md < Cargo.toml > named.txt
+          grep -q marquee named.txt
+          ! grep -q 'edition' named.txt
+
+          # Piped standard input, which is still read when nothing is named
+          # or when `-` asks for it. This path once read an empty document
           # because a non-interactive shell hands children /dev/null.
-          cat README.md | "$BIN" -w 60 | grep -q marquee
-          "$BIN" -w 60 - < README.md | grep -q marquee
+          cat README.md | "$BIN" -w 60 > piped.txt
+          grep -q marquee piped.txt
+          "$BIN" -w 60 - < README.md > dash.txt
+          grep -q marquee dash.txt
 
           # A reader that closes the pipe is how a filter is told to stop,
           # not a crash.

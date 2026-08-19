@@ -248,6 +248,13 @@ configuration file with rebindable keys.
   come from binary dumps, not XML — but rather than argue that, `syntect` is
   now built with exactly the features used, which takes `plist` and
   `quick-xml` out of the dependency tree altogether.
+- **A named source is no longer ignored in favour of standard input.** With
+  input redirected — a cron job, a CI step, an editor shelling out —
+  `marquee-markdown notes.md` rendered whatever was on stdin instead of
+  `notes.md`, or nothing at all when stdin was empty, with nothing on screen to
+  say so. Standard input is now read when it is the only thing on offer, or
+  when `-` asks for it. This is a deliberate divergence from glow, whose rule
+  is fine when a person types the pipe and quietly wrong everywhere else.
 - The file browser's paths are spelled with the platform's own separator; the
   tests asserting them assumed `/` and failed on Windows.
 
