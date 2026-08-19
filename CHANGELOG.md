@@ -14,8 +14,12 @@ Until 1.0 both halves may change.
 
 ## [Unreleased]
 
-Feature-complete against `glow`, plus the contents pane, search, and a
-configuration file with rebindable keys.
+Nothing yet.
+
+## [0.1.0] - 2026-08-19
+
+The first release. Feature-complete against `glow`, plus the contents pane,
+search, and a configuration file with rebindable keys.
 
 ### Added
 
@@ -294,3 +298,6 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
   rows the last few bindings are cut off.
 - Resizing re-lays out on every event; a large document dragged by a window
   edge will work harder than it needs to until a debounce lands.
+
+[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/SophanaSok/marquee-markdown/releases/tag/v0.1.0
