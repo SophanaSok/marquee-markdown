@@ -64,6 +64,10 @@ one failed once and was expensive to find:
   thing because the wrong mode was in force.
 - If it draws, `tests/frame.rs` will check every cell is painted at seven
   terminal sizes down to 1×1.
+- `tests/properties.rs` generates adversarial documents and checks the
+  invariants hold at arbitrary widths. Turn it up when touching layout:
+  `PROPTEST_CASES=4000 cargo test --test properties`. It found the
+  deep-nesting overflow that every fixture missed.
 - **Run the binary.** Several bugs in this project were invisible to hundreds
   of passing tests and obvious within seconds of using it: piped-stdin
   detection, broken pipes, a file watch that never fired for a relative path, a

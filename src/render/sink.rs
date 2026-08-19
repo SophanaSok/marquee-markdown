@@ -93,7 +93,7 @@ impl LineSink {
         kind: LineKind,
         source: Option<Range<usize>>,
     ) {
-        let lead_width: usize = lead.iter().map(|s| measure::width(&s.content)).sum();
+        let (lead, lead_width) = self.fit_lead(lead);
         let mut spans = lead;
         let mut links: SmallVec<[(Range<u16>, u32); 1]> = SmallVec::new();
         let mut col = lead_width;
@@ -146,12 +146,46 @@ impl LineSink {
         kind: LineKind,
         source: Option<Range<usize>>,
     ) {
-        let lead_width: usize = lead.iter().map(|s| measure::width(&s.content)).sum();
+        let (lead, lead_width) = self.fit_lead(lead);
         let mut all = lead;
         all.extend(spans);
         let width: usize = all.iter().map(|s| measure::width(&s.content)).sum();
         let lead_cols = u16::try_from(lead_width).unwrap_or(u16::MAX);
         self.push_line_with_links(all, width, lead_cols, kind, source, SmallVec::new());
+    }
+
+    /// Trim a lead so it can never fill the line on its own.
+    ///
+    /// Quotes and lists nested deeply enough accumulate a prefix wider than a
+    /// narrow terminal's whole column — three levels of `> - >` is already
+    /// twelve cells. The prefix is decoration and the text is the point, so
+    /// the decoration is what gives way. Without this the line comes out
+    /// wider than the column, which is the one thing nothing downstream can
+    /// survive: the painted page tears and a code container stops sealing.
+    ///
+    /// Leaving one cell matches `Context::available_width`, which floors the
+    /// room for content at one, so the two always add up to exactly the
+    /// width.
+    fn fit_lead(&self, lead: Vec<Span<'static>>) -> (Vec<Span<'static>>, usize) {
+        let budget = self.width.saturating_sub(1);
+        let total: usize = lead.iter().map(|span| measure::width(&span.content)).sum();
+        if total <= budget {
+            return (lead, total);
+        }
+        let mut out = Vec::with_capacity(lead.len());
+        let mut used = 0;
+        for span in lead {
+            if used >= budget {
+                break;
+            }
+            let text = measure::truncate(&span.content, budget - used, "");
+            if text.is_empty() {
+                continue;
+            }
+            used += measure::width(&text);
+            out.push(Span::styled(text, span.style));
+        }
+        (out, used)
     }
 
     fn push_line_with_links(
@@ -362,6 +396,40 @@ mod tests {
                 LineKind::Blank => assert_eq!(meta.lead_cols, 0),
                 _ => {}
             }
+        }
+    }
+
+    #[test]
+    fn a_lead_wider_than_the_column_gives_way_to_the_text() {
+        // Three levels of `> - >` is twelve cells of decoration before a
+        // character of content. Found by the property tests: this used to
+        // emit a thirteen-cell line into a twelve-cell column, which tears
+        // the painted page and unseals code containers.
+        let theme = crate::theme::Theme::new(crate::theme::ThemeVariant::Slate);
+        for width in 10u16..=16 {
+            let doc = crate::render::render(
+                "> - > - > - deeply nested text here\n",
+                &theme,
+                crate::render::LayoutOptions {
+                    width,
+                    code_line_numbers: false,
+                    preserve_new_lines: false,
+                },
+            );
+            for line in &doc.lines {
+                let rendered: String = line
+                    .spans
+                    .iter()
+                    .map(|span| span.content.as_ref())
+                    .collect();
+                assert_eq!(
+                    measure::width(&rendered),
+                    usize::from(width),
+                    "at width {width}: {rendered:?}"
+                );
+            }
+            // The text still gets a cell: decoration is what gave way.
+            assert!(doc.lines.len() > 1, "nothing was emitted at width {width}");
         }
     }
 }

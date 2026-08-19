@@ -16,6 +16,14 @@ Until 1.0 both halves may change.
 
 ### Added
 
+- **Property tests** over the invariants the design rests on: the width
+  invariant against generated markdown at arbitrary widths, with a corpus
+  chosen to disagree with itself about how wide it is (CJK, ZWJ emoji
+  families, regional indicators, variation selectors, combining marks, Nerd
+  Font private-use glyphs, RTL); search hits always naming a real place on
+  the page; the highlight index agreeing with the matches; drawing staying
+  inside its buffer; and scrolling never leaving the document. `proptest` had
+  been a declared dependency doing nothing since the first commit.
 - A link to a heading in the same document (`[x](#section)`) now scrolls to it
   instead of being handed to the system opener, which did nothing useful with
   a bare fragment. The outline already knows where every slug is. Copying such
@@ -23,6 +31,13 @@ Until 1.0 both halves may change.
 
 ### Fixed
 
+- **A lead wider than the column no longer overflows the line.** Quotes and
+  lists nested deeply enough accumulate a prefix wider than a narrow
+  terminal's whole column — three levels of `> - >` is already twelve cells —
+  and the line came out wider than the column it had to fit. That is the one
+  thing nothing downstream survives: the painted page tears and a code
+  container stops sealing. The decoration now gives way to the text, which is
+  the point of the line. Found by the new property tests, not by a fixture.
 - Links in a fetched document are resolved properly rather than concatenated:
   a root-relative `/docs/x` resolved against the directory instead of the host
   and produced a 404, protocol-relative `//host/x` was mangled, and `..` was
@@ -66,6 +81,8 @@ theme's business.
   from_line)`, idempotent per `(query, revision)`; `Match` is multi-segment.
 - `default-run = "marquee-markdown"`, so bare `cargo run` works again beside
   the `mmd` binary.
+- Dropped the unused `insta` dev-dependency; the frame tests assert
+  structural properties, which is sturdier than a snapshot and does not churn.
 
 ## [0.1.0] - 2026-08-19
 
