@@ -246,6 +246,7 @@ fn a_search_hit_is_highlighted_where_it_sits() {
         .search
         .current_match()
         .expect("the fixture contains `unicode`")
+        .segments[0]
         .clone();
     app.view.top = hit.line;
     let buf = frame(&mut app, 80, 24);

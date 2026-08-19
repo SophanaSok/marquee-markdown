@@ -122,7 +122,21 @@ fn right_side(app: &App) -> (String, Style) {
     if app.screen == Screen::Browser {
         return browser_right_side(app);
     }
-    if app.prompt.is_some() {
+    if let Some(prompt) = &app.prompt {
+        // Matches narrow live while a search is typed, so the count is the
+        // feedback; before anything is typed there is nothing to count yet.
+        if prompt.kind == crate::app::state::PromptKind::Search && !prompt.input.is_empty() {
+            let count = app.search.matches().len();
+            let text = if count == 0 {
+                " no matches ".to_owned()
+            } else {
+                format!(
+                    " {}/{count} ",
+                    app.search.current().map_or(0, |index| index + 1)
+                )
+            };
+            return (text, app.theme.status_message());
+        }
         return (" enter to search ".to_owned(), app.theme.status_bar());
     }
     if app.search.is_active() {
@@ -262,6 +276,28 @@ mod tests {
             !text.contains("doc.md"),
             "the prompt shares the bar: {text:?}"
         );
+    }
+
+    #[test]
+    fn typing_a_search_shows_the_narrowing_count() {
+        let mut app = app("needle one\n\nneedle two\n", "doc.md");
+        app.prompt = Some(crate::app::state::Prompt {
+            kind: crate::app::state::PromptKind::Search,
+            input: "needle".to_owned(),
+        });
+        // The reconcile step is what feeds the live input to the matcher.
+        crate::app::derived::sync(&mut app);
+        let text = text_of(&compose(&app, 60));
+        assert!(text.contains("1/2"), "{text:?}");
+
+        app.prompt.as_mut().unwrap().input = "needle tw".to_owned();
+        crate::app::derived::sync(&mut app);
+        let text = text_of(&compose(&app, 60));
+        assert!(text.contains("1/1"), "{text:?}");
+
+        app.prompt.as_mut().unwrap().input = "zzz".to_owned();
+        crate::app::derived::sync(&mut app);
+        assert!(text_of(&compose(&app, 60)).contains("no matches"));
     }
 
     #[test]

@@ -109,9 +109,10 @@ cargo install --path .
 
 ### Fonts
 
-Any monospace font works. A [Nerd Font](https://www.nerdfonts.com/) additionally
-gives you the icons on callouts and images; without one those show as a missing
-glyph, and everything else is unaffected.
+Any monospace font works — the callout and image icons default to standard
+Unicode glyphs (ⓘ ✦ ‼ ⚠ ✖ ▣). If you use a [Nerd
+Font](https://www.nerdfonts.com/), an `[icons]` block in a theme file swaps in
+its glyphs; see [Themes](#themes).
 
 ## Contents
 
@@ -258,10 +259,13 @@ combining marks still matches one typed with precomposed characters — a file
 you can see should never be a file you cannot find.
 
 Search runs over the rendered text, so a hit is already a place on the page and
-highlighting costs nothing. A lowercase query ignores case; a query with any
-capital in it does not. `esc` clears the highlight. One consequence of
-searching what is on screen: a phrase broken across a soft wrap will not match,
-because on the page it genuinely is two lines.
+highlighting costs nothing. The matches narrow as you type — the count in the
+status bar is the feedback — and `enter` commits the query and jumps to the
+first hit; abandoning the prompt with `esc` brings the previous highlight
+back. A phrase broken across a soft wrap matches, with the highlight split
+across both lines; markers and gutter bars are decoration, not text, and never
+match. A lowercase query ignores case; a query with any capital in it does
+not. `esc` clears the highlight.
 
 ## Editing, reloading, and copying
 
@@ -392,6 +396,27 @@ tip = "#85b085"
 important = "#b094c0"
 warning = "#d9a441"
 caution = "#dd7a6d"
+
+[icons]                   # optional — these are the defaults, any font draws them
+note = "ⓘ"
+tip = "✦"
+important = "‼"
+warning = "⚠"
+caution = "✖"
+image = "▣"               # placeholder in front of an image's alt text
+```
+
+Icons are part of the theme because glyph choice is a font question. With a
+[Nerd Font](https://www.nerdfonts.com/), this block swaps in its icons:
+
+```toml
+[icons]
+note = ""
+tip = ""
+important = ""
+warning = ""
+caution = ""
+image = ""
 ```
 
 `marquee-markdown themes` lists what is available and where each came from.

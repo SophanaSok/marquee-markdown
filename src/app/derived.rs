@@ -28,9 +28,16 @@ pub fn sync(app: &mut App) {
 
     // Matches are line indices, so a re-layout invalidates every one of them.
     // They are re-found here rather than remapped separately, which is what
-    // keeps them in step with the scroll position.
+    // keeps them in step with the scroll position. A search prompt's live
+    // input shadows the committed query — the same shape as the browser
+    // filter — so the highlight narrows as the reader types, and cancelling
+    // the prompt reverts on the next frame with no code of its own.
+    let query = match &app.prompt {
+        Some(prompt) if prompt.kind == PromptKind::Search => prompt.input.clone(),
+        _ => app.search.query().to_owned(),
+    };
     app.search
-        .refresh(app.doc.doc(), app.doc.revision(), app.view.top);
+        .ensure(app.doc.doc(), app.doc.revision(), &query, app.view.top);
     app.links.refresh(app.doc.doc(), app.doc.revision());
 }
 

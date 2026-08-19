@@ -39,6 +39,11 @@ pub struct LineMeta {
     pub plain: Range<usize>,
     /// Column ranges (in cells) occupied by links, with link-table indices.
     pub links: SmallVec<[(Range<u16>, u32); 1]>,
+    /// Display columns of leading decoration — quote bars, list markers,
+    /// hanging indent — at the start of this line's text in `plain`. What
+    /// comes after it is the line's content; search strips it so a phrase
+    /// can be matched across a soft wrap without the gutter in the middle.
+    pub lead_cols: u16,
 }
 
 /// What a rendered line is, for styling overlays and navigation.

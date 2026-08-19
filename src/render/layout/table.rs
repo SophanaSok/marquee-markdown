@@ -173,10 +173,10 @@ fn frame_row(
         text.push_str(&"─".repeat(w + 2));
     }
     text.push_str(right);
-    let mut spans = ctx.lead();
-    spans.push(Span::styled(text, border));
+    let frame = Span::styled(text, border);
+    let lead = ctx.lead();
     ctx.sink
-        .push_spans(spans, LineKind::Table, Some(span.clone()));
+        .push_spans(lead, vec![frame], LineKind::Table, Some(span.clone()));
 }
 
 /// Emit one logical row, wrapping cells and padding short ones, as one or more
@@ -218,8 +218,8 @@ fn cells_rows(
     let height = wrapped.iter().map(Vec::len).max().unwrap_or(1);
 
     for line_idx in 0..height {
-        let mut spans = ctx.lead();
-        spans.push(Span::styled("│", border));
+        let lead = ctx.lead();
+        let mut spans = vec![Span::styled("│", border)];
         for (col, cell_lines) in wrapped.iter().enumerate() {
             spans.push(Span::styled(" ", pad_style));
             let empty = Vec::new();
@@ -244,7 +244,7 @@ fn cells_rows(
             spans.push(Span::styled("│", border));
         }
         ctx.sink
-            .push_spans(spans, LineKind::Table, Some(span.clone()));
+            .push_spans(lead, spans, LineKind::Table, Some(span.clone()));
     }
 }
 
@@ -266,13 +266,10 @@ fn emit_cards(
 
     for (row_idx, row) in rows.iter().enumerate() {
         if row_idx > 0 {
-            let mut spans = ctx.lead();
-            spans.push(Span::styled(
-                "\u{2500}".repeat(ctx.available_width()),
-                ctx.theme.rule(),
-            ));
+            let divider = Span::styled("\u{2500}".repeat(ctx.available_width()), ctx.theme.rule());
+            let lead = ctx.lead();
             ctx.sink
-                .push_spans(spans, LineKind::Table, Some(span.clone()));
+                .push_spans(lead, vec![divider], LineKind::Table, Some(span.clone()));
         }
         for (col, cell) in row.iter().enumerate() {
             let width = ctx.available_width();

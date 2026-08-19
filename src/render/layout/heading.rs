@@ -39,11 +39,13 @@ pub(super) fn emit(
 
     // Hairline rule beneath the two top levels.
     if level <= 2 {
-        let lead = ctx.lead_rest();
         let rule = Span::styled("─".repeat(ctx.available_width()), ctx.theme.rule());
-        let mut spans = lead;
-        spans.push(rule);
-        ctx.sink
-            .push_spans(spans, LineKind::Heading(level), Some(span.clone()));
+        let lead = ctx.lead_rest();
+        ctx.sink.push_spans(
+            lead,
+            vec![rule],
+            LineKind::Heading(level),
+            Some(span.clone()),
+        );
     }
 }

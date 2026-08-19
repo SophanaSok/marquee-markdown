@@ -391,7 +391,15 @@ impl App {
                 .map_or_else(|| "-".to_owned(), |anchor| anchor.id.clone())
         };
         let search = match (self.prompt.as_ref(), self.search.is_active()) {
-            (Some(prompt), _) => format!("{}{}|", prompt.kind.sigil(), prompt.input),
+            // The live count follows the prompt text, so a test can watch the
+            // matches narrow while the query is still being typed.
+            (Some(prompt), _) => format!(
+                "{}{}|[{}/{}]",
+                prompt.kind.sigil(),
+                prompt.input,
+                self.search.current().map_or(0, |index| index + 1),
+                self.search.matches().len()
+            ),
             (None, true) => format!(
                 "{}[{}/{}]",
                 self.search.query(),

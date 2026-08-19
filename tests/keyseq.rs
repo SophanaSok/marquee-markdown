@@ -9,6 +9,7 @@
 use marquee_markdown::app::event::{Event, ScriptedEvents};
 use marquee_markdown::app::keymap::Chord;
 use marquee_markdown::app::{App, Options, drive};
+use marquee_markdown::doc::search::Match;
 use marquee_markdown::source::{Base, Source};
 use marquee_markdown::theme::{Theme, ThemeVariant};
 use ratatui::Terminal;
@@ -316,7 +317,11 @@ fn stepping_through_hits_moves_the_reader() {
     // what the reader asked for is to see that hit.
     let back = run(&text, "/heading 4\nnN");
     assert_eq!(back.search.current(), Some(0));
-    let line = back.search.current_match().expect("a hit").line;
+    let line = back
+        .search
+        .current_match()
+        .map(Match::first_line)
+        .expect("a hit");
     let height = usize::from(back.panes.body.height);
     assert!(
         (back.view.top..back.view.top + height).contains(&line),
@@ -378,7 +383,10 @@ fn a_search_survives_being_re_laid_out() {
     let app = run(&document(), "/heading 4\nnnT");
     assert!(app.summary().contains("[3/11]"), "{}", app.summary());
     let hit = app.search.current_match().expect("a hit");
-    assert!(hit.line < app.doc.doc().lines.len(), "stale line index");
+    assert!(
+        hit.first_line() < app.doc.doc().lines.len(),
+        "stale line index"
+    );
 }
 
 /// A directory of markdown files, and a reader browsing it.
@@ -894,4 +902,56 @@ fn a_rescan_keeps_the_filter() {
     }]));
     drive(&mut app, &mut terminal, &mut events).expect("the loop runs");
     assert!(app.summary().contains("filter=docs"), "{}", app.summary());
+}
+
+#[test]
+fn typing_a_search_narrows_the_matches_live() {
+    // The count updates with each keystroke, before enter is ever pressed —
+    // and the view stays put: narrowing is feedback, not navigation.
+    let text = document();
+    let partial = run(&text, "/heading");
+    assert!(
+        partial.summary().contains("search=/heading|[1/60]"),
+        "{}",
+        partial.summary()
+    );
+    assert_eq!(partial.view.top, 0, "typing scrolled the view");
+
+    let narrower = run(&text, "/heading 4");
+    assert!(
+        narrower.summary().contains("search=/heading 4|[1/11]"),
+        "{}",
+        narrower.summary()
+    );
+}
+
+#[test]
+fn escape_while_typing_reverts_to_the_committed_search() {
+    // A committed search, then a new query typed and abandoned: the old
+    // highlight comes back with no key doing any explicit restoring.
+    let app = run(&document(), "/heading 4\r/zzz<esc>");
+    assert!(
+        app.summary().contains("search=heading 4[1/11]"),
+        "{}",
+        app.summary()
+    );
+}
+
+#[test]
+fn n_steps_through_a_match_that_spans_two_lines() {
+    // A paragraph long enough to wrap at the 80-column harness width, with
+    // the phrase straddling the break.
+    let mut text = String::from(
+        "Filler filler filler filler filler filler filler filler filler \
+         crossing phrase and more words after it.\n\n",
+    );
+    text.push_str("Later the crossing phrase appears again, on one line.\n");
+    let app = run(&text, "/crossing phrase\rn");
+    assert!(app.summary().contains("[2/2]"), "{}", app.summary());
+    let hit = app.search.current_match().expect("a hit");
+    let height = usize::from(app.panes.body.height);
+    assert!(
+        (app.view.top..app.view.top + height).contains(&hit.first_line()),
+        "the hit was not revealed"
+    );
 }

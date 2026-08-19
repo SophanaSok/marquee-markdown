@@ -115,9 +115,8 @@ pub(super) fn emit(ctx: &mut Context<'_>, language: Option<&str>, text: &str, sp
 }
 
 fn push_row(ctx: &mut Context<'_>, row: Vec<Span<'static>>, kind: LineKind, span: &Range<usize>) {
-    let mut spans = ctx.lead();
-    spans.extend(row);
-    ctx.sink.push_spans(spans, kind, Some(span.clone()));
+    let lead = ctx.lead();
+    ctx.sink.push_spans(lead, row, kind, Some(span.clone()));
 }
 
 /// Width too small for a container: plain hard-wrapped code text.

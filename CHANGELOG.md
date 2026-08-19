@@ -16,6 +16,44 @@ Until 1.0 both halves may change.
 
 Nothing yet.
 
+## [0.2.0] - 2026-08-19
+
+Every rough edge 0.1.0 shipped with, resolved. One breaking change to the
+library: `AlertKind::icon()` is gone — the icon accessor moved to
+`Theme::alert_icon`, because glyph choice is a font question and fonts are the
+theme's business.
+
+### Added
+
+- **Icons are theme data.** The callout and image glyphs default to standard
+  Unicode symbols (ⓘ ✦ ‼ ⚠ ✖ ▣) that render in any monospace font — no more
+  missing-glyph boxes without a Nerd Font — and an `[icons]` table in a theme
+  file overrides them. The Nerd Font set is documented in the README.
+- **The key reference scrolls.** On a terminal too short for every binding,
+  the movement keys move the overlay itself, and its title shows where you
+  are in the list.
+- **The browser rescans.** `r` walks the directory again — keeping the filter
+  and, when the file still exists, the cursor — and `.` toggles hidden and
+  git-ignored files live. Every walk carries a generation, so reports from a
+  superseded walk are dropped rather than repopulating a cleared list.
+- **Search matches across soft wraps.** A phrase broken onto two lines by
+  wrapping now matches, with the highlight split across both. Markers and
+  gutter bars (`•`, `▎`, list numerals) are decoration and no longer match.
+- **Search narrows as you type.** The count updates live in the status bar;
+  `enter` commits and jumps, `esc` abandons the query and restores the
+  previous highlight.
+
+### Changed
+
+- `AlertKind::icon()` removed; use `Theme::alert_icon(kind)` and
+  `Theme::image_icon()`. `LineMeta` gains `lead_cols` and
+  `LineSink::push_spans` takes the lead separately — decoration and content
+  are now distinguishable in the rendered metadata.
+- `Search`'s `refresh` is subsumed by `ensure(doc, revision, query,
+  from_line)`, idempotent per `(query, revision)`; `Match` is multi-segment.
+- `default-run = "marquee-markdown"`, so bare `cargo run` works again beside
+  the `mmd` binary.
+
 ## [0.1.0] - 2026-08-19
 
 The first release. Feature-complete against `glow`, plus the contents pane,
@@ -299,5 +337,6 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
 - Resizing re-lays out on every event; a large document dragged by a window
   edge will work harder than it needs to until a debounce lands.
 
-[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/SophanaSok/marquee-markdown/releases/tag/v0.1.0

@@ -32,10 +32,9 @@ pub(super) fn emit(
             "\u{2026}",
         );
         let head = Span::styled(text, ctx.theme.alert(kind));
-        let mut spans = ctx.lead();
-        spans.push(head);
+        let lead = ctx.lead();
         ctx.sink
-            .push_spans(spans, LineKind::Quote, Some(span.clone()));
+            .push_spans(lead, vec![head], LineKind::Quote, Some(span.clone()));
     }
 
     // Children render with the quote's muted text as their base style via a
@@ -43,10 +42,10 @@ pub(super) fn emit(
     // through the shared styled path.
     for (i, block) in children.iter().enumerate() {
         if i > 0 || alert.is_some() {
-            // Spacing line still carries the bar.
-            let spans = ctx.lead_rest();
+            // Spacing line still carries the bar — all lead, no content.
+            let lead = ctx.lead_rest();
             ctx.sink
-                .push_spans(spans, LineKind::Quote, Some(span.clone()));
+                .push_spans(lead, Vec::new(), LineKind::Quote, Some(span.clone()));
         }
         match &block.kind {
             crate::render::block::BlockKind::Paragraph(content) => {

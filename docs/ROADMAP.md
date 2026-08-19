@@ -220,18 +220,16 @@ the design:
 
 ## Known rough edges
 
-Small, real, and worth an issue from anyone who hits them:
+All four that 0.1.0 shipped with were resolved in 0.2.0 (icons as theme data,
+a scrolling key reference, browser rescan with a live hidden-files toggle,
+and cross-wrap search that narrows as you type). What remains is smaller:
 
-- **Callout and image icons need a Nerd Font.** They are Nerd Font glyphs
-  chosen in `AlertKind::icon`, so a terminal without one shows a missing-glyph
-  box. The right fix is to make them part of the theme format, which is where
-  everything else visual already lives.
-- **The key reference does not scroll**, so below about 22 rows it clips its
-  last few entries. `marquee-markdown keys` shows all of them.
-- **The browser scans once**, so a file created while it is open does not
-  appear until it is reopened.
-- **Search matches the rendered text**, so a phrase broken across a soft wrap
-  does not match.
+- On macOS, file system events arrive per directory, so saving a sibling file
+  can trigger a redundant reload — re-read, never shown wrongly.
+- A relative link in a fetched document is resolved by joining, without
+  normalizing `..`.
+- A single overlong word hard-split at the column edge does not match across
+  its split; there is no space there for the search joiner to stand in for.
 
 ## Deferred deliberately
 

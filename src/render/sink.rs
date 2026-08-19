@@ -80,7 +80,7 @@ impl LineSink {
         if self.last_blank {
             return;
         }
-        self.push_spans(Vec::new(), LineKind::Blank, None);
+        self.push_spans(Vec::new(), Vec::new(), LineKind::Blank, None);
         self.last_blank = true;
     }
 
@@ -129,25 +129,36 @@ impl LineSink {
             spans.push(Span::styled(run, run_style));
         }
 
-        self.push_line_with_links(spans, col, kind, source, links);
+        let lead_cols = u16::try_from(lead_width).unwrap_or(u16::MAX);
+        self.push_line_with_links(spans, col, lead_cols, kind, source, links);
     }
 
-    /// Emit a pre-assembled line whose spans are already styled and measured.
-    /// `content_width` must be the exact display width of `spans`.
+    /// Emit a pre-assembled line: `lead` is the decoration (gutter bars,
+    /// borders), `spans` the content after it.
+    ///
+    /// The split matters to search, not to rendering: the lead's width is
+    /// recorded so line content can be told apart from decoration, and a
+    /// callout's `▎` bars never become searchable text.
     pub fn push_spans(
         &mut self,
+        lead: Vec<Span<'static>>,
         spans: Vec<Span<'static>>,
         kind: LineKind,
         source: Option<Range<usize>>,
     ) {
-        let width: usize = spans.iter().map(|s| measure::width(&s.content)).sum();
-        self.push_line_with_links(spans, width, kind, source, SmallVec::new());
+        let lead_width: usize = lead.iter().map(|s| measure::width(&s.content)).sum();
+        let mut all = lead;
+        all.extend(spans);
+        let width: usize = all.iter().map(|s| measure::width(&s.content)).sum();
+        let lead_cols = u16::try_from(lead_width).unwrap_or(u16::MAX);
+        self.push_line_with_links(all, width, lead_cols, kind, source, SmallVec::new());
     }
 
     fn push_line_with_links(
         &mut self,
         mut spans: Vec<Span<'static>>,
         content_width: usize,
+        lead_cols: u16,
         kind: LineKind,
         source: Option<Range<usize>>,
         links: SmallVec<[(Range<u16>, u32); 1]>,
@@ -187,6 +198,7 @@ impl LineSink {
             source,
             plain: plain_range,
             links,
+            lead_cols,
         });
         self.last_blank = kind == LineKind::Blank;
     }
@@ -318,5 +330,38 @@ mod tests {
         // one content span + one pad span
         assert_eq!(doc.lines[0].spans.len(), 2);
         assert_eq!(doc.lines[0].spans[0].content, "one two");
+    }
+
+    #[test]
+    fn the_lead_width_is_recorded_for_both_entry_points() {
+        // Search strips the lead to tell content from decoration; a line that
+        // lied about its lead would let a quote bar match, or eat the start
+        // of real text.
+        let theme = crate::theme::Theme::new(crate::theme::ThemeVariant::Slate);
+        let doc = crate::render::render(
+            "> quoted text\n\n- item\n\nplain\n",
+            &theme,
+            crate::render::LayoutOptions {
+                width: 30,
+                code_line_numbers: false,
+                preserve_new_lines: false,
+            },
+        );
+        for (index, meta) in doc.meta.iter().enumerate() {
+            let text = &doc.plain[meta.plain.clone()];
+            match meta.kind {
+                LineKind::Quote if !text.is_empty() => {
+                    assert_eq!(meta.lead_cols, 2, "quote line {index}: {text:?}")
+                }
+                LineKind::Body if text.starts_with('\u{2022}') => {
+                    assert_eq!(meta.lead_cols, 2, "list line {index}: {text:?}")
+                }
+                LineKind::Body if text == "plain" => {
+                    assert_eq!(meta.lead_cols, 0, "plain line {index}")
+                }
+                LineKind::Blank => assert_eq!(meta.lead_cols, 0),
+                _ => {}
+            }
+        }
     }
 }

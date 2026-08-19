@@ -502,7 +502,11 @@ fn accept_prompt(app: &mut App) {
                 &prompt.input,
                 app.view.top,
             );
-            match app.search.current_match().map(|hit| hit.line) {
+            match app
+                .search
+                .current_match()
+                .map(crate::doc::search::Match::first_line)
+            {
                 Some(line) => {
                     let extent = app.extent();
                     app.view.reveal(line, extent);
