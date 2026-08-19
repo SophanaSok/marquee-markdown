@@ -8,9 +8,8 @@ Until 1.0 the `render` module's public API may change within minor versions.
 
 ## [Unreleased]
 
-Pre-release. The rendering engine and the full-screen reader — contents pane
-and search included — are complete; the file browser and remote sources are not
-built yet.
+Pre-release. The rendering engine, the full-screen reader, the contents pane,
+search, and the file browser are complete; remote sources are not built yet.
 
 ### Added
 
@@ -93,6 +92,27 @@ built yet.
 - `esc` unwinds one layer at a time — overlay, then prompt, then focus, then
   the search highlight — and hints rather than quitting at the bottom.
 
+#### File browser
+
+- `marquee-markdown` with no argument, or with a directory, lists the markdown
+  under it — most recently edited first, with the age of each file.
+- The walk streams from a background thread, so the first screenful appears
+  immediately and a large tree fills in behind it rather than blocking the
+  first frame.
+- Hidden and git-ignored files are left out unless `-a` asks for them. Ignore
+  files are honored outside a git repository too.
+- Fuzzy filtering on `/`, applied as you type. Query and file names are both
+  normalized first, so a name written with combining marks still matches one
+  typed with precomposed characters.
+- `enter` reads a file and `esc` goes back to the list, so the browser is where
+  a reading session lives rather than somewhere passed through once. A file
+  named on the command line has no browser behind it, and `esc` there still
+  hints rather than opening one.
+- glow's paging inconsistency is reproduced deliberately: `f`/`d` move a whole
+  screen in the browser and half a screen in the pager, and `h`/`l` page in the
+  browser but scroll sideways in a document. Anyone with the muscle memory
+  would find a silent correction more surprising than the quirk.
+
 #### Theming
 
 - Two Claude palettes, `paper` (light) and `slate` (dark), compiled in as
@@ -118,8 +138,10 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
 
 ### Known gaps
 
-- `-p` and bare invocation (the file browser) exit with a clear message rather
-  than doing something unexpected.
+- `-p` exits with a clear message rather than doing something unexpected.
+- The browser scans once at startup: files created while it is open do not
+  appear until it is restarted.
+- `-a` is read at startup and cannot be toggled from inside the browser.
 - Search matches the rendered text, so a phrase broken across a soft wrap does
   not match. Searching is deliberately not incremental: the query runs when
   `enter` is pressed.
@@ -129,6 +151,5 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
   implemented yet.
 - `--config` is parsed but no configuration file is read yet.
 - `-n` (`--preserve-new-lines`) is parsed but not yet honored.
-- `-a` affects the browser, which does not exist yet.
 - Resizing re-lays out on every event; a large document dragged by a window
   edge will work harder than it needs to until a debounce lands.

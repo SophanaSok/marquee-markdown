@@ -5,9 +5,10 @@ A terminal markdown reader with the functionality of
 Claude artifacts do — a centered reading column on a painted page, typographic
 headings, sealed code cards — with a table-of-contents panel for navigation.
 
-> **Status: pre-release.** The rendering engine and the full-screen reader —
-> contents pane and search included — work today. The file browser and remote
-> sources are not built yet; see [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status: pre-release.** The rendering engine, the full-screen reader, the
+> contents pane, search, and the file browser all work today. Remote sources
+> (URLs and `owner/repo` shorthands) are not built yet; see
+> [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## What it looks different from
 
@@ -38,6 +39,7 @@ cargo install --path .
 ## Usage
 
 ```sh
+marquee-markdown                    # browse the markdown here
 marquee-markdown README.md          # render a file
 marquee-markdown docs/              # render a directory's README
 marquee-markdown -                  # read standard input
@@ -102,6 +104,38 @@ follows you as you read, while the **cursor** is where you left it. Scrolling
 never drags the cursor away mid-keystroke. The pane hides itself on a narrow
 terminal, and on a document with fewer than two headings, where it would cost
 a quarter of the screen to say nothing.
+
+## Browsing
+
+Run `marquee-markdown` with no argument, or point it at a directory, and it
+lists the markdown under it — most recently edited first, with hidden and
+git-ignored files left out unless `-a` says otherwise. The walk streams, so the
+first screenful is there immediately and a large tree fills in behind it.
+
+| Key | |
+| --- | --- |
+| `j` `k` · `down` `up` | next file, previous file |
+| `f` `d` · `l` `right` `pgdn` | next page |
+| `b` `u` · `h` `left` `pgup` | previous page |
+| `g` `G` · `home` `end` | first file, last file |
+| `enter` | read this file |
+| `/` | filter the list |
+| `esc` | clear the filter |
+| `q` · `ctrl+c` | quit |
+
+`esc` in a document goes back to the list, so the browser is where a reading
+session lives rather than somewhere you pass through once.
+
+Two of those keys are inconsistent with the document: `f`/`d` page a whole
+screen here and half a screen when reading, and `h`/`l` page here but scroll
+sideways there. That is glow's behavior, reproduced deliberately — anyone with
+the muscle memory would find a silent correction more surprising than the
+quirk, and rebindable keys are the fix glow cannot offer.
+
+The filter is fuzzy and runs as you type: `rdmp` finds `docs/ROADMAP.md`. Both
+the query and the file names are normalized first, so a name written with
+combining marks still matches one typed with precomposed characters — a file
+you can see should never be a file you cannot find.
 
 Search runs over the rendered text, so a hit is already a place on the page and
 highlighting costs nothing. A lowercase query ignores case; a query with any

@@ -97,6 +97,10 @@ app/         The reader: state, input, and the loop.
   layout.rs    Pure: terminal size + state -> Panes.
   derived.rs   Recomputed once per iteration: clamping, active section.
   terminal.rs  RAII alternate-screen guard and the panic hook.
+browser/     The file list, independent of any terminal.
+  walk.rs      Streaming ignore-aware directory walk, on its own thread.
+  filter.rs    Fuzzy matching, NFC-normalized on both sides.
+  format.rs    Relative times for the list.
 doc/         Document state, independent of any terminal.
   cache.rs     The ONLY caller of the layout engine; owns the heading tree.
   outline.rs   Headings as a tree, flattened into rows that know their subtree.
@@ -115,6 +119,10 @@ Two rules in the reader that are easy to undo by accident:
 - **The contents cursor and the active entry are different state.** The active
   entry follows the scroll position; the cursor is where the reader put it.
   Writing either into the other makes the pane feel broken.
+- **Reordering a list invalidates every index into it.** `Browser::extend` only
+  appends; sorting happens in `refresh`, which rebuilds the match indices and
+  re-finds the selected file by path in the same breath. Sorting anywhere else
+  leaves the cursor pointing at a different file, with nothing to show for it.
 
 ### The reader's loop
 

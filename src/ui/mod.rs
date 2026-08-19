@@ -6,6 +6,7 @@
 //! frame can be produced twice with identical results — which is what makes
 //! the snapshot tests meaningful.
 
+pub mod browser;
 pub mod document;
 pub mod help;
 pub mod status;
@@ -13,12 +14,17 @@ pub mod toc;
 
 use ratatui::Frame;
 
-use crate::app::state::{App, Overlay};
+use crate::app::state::{App, Overlay, Screen};
 
 /// Draw one frame.
 pub fn draw(frame: &mut Frame, app: &App) {
-    document::draw(frame, app);
-    toc::draw(frame, app);
+    match app.screen {
+        Screen::Browser => browser::draw(frame, app),
+        Screen::Document => {
+            document::draw(frame, app);
+            toc::draw(frame, app);
+        }
+    }
     status::draw(frame, app);
     match app.overlay {
         Some(Overlay::Help) => help::draw(frame, app),

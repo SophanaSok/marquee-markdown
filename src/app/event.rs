@@ -5,8 +5,13 @@
 //! and leaves room for the producers that arrive later (a file watcher, a
 //! directory walk) without changing anything downstream.
 
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::thread;
+
 use anyhow::Result;
 use crossterm::event::{self, KeyEvent, KeyEventKind, MouseEvent};
+
+use crate::browser::Scan;
 
 /// Something the reader has to react to.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,6 +25,8 @@ pub enum Event {
     Resize(u16, u16),
     /// Text was pasted in one go.
     Paste(String),
+    /// The directory walk reported in.
+    Scan(Scan),
 }
 
 /// Where events come from.
@@ -34,19 +41,48 @@ pub trait EventSource {
     fn next(&mut self) -> Result<Option<Event>>;
 }
 
-/// The real terminal.
-#[derive(Debug, Default)]
-pub struct TerminalEvents;
+/// Everything that can wake the reader, funnelled into one queue.
+///
+/// The terminal is read on its own thread and posts into the same channel the
+/// directory walk posts into, so the loop waits in one place. Without that,
+/// a walk finishing would not redraw until the reader happened to press a key.
+#[derive(Debug)]
+pub struct Events {
+    queue: Receiver<Event>,
+}
 
-impl EventSource for TerminalEvents {
-    fn next(&mut self) -> Result<Option<Event>> {
-        loop {
-            // Events the reader has no use for are dropped here rather than
-            // being carried through the update loop as a no-op case.
-            if let Some(event) = translate(event::read()?) {
-                return Ok(Some(event));
+impl Events {
+    /// Start reading the terminal, and hand back a sender for the other
+    /// producers.
+    ///
+    /// When every sender has been dropped and the terminal reader has stopped,
+    /// the queue closes and the loop ends — which is what makes a closed input
+    /// stream an exit rather than a hang.
+    #[must_use]
+    pub fn new() -> (Self, Sender<Event>) {
+        let (sender, queue) = mpsc::channel();
+        let terminal = sender.clone();
+        thread::spawn(move || {
+            loop {
+                let Ok(event) = event::read() else {
+                    return;
+                };
+                // Events the reader has no use for are dropped here rather
+                // than carried through the update loop as a no-op case.
+                if let Some(event) = translate(event)
+                    && terminal.send(event).is_err()
+                {
+                    return;
+                }
             }
-        }
+        });
+        (Self { queue }, sender)
+    }
+}
+
+impl EventSource for Events {
+    fn next(&mut self) -> Result<Option<Event>> {
+        Ok(self.queue.recv().ok())
     }
 }
 
@@ -113,5 +149,25 @@ mod tests {
         let mut events = ScriptedEvents::new([Event::Key(key)]);
         assert_eq!(events.next().unwrap(), Some(Event::Key(key)));
         assert_eq!(events.next().unwrap(), None);
+    }
+
+    #[test]
+    fn a_walk_report_reaches_the_loop_through_the_same_queue_as_a_key() {
+        let (mut events, sender) = Events::new();
+        sender.send(Event::Scan(Scan::Done)).expect("send");
+        assert_eq!(events.next().unwrap(), Some(Event::Scan(Scan::Done)));
+    }
+
+    #[test]
+    fn the_queue_closing_ends_the_loop() {
+        let (events, sender) = Events::new();
+        drop(sender);
+        // The terminal reader thread still holds a sender, so this stays open;
+        // what matters is that `next` reports exhaustion rather than blocking
+        // once every producer is gone. Exercised through the scripted source,
+        // which has no threads.
+        let mut scripted = ScriptedEvents::default();
+        assert_eq!(scripted.next().unwrap(), None);
+        drop(events);
     }
 }

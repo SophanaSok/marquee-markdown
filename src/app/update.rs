@@ -8,7 +8,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKi
 
 use super::action::Action;
 use super::event::Event;
-use super::state::{App, Focus, Overlay, Prompt, PromptKind};
+use super::state::{App, Focus, Overlay, Prompt, PromptKind, Screen};
 
 /// Apply one event.
 pub fn handle(app: &mut App, event: Event) {
@@ -26,6 +26,7 @@ pub fn handle(app: &mut App, event: Event) {
         }
         Event::Paste(text) => paste(app, text),
         Event::Mouse(mouse) => mouse_event(app, mouse),
+        Event::Scan(scan) => scan_reported(app, scan),
         // Resizes are handled by recomputing pane geometry before the next
         // draw, which happens for every iteration anyway.
         Event::Resize(_, _) => {}
@@ -85,6 +86,70 @@ pub fn apply(app: &mut App, action: Action) {
                 prompt.input.clear();
             }
         }
+
+        Action::BrowserDown => with_browser(app, |browser| browser.move_cursor(1)),
+        Action::BrowserUp => with_browser(app, |browser| browser.move_cursor(-1)),
+        Action::BrowserPageDown => browser_page(app, 1),
+        Action::BrowserPageUp => browser_page(app, -1),
+        Action::BrowserTop => with_browser(app, crate::browser::Browser::to_first),
+        Action::BrowserBottom => with_browser(app, crate::browser::Browser::to_last),
+        Action::BrowserOpen => open_selected_file(app),
+        Action::FilterStart => {
+            app.prompt = Some(Prompt {
+                kind: PromptKind::Filter,
+                // Filtering is incremental, so the prompt starts from what is
+                // already in force rather than throwing it away.
+                input: app
+                    .browser
+                    .as_ref()
+                    .map(|browser| browser.filter.clone())
+                    .unwrap_or_default(),
+            });
+        }
+    }
+}
+
+/// Do something to the browser, if there is one.
+fn with_browser(app: &mut App, change: impl FnOnce(&mut crate::browser::Browser)) {
+    if let Some(browser) = app.browser.as_mut() {
+        change(browser);
+    }
+}
+
+/// Move a whole screen through the file list, which is what these keys do in
+/// glow's browser even though the same keys move half a screen in its pager.
+fn browser_page(app: &mut App, direction: isize) {
+    let step = isize::try_from(app.panes.body.height.max(1)).unwrap_or(1);
+    with_browser(app, |browser| browser.move_cursor(direction * step));
+}
+
+/// Read the selected file.
+fn open_selected_file(app: &mut App) {
+    let Some(path) = app
+        .browser
+        .as_ref()
+        .and_then(|browser| browser.selected())
+        .map(|entry| entry.path.clone())
+    else {
+        app.message = Some("nothing to open".to_owned());
+        return;
+    };
+    match crate::source::resolve(&crate::source::SourceSpec::File(path.clone())) {
+        Ok(source) => app.read(source),
+        // A file that vanished mid-scan, or one that is not readable, is not
+        // worth ending the session over.
+        Err(error) => app.message = Some(format!("cannot open {}: {error}", path.display())),
+    }
+}
+
+/// Take a batch of results from the directory walk.
+fn scan_reported(app: &mut App, scan: crate::browser::Scan) {
+    let Some(browser) = app.browser.as_mut() else {
+        return;
+    };
+    match scan {
+        crate::browser::Scan::Found(entries) => browser.extend(entries),
+        crate::browser::Scan::Done => browser.scanning = false,
     }
 }
 
@@ -107,6 +172,16 @@ fn escape(app: &mut App) {
     if app.search.is_active() {
         app.search.clear();
         return;
+    }
+    if let Some(browser) = app.browser.as_mut() {
+        if !browser.filter.is_empty() {
+            browser.filter.clear();
+            return;
+        }
+        if app.screen == Screen::Document {
+            app.screen = Screen::Browser;
+            return;
+        }
     }
     app.message = Some("press q to quit".to_owned());
 }
@@ -231,6 +306,11 @@ fn accept_prompt(app: &mut App) {
         return;
     };
     match prompt.kind {
+        PromptKind::Filter => {
+            if let Some(browser) = app.browser.as_mut() {
+                browser.filter = prompt.input;
+            }
+        }
         PromptKind::Search => {
             if prompt.input.is_empty() {
                 app.search.clear();

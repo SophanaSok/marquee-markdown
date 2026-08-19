@@ -6,6 +6,7 @@
 //! cannot disagree — the bug where a closed prompt still swallows keys is not
 //! reachable.
 
+use crate::browser::Browser;
 use crate::doc::{DocCache, Search, View};
 use crate::source::Source;
 use crate::theme::{Appearance, Theme, ThemeVariant};
@@ -22,6 +23,8 @@ pub struct Options {
     pub line_numbers: bool,
     /// The `-m` flag.
     pub mouse: bool,
+    /// The `-a` flag: list hidden and ignored files when browsing.
+    pub all: bool,
 }
 
 /// A view layered over the document.
@@ -29,6 +32,16 @@ pub struct Options {
 pub enum Overlay {
     /// The key reference.
     Help,
+}
+
+/// Which screen the reader is on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Screen {
+    /// Choosing a file.
+    Browser,
+    /// Reading one.
+    #[default]
+    Document,
 }
 
 /// Which pane the keyboard is talking to.
@@ -46,6 +59,8 @@ pub enum Focus {
 pub enum PromptKind {
     /// An in-document search.
     Search,
+    /// Narrowing the file list.
+    Filter,
 }
 
 impl PromptKind {
@@ -58,6 +73,7 @@ impl PromptKind {
     pub const fn sigil(self) -> &'static str {
         match self {
             Self::Search => "/",
+            Self::Filter => "filter> ",
         }
     }
 }
@@ -106,6 +122,12 @@ pub struct App {
     pub overlay: Option<Overlay>,
     /// Pane geometry, recomputed once per iteration before drawing.
     pub panes: Panes,
+    /// Which screen is on show.
+    pub screen: Screen,
+    /// The file browser, when the reader arrived through one. `None` when a
+    /// file was named on the command line, which is what makes `esc` a hint
+    /// there and a way back here otherwise.
+    pub browser: Option<Browser>,
     /// Which pane the keyboard is talking to.
     pub focus: Focus,
     /// Whether the reader has asked for the contents pane. It can still be
@@ -143,6 +165,8 @@ impl App {
             keymap: Keymap::defaults(),
             overlay: None,
             panes: Panes::default(),
+            screen: Screen::Document,
+            browser: None,
             focus: Focus::Document,
             toc_visible: true,
             toc: Toc::default(),
@@ -153,6 +177,30 @@ impl App {
             options,
             should_quit: false,
         }
+    }
+
+    /// Open the file browser over `root`, with no document loaded yet.
+    #[must_use]
+    pub fn browsing(root: std::path::PathBuf, theme: Theme, options: Options) -> Self {
+        // The empty document is a placeholder until a file is chosen; there is
+        // deliberately no second code path for "no document", because every
+        // one of those is a place the two can disagree.
+        let placeholder = Source::from_text("", None, String::new(), crate::source::Base::Cwd);
+        let mut app = Self::new(placeholder, theme, options);
+        app.screen = Screen::Browser;
+        app.browser = Some(Browser::new(root));
+        app
+    }
+
+    /// Start reading `source`, leaving the browser as it was so `esc` comes
+    /// back to it.
+    pub fn read(&mut self, source: Source) {
+        self.doc = DocCache::new(source);
+        self.view = View::default();
+        self.toc = Toc::default();
+        self.search.clear();
+        self.screen = Screen::Document;
+        self.focus = Focus::Document;
     }
 
     /// Which bindings are in force, derived from what is open and what has
@@ -171,9 +219,10 @@ impl App {
     /// should describe, since opening it does not move focus.
     #[must_use]
     pub fn pane_mode(&self) -> Mode {
-        match self.focus {
-            Focus::Document => Mode::Document,
-            Focus::Toc => Mode::Toc,
+        match (self.screen, self.focus) {
+            (Screen::Browser, _) => Mode::Browser,
+            (Screen::Document, Focus::Document) => Mode::Document,
+            (Screen::Document, Focus::Toc) => Mode::Toc,
         }
     }
 
@@ -210,6 +259,26 @@ impl App {
     /// is a description of behavior rather than of structure.
     #[must_use]
     pub fn summary(&self) -> String {
+        if self.screen == Screen::Browser {
+            let browser = self
+                .browser
+                .as_ref()
+                .expect("the browser screen has a browser");
+            return format!(
+                "mode={} files={} cursor={} filter={} quit={}",
+                self.mode(),
+                browser.len(),
+                browser
+                    .selected()
+                    .map_or("-", |entry| entry.display.as_str()),
+                match (self.prompt.as_ref(), browser.filter.as_str()) {
+                    (Some(prompt), _) => format!("{}|", prompt.input),
+                    (None, "") => "-".to_owned(),
+                    (None, committed) => committed.to_owned(),
+                },
+                self.should_quit,
+            );
+        }
         let section = self.active_heading().map_or("-", |anchor| &anchor.id);
         let toc = if self.panes.sidebar.is_none() {
             "off".to_owned()

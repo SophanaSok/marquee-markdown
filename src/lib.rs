@@ -9,6 +9,7 @@
 #![forbid(unsafe_code)]
 
 pub mod app;
+pub mod browser;
 pub mod cli;
 pub mod doc;
 pub mod oneshot;

@@ -24,6 +24,8 @@ use super::action::Action;
 pub enum Mode {
     /// Reading a document.
     Document,
+    /// Choosing a file to read.
+    Browser,
     /// The table of contents has focus.
     Toc,
     /// Text is being typed at a prompt.
@@ -34,13 +36,20 @@ pub enum Mode {
 
 impl Mode {
     /// Every mode, for iteration in tests and in the help overlay.
-    pub const ALL: &'static [Self] = &[Self::Document, Self::Toc, Self::Prompt, Self::Help];
+    pub const ALL: &'static [Self] = &[
+        Self::Document,
+        Self::Browser,
+        Self::Toc,
+        Self::Prompt,
+        Self::Help,
+    ];
 
     /// Name used in configuration files (`[keys.document]`).
     #[must_use]
     pub const fn name(self) -> &'static str {
         match self {
             Self::Document => "document",
+            Self::Browser => "browser",
             Self::Toc => "toc",
             Self::Prompt => "prompt",
             Self::Help => "help",
@@ -258,6 +267,36 @@ const DEFAULTS: &[(Mode, &str, Action)] = &[
     (Mode::Document, "esc", Action::Escape),
     (Mode::Document, "q", Action::Quit),
     (Mode::Document, "ctrl+c", Action::Quit),
+    // Paging in the browser is a whole screen, while the same keys move half a
+    // screen in the pager. That inconsistency is glow's, reproduced verbatim
+    // rather than quietly improved: anyone with the muscle memory would find a
+    // silent change more surprising than the quirk. `[keys.*]` is the fix glow
+    // cannot offer.
+    (Mode::Browser, "j", Action::BrowserDown),
+    (Mode::Browser, "down", Action::BrowserDown),
+    (Mode::Browser, "k", Action::BrowserUp),
+    (Mode::Browser, "up", Action::BrowserUp),
+    (Mode::Browser, "l", Action::BrowserPageDown),
+    (Mode::Browser, "right", Action::BrowserPageDown),
+    (Mode::Browser, "pgdn", Action::BrowserPageDown),
+    (Mode::Browser, "f", Action::BrowserPageDown),
+    (Mode::Browser, "d", Action::BrowserPageDown),
+    (Mode::Browser, "h", Action::BrowserPageUp),
+    (Mode::Browser, "left", Action::BrowserPageUp),
+    (Mode::Browser, "pgup", Action::BrowserPageUp),
+    (Mode::Browser, "b", Action::BrowserPageUp),
+    (Mode::Browser, "u", Action::BrowserPageUp),
+    (Mode::Browser, "g", Action::BrowserTop),
+    (Mode::Browser, "home", Action::BrowserTop),
+    (Mode::Browser, "G", Action::BrowserBottom),
+    (Mode::Browser, "end", Action::BrowserBottom),
+    (Mode::Browser, "enter", Action::BrowserOpen),
+    (Mode::Browser, "/", Action::FilterStart),
+    (Mode::Browser, "T", Action::ToggleTheme),
+    (Mode::Browser, "?", Action::ToggleHelp),
+    (Mode::Browser, "esc", Action::Escape),
+    (Mode::Browser, "q", Action::Quit),
+    (Mode::Browser, "ctrl+c", Action::Quit),
     // The contents pane takes the same movement keys, pointed at itself. `h`
     // and `l` fold and unfold here, which is what those keys mean in every
     // tree view; in the document they still scroll sideways.
@@ -508,6 +547,22 @@ mod tests {
         unique.sort_unstable();
         unique.dedup();
         assert_eq!(actions.len(), unique.len(), "an action is listed twice");
+    }
+
+    #[test]
+    fn the_browser_pages_where_the_pager_half_pages() {
+        // glow is inconsistent here and this reproduces it deliberately.
+        let map = Keymap::defaults();
+        for code in [KeyCode::Char('f'), KeyCode::Char('d')] {
+            assert_eq!(
+                map.action(Mode::Browser, key(code)),
+                Some(Action::BrowserPageDown)
+            );
+        }
+        assert_eq!(
+            map.action(Mode::Document, key(KeyCode::Char('d'))),
+            Some(Action::HalfPageDown)
+        );
     }
 
     #[test]

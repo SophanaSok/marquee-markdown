@@ -17,8 +17,8 @@ scroll-tracking table-of-contents sidebar and in-document search.
 | **P1** One-shot render + theming | Source classification, frontmatter, code-file wrapping, ANSI output, `-l -n -w -s`, theme loader, `themes`/`man`/`completion` | 3 | **Done** except `-n` |
 | **P2** Document reader | Terminal guard + panic hook, event loop, view/anchor/render cache, pager keys via `Action`, status bar, keymap-rendered help, `-t` | 3 | **Done** (resize debounce open) |
 | **P3** TOC + search | Outline tree, active-section derivation, focus model, filter/collapse/auto-hide, `/` `n` `N` | 3 | **Done** (no TOC filter) |
-| **P4** Browser | Streaming gitignore-aware walk, paging, fuzzy filter with Unicode normalization, humanized modtimes, `-a` | 3 | Next |
-| **P5** Remote sources | `Fetcher` trait, http(s), `github://`/`gitlab://`, bare-host README API | 2 | |
+| **P4** Browser | Streaming gitignore-aware walk, paging, fuzzy filter with Unicode normalization, humanized modtimes, `-a` | 3 | **Done** (no rescan) |
+| **P5** Remote sources | `Fetcher` trait, http(s), `github://`/`gitlab://`, bare-host README API | 2 | Next |
 | **P6** Parity polish | Live reload, `e` at scroll line, `c` copy, `-p` pager, `-m` mouse, `ctrl+z`, link following, `y`, theme cycling | 2 | |
 | **P7** Config + keymaps | TOML schema, `MARQUEE_` env layer, precedence, user keymap merge, `config` subcommand | 2 | |
 | **P8** Release | `packaging/`, deb/rpm, release workflow, `docs/ARCHITECTURE.md`, crates.io | 2 | |
@@ -33,33 +33,28 @@ Themes load from TOML. Output degrades correctly when redirected.
 status bar, a key reference rendered from the live keymap, light/dark switching,
 and a resize that keeps your place instead of teleporting you.
 
-348 tests; `cargo clippy --all-targets -- -D warnings` and `cargo doc --no-deps`
+406 tests; `cargo clippy --all-targets -- -D warnings` and `cargo doc --no-deps`
 clean.
 
-## Immediate next steps (P4)
+## Immediate next steps (P5)
 
-The file browser. It is the last piece of glow parity that changes the shape of
-the application, because it adds a second screen.
+Remote sources: the last piece of glow parity that reaches outside the machine.
 
-1. `browser/walk.rs` — a streaming `ignore`-crate walk on a worker thread,
-   feeding results through the existing `Event` enum. It must stream: a walk of
-   a large tree that blocks the first frame is the thing that makes a browser
-   feel broken.
-2. `app/state.rs` — a `Screen` enum. Keep `Mode` derived from it the way it is
-   derived from focus today.
-3. `keymap.rs` — `Mode::Browser`. Per the collision table, glow's browser paging
-   keys (`b`/`u`/`f`/`d` full-page there, half-page in the pager) are reproduced
-   verbatim and mode-scoped. That inconsistency is glow's, and `[keys.*]` is the
-   fix glow cannot offer — document it as a quirk rather than silently
-   improving it.
-4. `browser/filter.rs` — fuzzy matching with `nucleo-matcher`, over
-   NFC-normalized names, so a filename typed with combining marks still
-   matches.
-5. The filter prompt is a second `PromptKind`. It shares `Mode::Prompt`, which
-   already captures all printable input; the sigil is what tells the two apart.
-6. `ui/browser.rs` — draw-only, slicing rows by hand as the contents pane does.
+1. `source/fetch.rs` — a `Fetcher` trait first, with the real `reqwest` client
+   behind it and a `FakeFetcher` with canned responses for tests. Everything
+   else in this phase should be testable with no network, the way `classify` is
+   testable with no filesystem. CI must never need the network.
+2. Plain `http(s)://` fetching, with the content type deciding whether the body
+   is markdown or a code file.
+3. The forge shorthands. Two details already established and worth not
+   rediscovering: GitHub's API returns 403 without a `User-Agent`, and GitLab's
+   `readme_url` needs `/-/blob/` rewritten to `/-/raw/`.
+4. `Base::Url` so relative links and images in a fetched document resolve
+   against where it came from.
+5. Failures must land in the status bar, not as an exit: a reader who mistypes
+   a repository name should stay in the reader.
 
-## What P2 and P3 built, and why it is shaped that way
+## What P2 to P4 built, and why it is shaped that way
 
 - `app/terminal.rs` — an RAII alternate-screen/raw-mode guard, plus a panic
   hook that restores the terminal *before* the message is printed. Without the
@@ -76,9 +71,11 @@ the application, because it adds a second screen.
   rather than fixed. A prompt binds almost nothing on purpose: any printable
   key it has not bound is text, which is what keeps `q` in a search box from
   quitting.
-- `app/event.rs` — the loop consumes its own `Event` enum, so a headless test
-  feeds exactly what a terminal would, and P4's directory walk plugs in as
-  another producer without touching the update logic.
+- `app/event.rs` — the loop consumes its own `Event` enum, and everything that
+  can wake the reader posts into one queue: the terminal on its own thread, the
+  directory walk on another. A headless test feeds exactly what a terminal
+  would, and the browser tests feed walk results the same way. P6's file
+  watcher is another producer, nothing more.
 - `app/update.rs` — the only mutation site.
 - `app/mod.rs` — `reconcile` before `draw`: pane geometry, then the layout
   cache, then derived state.
@@ -95,9 +92,12 @@ the application, because it adds a second screen.
   lets search highlight without re-laying anything out.
 - `render/tui.rs` — the buffer serializer, paired with `render/ansi.rs`. One
   layout engine, two destinations.
+- `browser/` — the walk, the filter and the selection, none of which know
+  about a terminal. The walk reports in batches through a callback, so the
+  browser does not depend on the application's event type either.
 - `ui/` — draw-only widgets taking `&App`.
 
-Two things that cost a debugging session each, recorded so they are not
+Three things that cost a debugging session each, recorded so they are not
 rediscovered:
 
 - **Pane geometry may not depend on anything only a layout can produce.** The
@@ -109,6 +109,12 @@ rediscovered:
 - **The cursor and the active entry are different state.** Collapsing them is
   the single easiest way to make the contents pane feel broken: scrolling would
   drag the selection out from under the reader mid-keystroke.
+- **Reordering a list invalidates every index into it.** The browser sorts by
+  modification time, so results arriving mid-scan insert themselves above the
+  cursor. Sorting inside `extend` left `matches` — and the cursor with it —
+  pointing at different files, silently. Sorting now happens only in `refresh`,
+  which rebuilds the indices in the same breath and re-finds the selected file
+  by path.
 
 Tests worth knowing about before changing any of it:
 

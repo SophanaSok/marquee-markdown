@@ -372,9 +372,10 @@ impl Theme {
             .add_modifier(Modifier::BOLD)
     }
 
-    /// A table-of-contents entry that is not the active section.
+    /// A row of a list pane — the contents pane or the file browser — that is
+    /// not picked out in any way.
     #[must_use]
-    pub fn toc_item(&self) -> Style {
+    pub fn list_item(&self) -> Style {
         Style::new()
             .bg(self.palette.bg.color())
             .fg(self.palette.muted.color())
@@ -449,20 +450,19 @@ impl Theme {
             .add_modifier(Modifier::BOLD)
     }
 
-    /// The contents entry the cursor is on. Distinct from
-    /// [`Self::toc_active`]: the cursor is where the reader put it, the active
-    /// entry is where the document is scrolled to, and they are often
-    /// different rows.
+    /// The row the cursor is on. Distinct from [`Self::toc_active`]: the
+    /// cursor is where the reader put it, the active entry is where the
+    /// document is scrolled to, and they are often different rows.
     #[must_use]
-    pub fn toc_cursor(&self) -> Style {
+    pub fn list_cursor(&self) -> Style {
         Style::new()
             .bg(self.palette.surface.color())
             .fg(self.palette.fg.color())
     }
 
-    /// The bar marking the cursor row while the contents pane has focus.
+    /// The bar marking the cursor row while its pane has focus.
     #[must_use]
-    pub fn toc_cursor_marker(&self) -> Style {
+    pub fn list_cursor_marker(&self) -> Style {
         Style::new()
             .bg(self.palette.surface.color())
             .fg(self.palette.accent.color())
@@ -471,6 +471,14 @@ impl Theme {
     /// The fold marker in front of a contents entry with children.
     #[must_use]
     pub fn toc_fold(&self) -> Style {
+        Style::new()
+            .bg(self.palette.bg.color())
+            .fg(self.palette.muted.color())
+    }
+
+    /// Secondary text in a list row, such as a file's age.
+    #[must_use]
+    pub fn list_meta(&self) -> Style {
         Style::new()
             .bg(self.palette.bg.color())
             .fg(self.palette.muted.color())
@@ -599,10 +607,11 @@ mod tests {
             theme.list_marker(),
             theme.search_match(),
             theme.search_current(),
-            theme.toc_item(),
+            theme.list_item(),
             theme.toc_active(),
-            theme.toc_cursor(),
-            theme.toc_cursor_marker(),
+            theme.list_cursor(),
+            theme.list_cursor_marker(),
+            theme.list_meta(),
             theme.toc_fold(),
             theme.sidebar_divider(),
         ];

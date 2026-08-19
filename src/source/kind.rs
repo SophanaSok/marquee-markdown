@@ -28,6 +28,20 @@ impl FileKind {
     }
 }
 
+/// Whether a path carries a markdown extension.
+///
+/// Stricter than [`of_path`], which also treats extensionless files as
+/// markdown: the file browser lists what a reader would call a markdown file,
+/// and offering them every `LICENSE` and `Makefile` in the tree would not.
+#[must_use]
+pub fn has_markdown_extension(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| {
+            MARKDOWN_EXTENSIONS.contains(&extension.to_ascii_lowercase().as_str())
+        })
+}
+
 /// Classify a path by extension.
 #[must_use]
 pub fn of_path(path: &Path) -> FileKind {
@@ -125,5 +139,13 @@ mod tests {
         };
         assert_eq!(language.as_deref(), Some("rs"));
         assert_eq!(text, src);
+    }
+
+    #[test]
+    fn the_browser_lists_markdown_files_but_not_every_extensionless_file() {
+        assert!(has_markdown_extension(Path::new("a/README.md")));
+        assert!(has_markdown_extension(Path::new("NOTES.MARKDOWN")));
+        assert!(!has_markdown_extension(Path::new("LICENSE")));
+        assert!(!has_markdown_extension(Path::new("src/main.rs")));
     }
 }

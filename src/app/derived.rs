@@ -4,7 +4,7 @@
 //! here is a function of the document, the view, and the pane sizes; putting
 //! it in one place is what keeps drawing free of mutation.
 
-use super::state::{App, Focus};
+use super::state::{App, Focus, PromptKind};
 
 /// Bring derived state back in line with the document and the view.
 pub fn sync(app: &mut App) {
@@ -23,12 +23,34 @@ pub fn sync(app: &mut App) {
     }
 
     sync_toc(app);
+    sync_browser(app);
 
     // Matches are line indices, so a re-layout invalidates every one of them.
     // They are re-found here rather than remapped separately, which is what
     // keeps them in step with the scroll position.
     app.search
         .refresh(app.doc.doc(), app.doc.revision(), app.view.top);
+}
+
+/// Re-filter the file list and keep its cursor on screen.
+///
+/// The filter runs from here rather than from the keystroke that changed it,
+/// so a query being typed and a query already committed take the same path —
+/// filtering is idempotent and only does work when something actually changed.
+fn sync_browser(app: &mut App) {
+    let query = match &app.prompt {
+        Some(prompt) if prompt.kind == PromptKind::Filter => prompt.input.clone(),
+        _ => app
+            .browser
+            .as_ref()
+            .map(|browser| browser.filter.clone())
+            .unwrap_or_default(),
+    };
+    let height = app.panes.body.height;
+    if let Some(browser) = app.browser.as_mut() {
+        browser.refresh(&query);
+        browser.clamp(height);
+    }
 }
 
 /// Rebuild what the contents pane shows, and keep the cursor somewhere real.

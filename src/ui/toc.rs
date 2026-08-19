@@ -62,7 +62,7 @@ pub fn entry(app: &App, index: usize, width: u16) -> Line<'static> {
     let Some(row) = app.doc.outline().rows().get(index) else {
         return Line::from(Span::styled(
             " ".repeat(usize::from(width)),
-            theme.toc_item(),
+            theme.list_item(),
         ));
     };
     let is_cursor = index == app.toc.cursor;
@@ -70,20 +70,20 @@ pub fn entry(app: &App, index: usize, width: u16) -> Line<'static> {
     let focused = app.focus == Focus::Toc;
 
     let base = if is_cursor {
-        theme.toc_cursor()
+        theme.list_cursor()
     } else if is_active {
         theme.toc_active()
     } else {
-        theme.toc_item()
+        theme.list_item()
     };
     // The bar says where the cursor is only while the pane has focus, so an
     // unfocused pane cannot look like it is taking keys.
     let (marker, marker_style) = if is_cursor && focused {
-        ("▎", theme.toc_cursor_marker())
+        ("▎", theme.list_cursor_marker())
     } else if is_cursor {
-        (" ", theme.toc_cursor())
+        (" ", theme.list_cursor())
     } else {
-        (" ", theme.toc_item())
+        (" ", theme.list_item())
     };
 
     let total = usize::from(width);
@@ -213,7 +213,7 @@ mod tests {
         let cursor = entry(&app, 2, 24);
         let active = entry(&app, 0, 24);
         assert_ne!(cursor.spans[1].style, active.spans[1].style);
-        assert_eq!(cursor.spans[1].style, app.theme.toc_cursor());
+        assert_eq!(cursor.spans[1].style, app.theme.list_cursor());
         assert_eq!(active.spans[1].style, app.theme.toc_active());
     }
 

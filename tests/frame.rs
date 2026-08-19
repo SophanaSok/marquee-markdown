@@ -83,6 +83,52 @@ fn assert_fully_painted(buf: &Buffer, what: &str) {
     }
 }
 
+/// A reader browsing a directory, with results already in.
+fn browsing() -> App {
+    use marquee_markdown::browser::Entry;
+    let mut app = App::browsing(
+        "/notes".into(),
+        Theme::new(ThemeVariant::Slate),
+        Options::default(),
+    );
+    let browser = app.browser.as_mut().expect("a browser");
+    browser.extend((0..40).map(|n| Entry {
+        path: format!("/notes/file-{n:02}.md").into(),
+        display: format!("file-{n:02}.md"),
+        modified: Some(std::time::SystemTime::UNIX_EPOCH),
+    }));
+    browser.scanning = false;
+    app
+}
+
+#[test]
+fn every_cell_of_the_browser_is_painted_at_every_size() {
+    for &(width, height) in SIZES {
+        let mut app = browsing();
+        let buf = frame(&mut app, width, height);
+        assert_fully_painted(&buf, &format!("browser at {width}x{height}"));
+    }
+}
+
+#[test]
+fn the_browser_never_shows_a_contents_pane() {
+    // It has no document to list the headings of.
+    let mut app = browsing();
+    frame(&mut app, 100, 30);
+    assert!(app.panes.sidebar.is_none());
+}
+
+#[test]
+fn an_empty_browser_is_still_a_painted_screen() {
+    let mut app = App::browsing(
+        "/notes".into(),
+        Theme::new(ThemeVariant::Slate),
+        Options::default(),
+    );
+    let buf = frame(&mut app, 80, 24);
+    assert_fully_painted(&buf, "empty browser");
+}
+
 #[test]
 fn every_cell_is_painted_at_every_size() {
     for &(width, height) in SIZES {

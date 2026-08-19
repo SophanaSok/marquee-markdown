@@ -81,7 +81,11 @@ pub fn compute(area: Rect, app: &App) -> Panes {
 fn sidebar_width(terminal: u16, app: &App) -> Option<u16> {
     // One entry is not a table of contents; it is a heading the reader can
     // already see.
-    if !app.toc_visible || terminal < SIDEBAR_MIN_TERMINAL || app.doc.heading_count() < 2 {
+    if app.screen != crate::app::state::Screen::Document
+        || !app.toc_visible
+        || terminal < SIDEBAR_MIN_TERMINAL
+        || app.doc.heading_count() < 2
+    {
         return None;
     }
     Some((terminal / 4).clamp(SIDEBAR_MIN, SIDEBAR_MAX))

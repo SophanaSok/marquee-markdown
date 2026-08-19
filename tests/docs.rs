@@ -10,7 +10,7 @@ use marquee_markdown::app::keymap::{Keymap, Mode};
 fn the_readme_documents_every_key_the_reader_binds() {
     let readme = include_str!("../README.md");
     let keymap = Keymap::defaults();
-    for mode in [Mode::Document, Mode::Toc] {
+    for mode in [Mode::Document, Mode::Browser, Mode::Toc] {
         for (chord, action) in keymap.bindings(mode) {
             assert!(
                 readme.contains(&format!("`{chord}`")),

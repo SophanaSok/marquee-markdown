@@ -4,7 +4,7 @@ use ratatui::Frame;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 
-use crate::app::state::App;
+use crate::app::state::{App, Screen};
 use crate::render::{measure, tui};
 
 /// Draw the status bar.
@@ -55,10 +55,25 @@ pub fn compose(app: &App, width: u16) -> Line<'static> {
 /// first, since the document itself is still on screen above it.
 fn left_side(app: &App) -> (String, Style, String) {
     if let Some(prompt) = &app.prompt {
+        // The sigil is what tells the browser's filter apart from the
+        // document's search: both live on `/`, and a reader who cannot see
+        // which one they are typing into has to guess.
         // A block stands in for the cursor: the real one is hidden, and a
         // prompt with no visible caret does not look like it is taking input.
         return (
             format!(" {}{}▏", prompt.kind.sigil(), prompt.input),
+            app.theme.status_active(),
+            String::new(),
+        );
+    }
+    if app.screen == Screen::Browser {
+        let root = app
+            .browser
+            .as_ref()
+            .map(|browser| browser.root.display().to_string())
+            .unwrap_or_default();
+        return (
+            format!(" {root} "),
             app.theme.status_active(),
             String::new(),
         );
@@ -74,10 +89,38 @@ fn left_side(app: &App) -> (String, Style, String) {
     )
 }
 
+/// The right of the bar while browsing: how many files, and whether the walk
+/// is still turning up more.
+fn browser_right_side(app: &App) -> (String, Style) {
+    let Some(browser) = &app.browser else {
+        return (String::new(), app.theme.status_bar());
+    };
+    let count = browser.len();
+    let files = if count == 1 { "file" } else { "files" };
+    if browser.scanning {
+        // Say the count is still moving, so a reader does not act on a number
+        // that is about to change.
+        return (
+            format!(" {count} {files} · looking… "),
+            app.theme.status_message(),
+        );
+    }
+    let total = browser.entries().len();
+    let text = if count == total {
+        format!(" {count} {files}  ? help ")
+    } else {
+        format!(" {count} of {total} {files} ")
+    };
+    (text, app.theme.status_bar())
+}
+
 /// The right of the bar: a message, the search, or how far through we are.
 fn right_side(app: &App) -> (String, Style) {
     if let Some(message) = &app.message {
         return (format!(" {message} "), app.theme.status_message());
+    }
+    if app.screen == Screen::Browser {
+        return browser_right_side(app);
     }
     if app.prompt.is_some() {
         return (" enter to search ".to_owned(), app.theme.status_bar());
@@ -151,6 +194,59 @@ mod tests {
         let text = text_of(&compose(&app, 60));
         assert!(text.contains("press q to quit"), "{text:?}");
         assert!(!text.contains("help"), "{text:?}");
+    }
+
+    #[test]
+    fn the_browser_names_the_directory_and_counts_what_is_in_it() {
+        use crate::browser::Entry;
+        let mut app = App::browsing(
+            "/home/reader/notes".into(),
+            Theme::new(ThemeVariant::Slate),
+            Options::default(),
+        );
+        let browser = app.browser.as_mut().unwrap();
+        browser.extend([Entry {
+            path: "/home/reader/notes/a.md".into(),
+            display: "a.md".into(),
+            modified: None,
+        }]);
+        browser.scanning = false;
+        crate::app::reconcile(&mut app, Rect::new(0, 0, 60, 24));
+
+        let text = text_of(&compose(&app, 60));
+        assert!(text.contains("/home/reader/notes"), "{text:?}");
+        assert!(text.contains("1 file"), "{text:?}");
+    }
+
+    #[test]
+    fn a_running_scan_says_the_count_is_not_final() {
+        let mut app = App::browsing(
+            "/notes".into(),
+            Theme::new(ThemeVariant::Slate),
+            Options::default(),
+        );
+        crate::app::reconcile(&mut app, Rect::new(0, 0, 60, 24));
+        assert!(text_of(&compose(&app, 60)).contains("looking"));
+    }
+
+    #[test]
+    fn a_filtered_list_says_how_much_it_is_hiding() {
+        use crate::browser::Entry;
+        let mut app = App::browsing(
+            "/notes".into(),
+            Theme::new(ThemeVariant::Slate),
+            Options::default(),
+        );
+        let browser = app.browser.as_mut().unwrap();
+        browser.extend((0..5).map(|n| Entry {
+            path: format!("/notes/{n}.md").into(),
+            display: format!("{n}.md"),
+            modified: None,
+        }));
+        browser.scanning = false;
+        browser.filter = "3".to_owned();
+        crate::app::reconcile(&mut app, Rect::new(0, 0, 60, 24));
+        assert!(text_of(&compose(&app, 60)).contains("1 of 5"));
     }
 
     #[test]

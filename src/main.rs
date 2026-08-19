@@ -60,20 +60,26 @@ fn run() -> Result<()> {
         }
         RunMode::Tui => {
             let source = source::resolve(&spec)?;
-            app::run(
-                source,
-                theme,
-                app::Options {
-                    width: cli.width,
-                    line_numbers: cli.line_numbers,
-                    mouse: cli.mouse,
-                },
-            )
+            app::run(source, theme, options(&cli))
+        }
+        RunMode::Browser => {
+            let root = match &spec {
+                source::SourceSpec::Dir(path) => path.clone(),
+                _ => std::env::current_dir()?,
+            };
+            app::browse(root, theme, options(&cli))
         }
         RunMode::Pager => anyhow::bail!("--pager is not built yet; run without -p for now"),
-        RunMode::Browser => {
-            anyhow::bail!("the file browser is not built yet; name a file to read for now")
-        }
+    }
+}
+
+/// The command-line settings the reader cares about.
+fn options(cli: &Cli) -> app::Options {
+    app::Options {
+        width: cli.width,
+        line_numbers: cli.line_numbers,
+        mouse: cli.mouse,
+        all: cli.all,
     }
 }
 

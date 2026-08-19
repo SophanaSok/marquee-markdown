@@ -20,6 +20,13 @@ const LAYERS: &[Layer] = &[
                  rather than archaeological",
     },
     Layer {
+        dir: "src/browser",
+        forbidden: &["crate::app", "crate::ui"],
+        reason: "the browser models a directory of files, not a screen; keeping \
+                 it below the shell is what lets the walk, the filter and the \
+                 selection be tested without a terminal",
+    },
+    Layer {
         dir: "src/doc",
         forbidden: &["crate::app", "crate::ui", "crate::browser"],
         reason: "document state is modelled without reference to a terminal, \

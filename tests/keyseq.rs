@@ -333,3 +333,216 @@ fn a_search_survives_being_re_laid_out() {
     let hit = app.search.current_match().expect("a hit");
     assert!(hit.line < app.doc.doc().lines.len(), "stale line index");
 }
+
+/// A directory of markdown files, and a reader browsing it.
+///
+/// The walk's results are fed in as events, which is exactly how they arrive
+/// from the real walk — so the browser is exercised through the same door.
+fn browsing(files: &[&str], script: &str) -> (tempfile::TempDir, App) {
+    use marquee_markdown::browser::{Entry, Scan};
+
+    let dir = tempfile::tempdir().expect("temp dir");
+    let mut entries = Vec::new();
+    for (index, name) in files.iter().enumerate() {
+        let path = dir.path().join(name);
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).expect("mkdir");
+        }
+        std::fs::write(&path, format!("# {name}\n\nBody of {name}.\n")).expect("write");
+        entries.push(Entry {
+            path,
+            display: (*name).to_owned(),
+            // Ordered so the first file listed is the first one named.
+            modified: Some(
+                std::time::SystemTime::UNIX_EPOCH
+                    + std::time::Duration::from_secs(1_000_000 - index as u64),
+            ),
+        });
+    }
+
+    let mut app = App::browsing(
+        dir.path().to_path_buf(),
+        Theme::new(ThemeVariant::Slate),
+        Options::default(),
+    );
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).expect("test terminal");
+    let mut events = ScriptedEvents::new(
+        [Event::Scan(Scan::Found(entries)), Event::Scan(Scan::Done)]
+            .into_iter()
+            .chain(keys(script)),
+    );
+    drive(&mut app, &mut terminal, &mut events).expect("the loop runs");
+    (dir, app)
+}
+
+const FILES: &[&str] = &[
+    "README.md",
+    "docs/ROADMAP.md",
+    "docs/THEMING.md",
+    "notes/meeting.md",
+];
+
+#[test]
+fn the_browser_lists_what_the_walk_found() {
+    let (_dir, app) = browsing(FILES, "");
+    assert_eq!(
+        app.summary(),
+        "mode=browser files=4 cursor=README.md filter=- quit=false"
+    );
+}
+
+#[test]
+fn moving_through_the_list_stops_at_both_ends() {
+    assert!(
+        browsing(FILES, "jj")
+            .1
+            .summary()
+            .contains("cursor=docs/THEMING.md")
+    );
+    assert!(
+        browsing(FILES, "jjjjjjjj")
+            .1
+            .summary()
+            .contains("cursor=notes/meeting.md")
+    );
+    assert!(
+        browsing(FILES, "jjkk")
+            .1
+            .summary()
+            .contains("cursor=README.md")
+    );
+    assert!(
+        browsing(FILES, "G")
+            .1
+            .summary()
+            .contains("cursor=notes/meeting.md")
+    );
+    assert!(
+        browsing(FILES, "Gg")
+            .1
+            .summary()
+            .contains("cursor=README.md")
+    );
+}
+
+#[test]
+fn the_filter_narrows_the_list_as_it_is_typed() {
+    // Incremental: the list is already narrowed before enter is pressed.
+    let (_dir, app) = browsing(FILES, "/theming");
+    assert!(app.summary().contains("files=1"), "{}", app.summary());
+    assert!(
+        app.summary().contains("cursor=docs/THEMING.md"),
+        "{}",
+        app.summary()
+    );
+}
+
+#[test]
+fn the_filter_is_fuzzy() {
+    let (_dir, app) = browsing(FILES, "/rdmp\n");
+    assert!(
+        app.summary().contains("cursor=docs/ROADMAP.md"),
+        "{}",
+        app.summary()
+    );
+}
+
+#[test]
+fn typing_a_filter_does_not_run_the_keys_as_commands() {
+    // `q`, `j` and `G` all do something in the browser.
+    let (_dir, app) = browsing(FILES, "/qjG");
+    assert!(!app.should_quit, "a letter typed into the filter quit");
+    assert!(app.summary().contains("filter=qjG|"), "{}", app.summary());
+}
+
+#[test]
+fn escape_clears_a_committed_filter() {
+    let (_dir, app) = browsing(FILES, "/docs\n<esc>");
+    assert!(app.summary().contains("files=4"), "{}", app.summary());
+    assert!(app.summary().contains("filter=-"), "{}", app.summary());
+}
+
+#[test]
+fn escape_cancels_a_filter_being_typed_without_committing_it() {
+    let (_dir, app) = browsing(FILES, "/docs<esc>");
+    assert!(app.summary().contains("files=4"), "{}", app.summary());
+    assert!(app.summary().contains("filter=-"), "{}", app.summary());
+}
+
+#[test]
+fn opening_a_file_reads_it() {
+    let (_dir, app) = browsing(FILES, "j\n");
+    assert!(
+        app.summary().starts_with("mode=document"),
+        "{}",
+        app.summary()
+    );
+    assert_eq!(app.doc.source.display_name, "ROADMAP.md");
+    assert!(!app.doc.doc().lines.is_empty(), "nothing was laid out");
+}
+
+#[test]
+fn escape_goes_back_to_the_browser_from_a_document() {
+    let (_dir, app) = browsing(FILES, "j\n<esc>");
+    assert!(
+        app.summary().starts_with("mode=browser"),
+        "{}",
+        app.summary()
+    );
+    // And the list is where it was left, not reset.
+    assert!(
+        app.summary().contains("cursor=docs/ROADMAP.md"),
+        "{}",
+        app.summary()
+    );
+}
+
+#[test]
+fn a_document_opened_from_the_browser_can_be_read_and_left_repeatedly() {
+    let (_dir, app) = browsing(FILES, "j\n<esc>jj\n<esc>");
+    assert!(
+        app.summary().starts_with("mode=browser"),
+        "{}",
+        app.summary()
+    );
+    assert!(
+        app.summary().contains("cursor=notes/meeting.md"),
+        "{}",
+        app.summary()
+    );
+}
+
+#[test]
+fn a_file_named_on_the_command_line_has_no_browser_to_go_back_to() {
+    // `esc` there must hint rather than opening a browser that was never asked
+    // for.
+    let app = run(&document(), "<esc>");
+    assert!(app.browser.is_none());
+    assert!(app.message.is_some());
+    assert!(!app.should_quit);
+}
+
+#[test]
+fn the_browser_survives_having_nothing_to_list() {
+    let (_dir, app) = browsing(&[], "jkG\n/x\n");
+    assert!(app.summary().contains("files=0"), "{}", app.summary());
+    assert!(!app.should_quit);
+}
+
+#[test]
+fn paging_moves_a_whole_screen_in_the_browser() {
+    let names: Vec<String> = (0..60).map(|n| format!("file-{n:02}.md")).collect();
+    let files: Vec<&str> = names.iter().map(String::as_str).collect();
+    let (_dir, one) = browsing(&files, "f");
+    let (_dir2, two) = browsing(&files, "ff");
+    assert!(
+        one.summary().contains("cursor=file-23.md"),
+        "{}",
+        one.summary()
+    );
+    assert!(
+        two.summary().contains("cursor=file-46.md"),
+        "{}",
+        two.summary()
+    );
+}

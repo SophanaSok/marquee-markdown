@@ -22,24 +22,59 @@ pub mod state;
 pub mod terminal;
 pub mod update;
 
+use std::path::PathBuf;
+
 use anyhow::Result;
 use ratatui::layout::Rect;
 
+use crate::browser;
 use crate::render::LayoutOptions;
 use crate::source::Source;
 use crate::theme::Theme;
 
-pub use state::{App, Options, Overlay};
+pub use state::{App, Options, Overlay, Screen};
 
 /// Run the full-screen reader over a document until the reader quits.
 ///
 /// # Errors
 /// Returns an error when the terminal cannot be taken over or drawing fails.
 pub fn run(source: Source, theme: Theme, options: Options) -> Result<()> {
-    let mut app = App::new(source, theme, options);
+    take_over(App::new(source, theme, options), options, |_| {})
+}
+
+/// Open the file browser over `root`.
+///
+/// The directory walk starts before the terminal is taken over, so the first
+/// screenful is already arriving by the time there is something to draw it on.
+///
+/// # Errors
+/// Returns an error when the terminal cannot be taken over or drawing fails.
+pub fn browse(root: PathBuf, theme: Theme, options: Options) -> Result<()> {
+    let all = options.all;
+    take_over(
+        App::browsing(root.clone(), theme, options),
+        options,
+        move |sender| {
+            browser::walk::spawn(root, all, move |scan| {
+                sender.send(event::Event::Scan(scan)).is_ok()
+            });
+        },
+    )
+}
+
+/// Take over the terminal and run `app` until it quits.
+///
+/// `start` is handed the event sender so background work can be started with
+/// somewhere to report to.
+fn take_over(
+    mut app: App,
+    options: Options,
+    start: impl FnOnce(std::sync::mpsc::Sender<event::Event>),
+) -> Result<()> {
     terminal::install_panic_hook();
     let mut screen = terminal::Screen::enter(options.mouse)?;
-    let mut events = event::TerminalEvents;
+    let (mut events, sender) = event::Events::new();
+    start(sender);
     drive(&mut app, screen.terminal(), &mut events)
 }
 

@@ -71,6 +71,22 @@ pub enum Action {
     PromptBackspace,
     /// Clear the prompt without cancelling it.
     PromptClear,
+    /// Move down one file in the browser.
+    BrowserDown,
+    /// Move up one file in the browser.
+    BrowserUp,
+    /// Move a whole screen down the file list.
+    BrowserPageDown,
+    /// Move a whole screen up the file list.
+    BrowserPageUp,
+    /// Go to the first file.
+    BrowserTop,
+    /// Go to the last file.
+    BrowserBottom,
+    /// Read the selected file.
+    BrowserOpen,
+    /// Begin filtering the file list.
+    FilterStart,
 }
 
 impl Action {
@@ -98,6 +114,14 @@ impl Action {
         Self::TocCollapse,
         Self::TocExpand,
         Self::TocOpen,
+        Self::BrowserDown,
+        Self::BrowserUp,
+        Self::BrowserPageDown,
+        Self::BrowserPageUp,
+        Self::BrowserTop,
+        Self::BrowserBottom,
+        Self::BrowserOpen,
+        Self::FilterStart,
         Self::PromptAccept,
         Self::PromptBackspace,
         Self::PromptClear,
@@ -140,6 +164,14 @@ impl Action {
             Self::PromptAccept => "prompt-accept",
             Self::PromptBackspace => "prompt-backspace",
             Self::PromptClear => "prompt-clear",
+            Self::BrowserDown => "browser-down",
+            Self::BrowserUp => "browser-up",
+            Self::BrowserPageDown => "browser-page-down",
+            Self::BrowserPageUp => "browser-page-up",
+            Self::BrowserTop => "browser-top",
+            Self::BrowserBottom => "browser-bottom",
+            Self::BrowserOpen => "browser-open",
+            Self::FilterStart => "filter-start",
         }
     }
 
@@ -176,6 +208,14 @@ impl Action {
             Self::PromptAccept => "accept",
             Self::PromptBackspace => "delete back",
             Self::PromptClear => "clear",
+            Self::BrowserDown => "next file",
+            Self::BrowserUp => "previous file",
+            Self::BrowserPageDown => "next page",
+            Self::BrowserPageUp => "previous page",
+            Self::BrowserTop => "first file",
+            Self::BrowserBottom => "last file",
+            Self::BrowserOpen => "read this file",
+            Self::FilterStart => "filter the list",
         }
     }
 }
@@ -248,13 +288,21 @@ mod tests {
             | Action::SearchPrevious
             | Action::PromptAccept
             | Action::PromptBackspace
-            | Action::PromptClear => {}
+            | Action::PromptClear
+            | Action::BrowserDown
+            | Action::BrowserUp
+            | Action::BrowserPageDown
+            | Action::BrowserPageUp
+            | Action::BrowserTop
+            | Action::BrowserBottom
+            | Action::BrowserOpen
+            | Action::FilterStart => {}
         }
     }
 
     #[test]
     fn every_variant_reaches_the_list() {
-        assert_eq!(Action::ALL.len(), 29, "Action::ALL is out of date");
+        assert_eq!(Action::ALL.len(), 37, "Action::ALL is out of date");
     }
 
     #[test]
