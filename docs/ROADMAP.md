@@ -226,8 +226,6 @@ and cross-wrap search that narrows as you type). What remains is smaller:
 
 - On macOS, file system events arrive per directory, so saving a sibling file
   can trigger a redundant reload — re-read, never shown wrongly.
-- A relative link in a fetched document is resolved by joining, without
-  normalizing `..`.
 - A single overlong word hard-split at the column edge does not match across
   its split; there is no space there for the search joiner to stand in for.
 

@@ -189,7 +189,7 @@ Keys are written here the way a configuration file will spell them.
 | `/` | search |
 | `n` `N` | next hit, previous hit |
 | `]` `[` | next link, previous link |
-| `enter` | open the selected link |
+| `enter` | follow the selected link |
 | `y` | copy the selected link |
 | `c` | copy the document |
 | `e` | edit, at the line on screen |
@@ -278,6 +278,11 @@ report changes.
 and reloads when the editor exits. Line arguments are spelled the way each
 editor wants them; an editor that is not recognized is handed the path alone
 rather than a flag it would take for a second filename.
+
+A link to a heading in the same document (`[see below](#section)`) scrolls
+there rather than handing the fragment to your browser — the contents pane
+already knows where every heading is. Links out are resolved against wherever
+the document came from, including root-relative ones and `..`.
 
 `c` copies the markdown as written, not as rendered — what you want to paste
 elsewhere is the source. `y` copies the address of the selected link. Both go

@@ -193,29 +193,77 @@ fn step_link(app: &mut App, direction: isize) {
     }
 }
 
-/// Open the selected link in whatever the system opens it with.
+/// Follow the selected link.
+///
+/// A link to a heading in this document is navigation, not a handoff: the
+/// outline already knows where every slug is, and sending `#section` to the
+/// system opener does nothing a reader would recognise as following it.
 fn open_link(app: &mut App) {
-    let Some(url) = app.links.selected_url(app.doc.doc()) else {
+    let Some(target) = selected_target(app) else {
         app.message = Some("press ] to pick a link".to_owned());
         return;
     };
-    let url = resolve_link(app, url);
-    // Opening hands off to another program entirely; that it failed is worth
-    // saying, but never worth ending the session over.
-    match open::that_detached(&url) {
-        Ok(()) => app.message = Some(format!("opening {url}")),
-        Err(error) => app.message = Some(format!("cannot open {url}: {error}")),
+    match target {
+        LinkTarget::Anchor(slug) => jump_to_anchor(app, &slug),
+        LinkTarget::External(url) => {
+            // Opening hands off to another program entirely; that it failed
+            // is worth saying, but never worth ending the session over.
+            match open::that_detached(&url) {
+                Ok(()) => app.message = Some(format!("opening {url}")),
+                Err(error) => app.message = Some(format!("cannot open {url}: {error}")),
+            }
+        }
+    }
+}
+
+/// Scroll to the heading a `#slug` link names.
+fn jump_to_anchor(app: &mut App, slug: &str) {
+    let found = app
+        .doc
+        .doc()
+        .outline
+        .iter()
+        .find(|anchor| anchor.id == slug)
+        .map(|anchor| (anchor.line, anchor.text.clone()));
+    match found {
+        Some((line, text)) => {
+            let extent = app.extent();
+            app.view.go_to(line, extent);
+            app.message = Some(format!("\u{2192} {text}"));
+        }
+        None => app.message = Some(format!("no heading `#{slug}` in this document")),
     }
 }
 
 /// Copy the selected link's address.
 fn copy_link(app: &mut App) {
-    let Some(url) = app.links.selected_url(app.doc.doc()) else {
+    let Some(target) = selected_target(app) else {
         app.message = Some("press ] to pick a link".to_owned());
         return;
     };
-    let url = resolve_link(app, url);
-    copy(app, &url);
+    // An in-document link is copied as the document spells it: `#section` is
+    // what belongs in the markdown it came from, and there is no address to
+    // give instead.
+    let text = match target {
+        LinkTarget::Anchor(slug) => format!("#{slug}"),
+        LinkTarget::External(url) => url,
+    };
+    copy(app, &text);
+}
+
+/// Where a link goes, once resolved against the document it is in.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum LinkTarget {
+    /// A heading in this document, by slug.
+    Anchor(String),
+    /// An address for the system to open.
+    External(String),
+}
+
+/// The selected link, resolved. `None` when nothing is selected.
+fn selected_target(app: &App) -> Option<LinkTarget> {
+    let link = app.links.selected_url(app.doc.doc())?;
+    Some(resolve_link(app, link))
 }
 
 /// Copy the document as it was written, not as it was rendered: what a reader
@@ -238,17 +286,19 @@ fn copy(app: &mut App, text: &str) {
 
 /// Turn a link into something openable, resolving a relative one against
 /// wherever the document came from.
-fn resolve_link(app: &App, link: &str) -> String {
+fn resolve_link(app: &App, link: &str) -> LinkTarget {
     use crate::source::Base;
 
-    if link.contains("://") || link.starts_with("mailto:") {
-        return link.to_owned();
+    if let Some(slug) = link.strip_prefix('#') {
+        return LinkTarget::Anchor(slug.to_owned());
     }
-    match &app.doc.source.base {
-        Base::Url(base) => format!("{base}{link}"),
+    LinkTarget::External(match &app.doc.source.base {
+        // Joining is not enough: a root-relative link resolves against the
+        // host, and `..` has to be folded away.
+        Base::Url(base) => crate::source::remote::join_url(base, link),
         Base::Dir(dir) => dir.join(link).display().to_string(),
         Base::Cwd => link.to_owned(),
-    }
+    })
 }
 
 /// Ask the loop to open the document in an editor, at the line on screen.

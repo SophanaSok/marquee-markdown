@@ -123,6 +123,89 @@ fn remote_kind(file_name: Option<&str>, content_type: Option<&str>) -> FileKind 
     }
 }
 
+/// Resolve `link` against `base`, the directory URL a document came from.
+///
+/// Joining the two strings is not enough, and the ways it fails are not
+/// cosmetic: a root-relative `/docs/x` appended to `https://h/a/b/` gives
+/// `https://h/a/b//docs/x`, which is a 404 rather than the page the author
+/// meant. Scheme-absolute, protocol-relative and root-relative links each
+/// resolve from a different starting point, and `.` / `..` are folded away.
+#[must_use]
+pub fn join_url(base: &str, link: &str) -> String {
+    if has_scheme(link) {
+        return normalize(link);
+    }
+    if let Some(rest) = link.strip_prefix("//") {
+        // Protocol-relative: keep the scheme we arrived by.
+        let scheme = base.split("://").next().unwrap_or("https");
+        return normalize(&format!("{scheme}://{rest}"));
+    }
+    if link.starts_with('/') {
+        // Root-relative: against the host, not the directory.
+        return normalize(&format!("{}{link}", origin(base)));
+    }
+    normalize(&format!("{base}{link}"))
+}
+
+/// Whether `link` starts with a URL scheme (`https:`, `mailto:`, …).
+///
+/// Stricter than looking for `://`, which misses `mailto:` and would be
+/// fooled by a `://` appearing inside a query string.
+fn has_scheme(link: &str) -> bool {
+    let Some(colon) = link.find(':') else {
+        return false;
+    };
+    let scheme = &link[..colon];
+    !scheme.is_empty()
+        && scheme.starts_with(|c: char| c.is_ascii_alphabetic())
+        && scheme
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '-' | '.'))
+}
+
+/// The scheme and host of a URL, without any path.
+fn origin(url: &str) -> &str {
+    let start = url.find("://").map_or(0, |index| index + 3);
+    match url[start..].find('/') {
+        Some(index) => &url[..start + index],
+        None => url,
+    }
+}
+
+/// Fold `.` and `..` away in a URL's path, leaving any query and fragment
+/// alone.
+fn normalize(url: &str) -> String {
+    let start = url.find("://").map_or(0, |index| index + 3);
+    let Some(path_start) = url[start..].find('/').map(|index| start + index) else {
+        return url.to_owned();
+    };
+    let (head, rest) = url.split_at(path_start);
+    let cut = rest.find(['?', '#']).unwrap_or(rest.len());
+    let (path, tail) = rest.split_at(cut);
+
+    let mut parts: Vec<&str> = Vec::new();
+    for part in path.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                parts.pop();
+            }
+            other => parts.push(other),
+        }
+    }
+    let mut out = String::from(head);
+    for part in &parts {
+        out.push('/');
+        out.push_str(part);
+    }
+    // A path that ended in a separator still names a directory.
+    if path.ends_with('/') || path == "/" || parts.is_empty() {
+        out.push('/');
+    }
+    out.push_str(tail);
+    out
+}
+
 /// Split a URL into the directory it lives in and its final segment.
 ///
 /// The directory is what relative links resolve against, and it always ends in
@@ -169,6 +252,83 @@ mod tests {
             split_url("https://x.dev/a.md?raw=1#top"),
             ("https://x.dev/".to_owned(), Some("a.md"))
         );
+    }
+
+    #[test]
+    fn a_relative_link_resolves_against_the_directory() {
+        let base = "https://x.dev/docs/guide/";
+        assert_eq!(
+            join_url(base, "other.md"),
+            "https://x.dev/docs/guide/other.md"
+        );
+        assert_eq!(
+            join_url(base, "./other.md"),
+            "https://x.dev/docs/guide/other.md"
+        );
+    }
+
+    #[test]
+    fn a_root_relative_link_resolves_against_the_host() {
+        // Joined naively this gives `…/docs/guide//api`, which is a 404.
+        assert_eq!(
+            join_url("https://x.dev/docs/guide/", "/api/index.md"),
+            "https://x.dev/api/index.md"
+        );
+    }
+
+    #[test]
+    fn a_protocol_relative_link_keeps_the_scheme_it_arrived_by() {
+        assert_eq!(
+            join_url("http://x.dev/a/", "//cdn.dev/lib.md"),
+            "http://cdn.dev/lib.md"
+        );
+    }
+
+    #[test]
+    fn dot_dot_is_folded_away() {
+        assert_eq!(
+            join_url("https://x.dev/a/b/c/", "../../up.md"),
+            "https://x.dev/a/up.md"
+        );
+        assert_eq!(join_url("https://x.dev/a/b/", "../"), "https://x.dev/a/");
+        // Climbing past the root stops there rather than escaping the host.
+        assert_eq!(
+            join_url("https://x.dev/a/", "../../../x.md"),
+            "https://x.dev/x.md"
+        );
+    }
+
+    #[test]
+    fn an_absolute_link_is_left_alone_apart_from_normalizing() {
+        assert_eq!(
+            join_url("https://x.dev/a/", "https://other.dev/b.md"),
+            "https://other.dev/b.md"
+        );
+        assert_eq!(
+            join_url("https://x.dev/a/", "mailto:a@b.dev"),
+            "mailto:a@b.dev"
+        );
+    }
+
+    #[test]
+    fn a_query_or_fragment_survives_the_join() {
+        assert_eq!(
+            join_url("https://x.dev/a/", "b.md?raw=1#top"),
+            "https://x.dev/a/b.md?raw=1#top"
+        );
+        // And `..` inside a query is not a path segment.
+        assert_eq!(
+            join_url("https://x.dev/a/", "b.md?p=../x"),
+            "https://x.dev/a/b.md?p=../x"
+        );
+    }
+
+    #[test]
+    fn a_scheme_is_told_apart_from_a_colon_in_a_path() {
+        assert!(has_scheme("https://x.dev"));
+        assert!(has_scheme("mailto:a@b.dev"));
+        assert!(!has_scheme("notes/2026:the-year.md"));
+        assert!(!has_scheme("./relative"));
     }
 
     #[test]

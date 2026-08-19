@@ -955,3 +955,59 @@ fn n_steps_through_a_match_that_spans_two_lines() {
         "the hit was not revealed"
     );
 }
+
+#[test]
+fn a_link_to_a_heading_in_this_document_scrolls_to_it() {
+    // The outline already knows where every slug is; handing `#slug` to the
+    // system opener would do nothing a reader recognises as following it.
+    let mut text = String::from("See [the last part](#chapter-12) below.\n\n");
+    text.push_str(&nested());
+    let app = run(&text, "]\r");
+
+    // The heading is on screen. It cannot always be *at* the top — a target
+    // in the last screenful has nowhere further to scroll — so visibility is
+    // the property, not the offset.
+    let line = app
+        .doc
+        .doc()
+        .outline
+        .iter()
+        .find(|anchor| anchor.id == "chapter-12")
+        .expect("the heading exists")
+        .line;
+    let height = usize::from(app.panes.body.height);
+    assert!(
+        (app.view.top..app.view.top + height).contains(&line),
+        "line {line} not visible from top {}",
+        app.view.top
+    );
+    assert!(app.view.top > 0, "the view did not move");
+    assert!(app.message.is_some(), "nothing confirmed the jump");
+}
+
+#[test]
+fn a_link_to_a_heading_that_is_not_there_says_so() {
+    let text = format!("See [nowhere](#no-such-heading).\n\n{}", nested());
+    let app = run(&text, "]\r");
+    assert_eq!(app.view.top, 0, "it moved anyway");
+    assert!(
+        app.message
+            .as_deref()
+            .is_some_and(|m| m.contains("no-such-heading")),
+        "{:?}",
+        app.message
+    );
+}
+
+#[test]
+fn copying_an_in_document_link_copies_what_the_markdown_says() {
+    // There is no address to give instead, and `#section` is what belongs
+    // back in a markdown file.
+    let text = format!("See [below](#chapter-3).\n\n{}", nested());
+    let app = run(&text, "]y");
+    assert!(
+        app.message.as_deref().is_some_and(|m| m.contains("copied")),
+        "{:?}",
+        app.message
+    );
+}

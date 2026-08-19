@@ -14,7 +14,20 @@ Until 1.0 both halves may change.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- A link to a heading in the same document (`[x](#section)`) now scrolls to it
+  instead of being handed to the system opener, which did nothing useful with
+  a bare fragment. The outline already knows where every slug is. Copying such
+  a link copies `#section` — what belongs back in a markdown file.
+
+### Fixed
+
+- Links in a fetched document are resolved properly rather than concatenated:
+  a root-relative `/docs/x` resolved against the directory instead of the host
+  and produced a 404, protocol-relative `//host/x` was mangled, and `..` was
+  never folded away. `mailto:` and other schemes are recognised without
+  relying on `://` appearing.
 
 ## [0.2.0] - 2026-08-19
 
