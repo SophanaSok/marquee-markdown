@@ -63,7 +63,9 @@ jobs:
       - name: Build and exercise the binary
         shell: bash
         run: |
-          set -euo pipefail
+          # `-x` so a failure names the command that failed: a smoke job that
+          # only says "exit 1" makes you push again to find out where.
+          set -euxo pipefail
           # `--locked`, so this exercises the dependency versions the
           # repository actually pins rather than whatever resolves today.
           cargo build --release --locked

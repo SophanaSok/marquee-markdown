@@ -266,6 +266,9 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
 
 - Callout and image icons are Nerd Font glyphs; a terminal without one shows a
   missing-glyph box. They should be part of the theme format.
+- On macOS, file system events are reported per directory, so saving a
+  different file beside the open one can trigger a redundant reload. The
+  document is re-read rather than shown wrongly.
 
 - A fetch failure at startup exits with a message rather than opening the
   reader with an explanation in the status bar.
