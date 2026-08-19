@@ -9,6 +9,9 @@ cargo build
 cargo build --release
 ```
 
+Requires Rust 1.88 (let-chains). `rust-version` in `Cargo.toml` is the single
+statement of that, and CI reads it from there rather than repeating it.
+
 No C toolchain is required: `syntect` uses the pure-Rust `fancy-regex` backend
 (`default-features = false, features = ["default-fancy"]`, with `two-face` on
 `syntect-fancy` to match). Do not switch to the default `onig` backend — it
@@ -48,6 +51,10 @@ cargo fmt --all -- --check
 ```
 
 Project clippy config is in `Cargo.toml` under `[lints.clippy]`.
+
+Clippy is MSRV-aware: it suppresses suggestions that need a newer Rust than
+`rust-version` promises. Getting that field wrong therefore hides lints as well
+as misleading users.
 
 ## Architecture
 
@@ -208,6 +215,13 @@ whose text contains escapes.
   drifted.
 - New keys must go through the `Action` enum, never a hardcoded `KeyCode` match
   — otherwise the configurable keymap becomes a rewrite.
+
+## Before a release
+
+`packaging/README.md` has the sequence. The parts that are easy to forget:
+`docs/KEYBINDINGS.md` is generated, the changelog heading must contain the
+version (the release workflow matches on it), and the man page and completions
+come from the binary rather than the repository.
 
 ## Testing notes
 

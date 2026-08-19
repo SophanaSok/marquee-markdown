@@ -1,0 +1,148 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-targets -- -D warnings
+      # The library is meant to be used, so its documentation has to build
+      # clean — including the intra-doc links.
+      - run: cargo doc --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  test:
+    # Every OS: terminal handling, path resolution and the file watcher all
+    # differ per platform, and `ctrl+z` exists on only one of them.
+    name: Test ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.os }}
+      - run: cargo test --all-targets
+      # `--all-targets` silently skips doctests, and the render module's
+      # public example is one.
+      - run: cargo test --doc
+
+  smoke:
+    # Several bugs in this project were invisible to the whole test suite and
+    # obvious within seconds of running the binary. This is that check, for
+    # the ones that can be made without a terminal.
+    name: Smoke test the CLI
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build and exercise the binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo build --release
+          BIN=target/release/marquee-markdown
+          "$BIN" --version
+
+          # Rendering a file, and the width flag being honored exactly.
+          "$BIN" -w 60 README.md | head -5
+          test "$("$BIN" -w 60 README.md | head -1 | wc -c)" -eq 61
+
+          # Piped standard input. This path once read an empty document
+          # because a non-interactive shell hands children /dev/null.
+          cat README.md | "$BIN" -w 60 | grep -q marquee
+          "$BIN" -w 60 - < README.md | grep -q marquee
+
+          # A reader that closes the pipe is how a filter is told to stop,
+          # not a crash.
+          "$BIN" README.md | head -c 200 > /dev/null
+
+          # Redirected output carries no escape sequences.
+          "$BIN" README.md > out.txt
+          ! grep -q $'\x1b' out.txt
+
+          # `-n` keeps the author's line breaks; without it they are re-flowed.
+          printf '# T\n\nalpha\nbeta\n' > n.md
+          "$BIN" -n -w 40 n.md | grep -q '^alpha  *$'
+          ! "$BIN" -w 40 n.md | grep -q '^alpha  *$'
+
+          # The generated surfaces still generate.
+          "$BIN" man | head -3
+          "$BIN" completion bash | head -3
+          "$BIN" themes | grep -q slate
+          "$BIN" keys | grep -q line-down
+          "$BIN" config | grep -q '\[general\]'
+
+          # The effective configuration round-trips as a configuration file.
+          "$BIN" config > round-trip.toml
+          "$BIN" --config round-trip.toml config > /dev/null
+
+  msrv:
+    name: MSRV
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Read from the manifest rather than repeating it, so the version
+      # promised and the version tested cannot drift.
+      - id: msrv
+        run: echo "version=$(grep -m1 '^rust-version' Cargo.toml | cut -d'"' -f2)" >> "$GITHUB_OUTPUT"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --all-targets
+
+  package:
+    name: Publishable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      # Catches what only publishing catches: a missing README, metadata that
+      # will not validate, or a file excluded that turns out to be needed.
+      - run: cargo package --allow-dirty
+      # `cargo package` only *builds* what it packaged, so a test that reads a
+      # file left out of the archive still compiles here and not for anyone who
+      # downloads it. `docs/` was excluded once, with a test reading a file
+      # from it; this is the check that would have caught it.
+      - name: The packaged crate's own tests compile
+        shell: bash
+        run: |
+          version=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          cd "target/package/marquee-markdown-$version"
+          cargo test --no-run
+
+  audit:
+    name: Advisories
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo install cargo-deny --locked
+      - run: cargo deny check

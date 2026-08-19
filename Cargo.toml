@@ -2,7 +2,7 @@
 name = "marquee-markdown"
 version = "0.1.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.88"
 description = "A TUI markdown reader that renders documents like Claude artifacts, with a table-of-contents panel"
 license = "MIT"
 authors = ["Sophana Sok <sokdevelopment@gmail.com>"]
@@ -11,7 +11,7 @@ homepage = "https://github.com/SophanaSok/marquee-markdown"
 readme = "README.md"
 keywords = ["markdown", "tui", "viewer", "terminal", "reader"]
 categories = ["command-line-utilities", "text-processing"]
-exclude = ["/.github", "/packaging", "/docs"]
+exclude = ["/.github", "/packaging"]
 
 [[bin]]
 name = "marquee-markdown"

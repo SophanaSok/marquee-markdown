@@ -5,9 +5,8 @@ A terminal markdown reader with the functionality of
 Claude artifacts do — a centered reading column on a painted page, typographic
 headings, sealed code cards — with a table-of-contents panel for navigation.
 
-> **Status: pre-release.** Everything below works today. What remains before
-> 1.0 is packaging and a release workflow — see
-> [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status: pre-release.** Everything below works today. See
+> [docs/ROADMAP.md](docs/ROADMAP.md) for what is left before 1.0.
 
 ## What it looks different from
 
@@ -28,7 +27,8 @@ Rendering the same document through glow 3.0.0 shows what this fixes:
 
 ## Install
 
-Requires Rust 1.85 or newer. No C toolchain is needed — syntax highlighting
+Requires Rust 1.88 or newer — the code uses let-chains, which that release
+stabilized for the 2024 edition. No C toolchain is needed: syntax highlighting
 uses a pure-Rust regex backend, so the project builds anywhere Rust does.
 
 ```sh
@@ -307,11 +307,21 @@ assert_eq!(doc.outline[0].text, "Title");
 assert!(doc.lines.iter().all(|l| l.width() == 80));
 ```
 
-## Development
+## Contributing
 
-See [AGENTS.md](AGENTS.md) for commands, architecture, and the two invariants
-the design rests on, and [docs/ROADMAP.md](docs/ROADMAP.md) for what is built
-and what comes next.
+Pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) is the short
+version; [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) explains how the code is
+shaped and why, including the invariants that several tests exist to enforce.
+
+- [docs/KEYBINDINGS.md](docs/KEYBINDINGS.md) — every binding, generated from
+  the keymap
+- [docs/ROADMAP.md](docs/ROADMAP.md) — what is built and what is left
+- [AGENTS.md](AGENTS.md) — the same ground as the architecture document, in
+  working-notes form
+- [CHANGELOG.md](CHANGELOG.md)
+
+Requires Rust 1.88. Nothing else: syntax highlighting uses a pure-Rust regex
+backend on purpose, so there is no C toolchain and no system library to find.
 
 ```sh
 cargo test

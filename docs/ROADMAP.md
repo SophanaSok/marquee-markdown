@@ -13,7 +13,7 @@ scroll-tracking table-of-contents sidebar and in-document search.
 
 | Phase | Contents | Effort | State |
 | --- | --- | --- | --- |
-| **P0** Skeleton | Manifest with crates.io + deb/rpm metadata, lib/bin split, clippy config, pure-Rust syntect backend, layering test | 2 | **Done** (CI and contributor docs still open) |
+| **P0** Skeleton | Manifest with crates.io + deb/rpm metadata, lib/bin split, clippy config, pure-Rust syntect backend, layering test | 2 | **Done** |
 | **P1** One-shot render + theming | Source classification, frontmatter, code-file wrapping, ANSI output, `-l -n -w -s`, theme loader, `themes`/`man`/`completion` | 3 | **Done** |
 | **P2** Document reader | Terminal guard + panic hook, event loop, view/anchor/render cache, pager keys via `Action`, status bar, keymap-rendered help, `-t` | 3 | **Done** (resize debounce open) |
 | **P3** TOC + search | Outline tree, active-section derivation, focus model, filter/collapse/auto-hide, `/` `n` `N` | 3 | **Done** (no TOC filter) |
@@ -21,7 +21,7 @@ scroll-tracking table-of-contents sidebar and in-document search.
 | **P5** Remote sources | `Fetcher` trait, http(s), `github://`/`gitlab://`, bare-host README API | 2 | **Done** |
 | **P6** Parity polish | Live reload, `e` at scroll line, `c` copy, `-p` pager, `ctrl+z`, link following, `y` | 2 | **Done** |
 | **P7** Config + keymaps | TOML schema, `MARQUEE_` env layer, precedence, user keymap merge, `config` subcommand | 2 | **Done** |
-| **P8** Release | `packaging/`, deb/rpm, release workflow, `docs/ARCHITECTURE.md`, crates.io | 2 | Next |
+| **P8** Release | `packaging/`, deb/rpm, release workflow, `docs/ARCHITECTURE.md`, crates.io | 2 | **Done** bar the first publish |
 
 ## What works today
 
@@ -37,32 +37,32 @@ and a resize that keeps your place instead of teleporting you.
 `cargo clippy --all-targets -- -D warnings` and `cargo doc --no-deps`
 clean.
 
-## Immediate next steps (P8)
+## What is left
 
-Release. Nothing here changes behavior; it is all about other people being able
-to install and contribute to this.
+The build is done. What remains is the part that needs a person rather than a
+commit:
 
-1. **CI**, which has been outstanding since P0 and is the one that matters:
-   `fmt --check`, `clippy -D warnings`, `test`, `doc --no-deps`, an MSRV job
-   pinned to `rust-version`, across ubuntu/macos/windows. The network is never
-   touched — `tests/network.rs` is `#[ignore]`d and must stay that way.
-2. **`docs/ARCHITECTURE.md`** — the highest-value file in the repository for a
-   newcomer. The module map, the render pipeline, and the invariants. Much of
-   it can be lifted from `AGENTS.md`, which has been kept current deliberately.
-3. **CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md**, and issue templates.
-4. **`packaging/`** — deb and rpm metadata already exist in `Cargo.toml`; wire
-   them up along with man pages and completions, which the binary can already
-   generate.
-5. **A release workflow**, and the first crates.io publish.
+1. **Push to GitHub and watch CI go green.** Everything in `.github/` has been
+   validated locally — the workflows parse, every command in them runs here —
+   but no workflow is real until a runner has executed it. Expect the
+   `cargo deny` licence list in `deny.toml` to need one or two additions.
+2. **Two decisions to make before 1.0**, because both are hard to change once
+   people depend on them:
+   - **A short binary alias.** `marquee-markdown` is a lot to type for
+     something invoked constantly; a second `[[bin]]` (`mq`, say) is a
+     three-line change. Deliberately not done unilaterally: the name was
+     chosen, and adding a second one is a naming decision, not a refactor.
+   - **Whether `render` is stable.** The changelog says its public API may
+     change within minor versions. That is the right caveat for 0.x; before
+     1.0 it needs to become a promise or an explicit "this crate is a binary
+     that happens to expose its renderer".
+3. **Tag `v0.1.0` and publish.** `packaging/README.md` has the sequence.
 
-Two things to decide before 1.0 rather than after, because both are hard to
-change once people depend on them: whether to ship a short binary alias
-(`marquee-markdown` is long to type for something invoked constantly), and
-whether `render` is stable enough to promise. The changelog currently says the
-`render` API may change within minor versions — either commit to that or drop
-the caveat.
+Beyond that, the deferrals below are the backlog — images, a scrollable wide
+table, and a scrollable key reference are the three most likely to be asked
+for.
 
-## What P2 to P7 built, and why it is shaped that way
+## What each phase built, and why it is shaped that way
 
 - `app/terminal.rs` — an RAII alternate-screen/raw-mode guard, plus a panic
   hook that restores the terminal *before* the message is printed. Without the
@@ -223,8 +223,10 @@ the design:
 - **Workspace split.** One crate with a strict lib/bin split, with the render
   isolation test keeping extraction mechanical. Split only if someone actually
   wants to depend on the renderer.
-- **A short binary alias.** `marquee-markdown` is long to type for a tool
-  invoked constantly; a second `[[bin]]` is a three-line change whenever wanted.
+- **A short binary alias.** See the decisions above.
+- **A scrollable key reference.** Below about 22 rows the overlay clips its
+  last few bindings. `marquee-markdown keys` shows all of them, so nothing is
+  unreachable, but the overlay should scroll.
 
 ## Reference
 

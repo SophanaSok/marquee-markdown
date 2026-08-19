@@ -43,26 +43,26 @@ pub fn list() -> Vec<Entry> {
             origin: Origin::BuiltIn,
         })
         .collect();
-    if let Some(dir) = user_theme_dir() {
-        if let Ok(entries) = std::fs::read_dir(&dir) {
-            let mut user: Vec<Entry> = entries
-                .flatten()
-                .filter_map(|e| {
-                    let path = e.path();
-                    if path.extension().is_some_and(|x| x == "toml") {
-                        let name = path.file_stem()?.to_str()?.to_owned();
-                        Some(Entry {
-                            name,
-                            origin: Origin::User(path),
-                        })
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            user.sort_by(|a, b| a.name.cmp(&b.name));
-            out.extend(user);
-        }
+    if let Some(dir) = user_theme_dir()
+        && let Ok(entries) = std::fs::read_dir(&dir)
+    {
+        let mut user: Vec<Entry> = entries
+            .flatten()
+            .filter_map(|e| {
+                let path = e.path();
+                if path.extension().is_some_and(|x| x == "toml") {
+                    let name = path.file_stem()?.to_str()?.to_owned();
+                    Some(Entry {
+                        name,
+                        origin: Origin::User(path),
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+        user.sort_by(|a, b| a.name.cmp(&b.name));
+        out.extend(user);
     }
     out
 }

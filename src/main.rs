@@ -1,6 +1,8 @@
 //! Binary entry point.
 
-use anyhow::Result;
+use std::io::Write;
+
+use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser};
 
 use marquee_markdown::app;
@@ -109,44 +111,55 @@ fn options(config: &Config) -> app::Options {
     }
 }
 
+/// Run a subcommand.
+///
+/// Everything is built in memory and written once through a `Write`, rather
+/// than printed. `print!` panics when the pipe closes, and `clap_complete`
+/// panics internally on a write error — so `… completion bash | head` aborted
+/// with a backtrace instead of stopping quietly, which is what closing a pipe
+/// is supposed to mean.
 fn run_command(command: &Command, cli: &Cli) -> Result<()> {
-    match command {
+    let text = match command {
         Command::Config => {
             let config = load_config(cli)?;
             for warning in &config.warnings {
                 eprintln!("warning: {warning}");
             }
-            print!("{}", config.to_toml());
-            Ok(())
+            config.to_toml()
         }
         Command::Keys => {
             let config = load_config(cli)?;
-            print!(
-                "{}",
-                marquee_markdown::config::keys::reference(&config.keymap)
-            );
-            Ok(())
+            marquee_markdown::config::keys::reference(&config.keymap)
         }
-        Command::Themes => {
-            for entry in registry::list() {
+        Command::Themes => registry::list()
+            .into_iter()
+            .map(|entry| {
                 let origin = match &entry.origin {
                     registry::Origin::BuiltIn => "built-in".to_owned(),
                     registry::Origin::User(path) => path.display().to_string(),
                 };
-                println!("{:<12} {origin}", entry.name);
-            }
-            Ok(())
-        }
+                format!("{:<12} {origin}\n", entry.name)
+            })
+            .collect(),
         Command::Man => {
-            let man = clap_mangen::Man::new(Cli::command());
-            man.render(&mut std::io::stdout())?;
-            Ok(())
+            let mut rendered = Vec::new();
+            clap_mangen::Man::new(Cli::command()).render(&mut rendered)?;
+            String::from_utf8(rendered).context("the man page was not valid UTF-8")?
         }
         Command::Completion { shell } => {
+            let mut rendered = Vec::new();
             let mut command = Cli::command();
             let name = command.get_name().to_owned();
-            clap_complete::generate(*shell, &mut command, name, &mut std::io::stdout());
-            Ok(())
+            // Writing into a buffer cannot fail, which is the only way to keep
+            // this out of the panic path.
+            clap_complete::generate(*shell, &mut command, name, &mut rendered);
+            String::from_utf8(rendered).context("the completion script was not valid UTF-8")?
         }
-    }
+    };
+
+    let stdout = std::io::stdout();
+    let mut out = stdout.lock();
+    out.write_all(text.as_bytes())?;
+    out.flush()?;
+    Ok(())
 }

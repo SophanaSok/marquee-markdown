@@ -1,0 +1,32 @@
+name: Feature request
+description: Suggest something the reader should do.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you are trying to do
+      description: >
+        The task, rather than the feature. Knowing what you are actually trying
+        to accomplish often turns up a better answer than the one asked for.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like
+
+  - type: dropdown
+    id: parity
+    attributes:
+      label: Does glow do this?
+      description: >
+        Parity with glow is a goal, so this changes how a request is weighed.
+      options:
+        - "No — this would be new"
+        - "Yes, and marquee-markdown does not"
+        - "Yes, but marquee-markdown does it differently"
+        - "I do not know"
+    validations:
+      required: true

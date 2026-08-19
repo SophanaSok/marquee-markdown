@@ -1,0 +1,60 @@
+name: Bug report
+description: Something renders wrong, behaves wrong, or crashes.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. A document that reproduces the problem is
+        the single most useful thing you can attach.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you saw, and what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: document
+    attributes:
+      label: The markdown that reproduces it
+      description: >
+        The smallest document that shows the problem. Paste it here, or attach
+        the file. If it only happens with a remote document, the URL is fine.
+      render: markdown
+
+  - type: input
+    id: command
+    attributes:
+      label: The command you ran
+      placeholder: marquee-markdown -t -w 80 notes.md
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `marquee-markdown --version`.
+    validations:
+      required: true
+
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal and operating system
+      description: >
+        Which terminal, and whether it is inside tmux, screen, or over SSH.
+        Rendering problems are often specific to one of those.
+      placeholder: foot 1.27 on Arch Linux, not in tmux
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration
+      description: >
+        Output of `marquee-markdown config`, if you have a configuration file
+        or any MARQUEE_ environment variables set.
+      render: toml

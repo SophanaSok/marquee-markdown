@@ -100,10 +100,10 @@ fn write_line(
                 if open_link.is_some() {
                     out.write_all(b"\x1b]8;;\x1b\\")?;
                 }
-                if let Some(idx) = active {
-                    if let Some(dest) = doc.links.get(idx as usize) {
-                        write!(out, "\x1b]8;;{dest}\x1b\\")?;
-                    }
+                if let Some(idx) = active
+                    && let Some(dest) = doc.links.get(idx as usize)
+                {
+                    write!(out, "\x1b]8;;{dest}\x1b\\")?;
                 }
                 open_link = active;
             }

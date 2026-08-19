@@ -86,17 +86,17 @@ pub fn classify(arg: Option<&str>, stdin_is_pipe: bool, fs: &dyn FsProbe) -> Sou
     }
     for forge in [Forge::GitHub, Forge::GitLab] {
         let scheme = format!("{}://", forge.scheme());
-        if let Some(rest) = arg.strip_prefix(&scheme) {
-            if let Some(spec) = repo_spec(forge, rest) {
-                return spec;
-            }
+        if let Some(rest) = arg.strip_prefix(&scheme)
+            && let Some(spec) = repo_spec(forge, rest)
+        {
+            return spec;
         }
         // Bare `github.com/owner/repo`, optionally with a www. prefix.
         let bare = arg.strip_prefix("www.").unwrap_or(arg);
-        if let Some(rest) = bare.strip_prefix(&format!("{}/", forge.host())) {
-            if let Some(spec) = repo_spec(forge, rest) {
-                return spec;
-            }
+        if let Some(rest) = bare.strip_prefix(&format!("{}/", forge.host()))
+            && let Some(spec) = repo_spec(forge, rest)
+        {
+            return spec;
         }
     }
     if arg.starts_with("http://") || arg.starts_with("https://") {

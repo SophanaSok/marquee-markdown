@@ -1,0 +1,131 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            name: x86_64-linux
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            name: aarch64-macos
+            target: aarch64-apple-darwin
+          - os: macos-13
+            name: x86_64-macos
+            target: x86_64-apple-darwin
+          - os: windows-latest
+            name: x86_64-windows
+            target: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+
+      # The binary generates its own man page and completions, so they cannot
+      # drift from the flags it actually accepts.
+      - name: Generate man page and completions
+        shell: bash
+        run: |
+          bin="target/${{ matrix.target }}/release/marquee-markdown"
+          [ -f "$bin.exe" ] && bin="$bin.exe"
+          mkdir -p dist/man dist/completions
+          "$bin" man > dist/man/marquee-markdown.1
+          for shell in bash zsh fish powershell elvish; do
+            "$bin" completion "$shell" > "dist/completions/marquee-markdown.$shell"
+          done
+
+      - name: Package (unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          name="marquee-markdown-${GITHUB_REF_NAME}-${{ matrix.name }}"
+          mkdir -p "$name"
+          cp "target/${{ matrix.target }}/release/marquee-markdown" "$name/"
+          strip "$name/marquee-markdown" || true
+          cp README.md LICENSE CHANGELOG.md "$name/"
+          cp -r dist/man dist/completions "$name/"
+          tar czf "$name.tar.gz" "$name"
+
+      - name: Package (windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          name="marquee-markdown-${GITHUB_REF_NAME}-${{ matrix.name }}"
+          mkdir -p "$name"
+          cp "target/${{ matrix.target }}/release/marquee-markdown.exe" "$name/"
+          cp README.md LICENSE CHANGELOG.md "$name/"
+          cp -r dist/completions "$name/"
+          7z a "$name.zip" "$name"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: |
+            marquee-markdown-*.tar.gz
+            marquee-markdown-*.zip
+
+  linux-packages:
+    name: Debian and RPM packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo install cargo-deb cargo-generate-rpm --locked
+      - run: cargo build --release --locked
+      - run: cargo deb --no-build
+      - run: cargo generate-rpm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-packages
+          path: |
+            target/debian/*.deb
+            target/generate-rpm/*.rpm
+
+  release:
+    name: Publish the release
+    needs: [build, linux-packages]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Collect and checksum
+        run: |
+          mkdir -p release
+          find artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name '*.deb' -o -name '*.rpm' \) \
+            -exec cp {} release/ \;
+          cd release && sha256sum * > checksums.txt
+      - name: Take the notes from the changelog
+        id: notes
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v ver="$version" '
+            /^## / { if (found) exit; if (index($0, ver)) found = 1; next }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          echo "body<<NOTES_EOF" >> "$GITHUB_OUTPUT"
+          cat notes.md >> "$GITHUB_OUTPUT"
+          echo "NOTES_EOF" >> "$GITHUB_OUTPUT"
+      - uses: softprops/action-gh-release@v2
+        with:
+          body: ${{ steps.notes.outputs.body }}
+          files: release/*
