@@ -14,6 +14,13 @@ Until 1.0 both halves may change.
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.2.1] - 2026-08-19
+
+A correctness release: a line could come out wider than the column it had to
+fit, which is the one thing the rendering design cannot survive.
+
 ### Added
 
 - **Property tests** over the invariants the design rests on: the width
@@ -367,6 +374,7 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
 - Resizing re-lays out on every event; a large document dragged by a window
   edge will work harder than it needs to until a debounce lands.
 
-[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/SophanaSok/marquee-markdown/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/SophanaSok/marquee-markdown/releases/tag/v0.1.0
