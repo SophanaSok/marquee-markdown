@@ -33,7 +33,7 @@ Themes load from TOML. Output degrades correctly when redirected.
 status bar, a key reference rendered from the live keymap, light/dark switching,
 and a resize that keeps your place instead of teleporting you.
 
-529 tests, plus four `#[ignore]`d live checks against the real forges;
+531 tests, plus four `#[ignore]`d live checks against the real forges;
 `cargo clippy --all-targets -- -D warnings` and `cargo doc --no-deps`
 clean.
 
@@ -42,10 +42,13 @@ clean.
 The build is done. What remains is the part that needs a person rather than a
 commit:
 
-1. **Push to GitHub and watch CI go green.** Everything in `.github/` has been
-   validated locally — the workflows parse, every command in them runs here —
-   but no workflow is real until a runner has executed it. Expect the
-   `cargo deny` licence list in `deny.toml` to need one or two additions.
+1. ~~Push to GitHub and watch CI go green.~~ **Done**, and worth what it cost:
+   the first four runs found a licence to allow, two advisories (removed by
+   narrowing syntect's features rather than waived), an MSRV violation that
+   compiles fine on a current toolchain, three Windows tests that assumed `/`
+   as a path separator, a macOS file-watch test asserting a precision FSEvents
+   does not offer — and a real bug in which a named source was silently
+   ignored in favour of redirected standard input.
 2. **Both pre-1.0 decisions are now made**, and implemented:
    - **The short alias is `mmd`**, installed alongside `marquee-markdown` by
      every install method. Both binaries are stubs over `cli::run`, so they
@@ -59,7 +62,9 @@ commit:
      needs, and having it opaque means the block tree never has to be frozen.
      Add `cargo semver-checks` to CI once there is a published version to use
      as a baseline.
-3. **Tag `v0.1.0` and publish.** `packaging/README.md` has the sequence.
+3. **Tag `v0.1.0` and publish.** `packaging/README.md` has the sequence. The
+   release workflow has not been exercised yet — it only runs on a tag, so the
+   first tag is also its first test.
 
 Beyond that, the deferrals below are the backlog — images, a scrollable wide
 table, and a scrollable key reference are the three most likely to be asked
