@@ -17,6 +17,14 @@ exclude = ["/.github", "/packaging"]
 name = "marquee-markdown"
 path = "src/main.rs"
 
+# The short name, for something invoked constantly. Both are stubs over
+# `cli::run`, so they cannot drift apart. Shipped as a second binary rather
+# than a symlink so that every install method — cargo, deb, rpm, brew, scoop,
+# a downloaded archive — produces the same thing.
+[[bin]]
+name = "mmd"
+path = "src/bin/mmd.rs"
+
 [dependencies]
 anyhow = "1.0.104"
 arboard = "3.6.1"
@@ -76,6 +84,7 @@ section = "utils"
 priority = "optional"
 assets = [
     ["target/release/marquee-markdown", "usr/bin/", "755"],
+    ["target/release/mmd", "usr/bin/", "755"],
     ["README.md", "usr/share/doc/marquee-markdown/", "644"],
     ["LICENSE", "usr/share/doc/marquee-markdown/", "644"],
 ]
@@ -86,6 +95,7 @@ summary = "A TUI markdown reader that renders documents like Claude artifacts"
 release = "1"
 assets = [
     { source = "target/release/marquee-markdown", dest = "/usr/bin/marquee-markdown", mode = "755" },
+    { source = "target/release/mmd", dest = "/usr/bin/mmd", mode = "755" },
     { source = "README.md", dest = "/usr/share/doc/marquee-markdown/README.md", mode = "644" },
     { source = "LICENSE", dest = "/usr/share/licenses/marquee-markdown/LICENSE", mode = "644" },
 ]

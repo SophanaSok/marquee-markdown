@@ -40,15 +40,20 @@ jobs:
 
       # The binary generates its own man page and completions, so they cannot
       # drift from the flags it actually accepts.
-      - name: Generate man page and completions
+      # Generated under both names: completions registered for a name the
+      # reader does not type simply never fire.
+      - name: Generate man pages and completions
         shell: bash
         run: |
-          bin="target/${{ matrix.target }}/release/marquee-markdown"
-          [ -f "$bin.exe" ] && bin="$bin.exe"
+          dir="target/${{ matrix.target }}/release"
           mkdir -p dist/man dist/completions
-          "$bin" man > dist/man/marquee-markdown.1
-          for shell in bash zsh fish powershell elvish; do
-            "$bin" completion "$shell" > "dist/completions/marquee-markdown.$shell"
+          for name in marquee-markdown mmd; do
+            bin="$dir/$name"
+            [ -f "$bin.exe" ] && bin="$bin.exe"
+            "$bin" man > "dist/man/$name.1"
+            for shell in bash zsh fish powershell elvish; do
+              "$bin" completion "$shell" > "dist/completions/$name.$shell"
+            done
           done
 
       - name: Package (unix)
@@ -58,7 +63,7 @@ jobs:
           name="marquee-markdown-${GITHUB_REF_NAME}-${{ matrix.name }}"
           mkdir -p "$name"
           cp "target/${{ matrix.target }}/release/marquee-markdown" "$name/"
-          strip "$name/marquee-markdown" || true
+          cp "target/${{ matrix.target }}/release/mmd" "$name/"
           cp README.md LICENSE CHANGELOG.md "$name/"
           cp -r dist/man dist/completions "$name/"
           tar czf "$name.tar.gz" "$name"
@@ -70,6 +75,7 @@ jobs:
           name="marquee-markdown-${GITHUB_REF_NAME}-${{ matrix.name }}"
           mkdir -p "$name"
           cp "target/${{ matrix.target }}/release/marquee-markdown.exe" "$name/"
+          cp "target/${{ matrix.target }}/release/mmd.exe" "$name/"
           cp README.md LICENSE CHANGELOG.md "$name/"
           cp -r dist/completions "$name/"
           7z a "$name.zip" "$name"

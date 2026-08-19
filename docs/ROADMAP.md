@@ -33,7 +33,7 @@ Themes load from TOML. Output degrades correctly when redirected.
 status bar, a key reference rendered from the live keymap, light/dark switching,
 and a resize that keeps your place instead of teleporting you.
 
-523 tests, plus four `#[ignore]`d live checks against the real forges;
+529 tests, plus four `#[ignore]`d live checks against the real forges;
 `cargo clippy --all-targets -- -D warnings` and `cargo doc --no-deps`
 clean.
 
@@ -46,16 +46,19 @@ commit:
    validated locally — the workflows parse, every command in them runs here —
    but no workflow is real until a runner has executed it. Expect the
    `cargo deny` licence list in `deny.toml` to need one or two additions.
-2. **Two decisions to make before 1.0**, because both are hard to change once
-   people depend on them:
-   - **A short binary alias.** `marquee-markdown` is a lot to type for
-     something invoked constantly; a second `[[bin]]` (`mq`, say) is a
-     three-line change. Deliberately not done unilaterally: the name was
-     chosen, and adding a second one is a naming decision, not a refactor.
-   - **Whether `render` is stable.** The changelog says its public API may
-     change within minor versions. That is the right caveat for 0.x; before
-     1.0 it needs to become a promise or an explicit "this crate is a binary
-     that happens to expose its renderer".
+2. **Both pre-1.0 decisions are now made**, and implemented:
+   - **The short alias is `mmd`**, installed alongside `marquee-markdown` by
+     every install method. Both binaries are stubs over `cli::run`, so they
+     cannot drift, and the generated man page and completions are named after
+     whichever was invoked.
+   - **The library API is in two halves.** A small stable surface —
+     `render::{render, Document, RenderedDoc, LayoutOptions, ansi, tui,
+     overlay, measure}` and `theme` — and the pipeline behind it, marked
+     `#[doc(hidden)]` and free to change. `Document` was added to make that
+     split possible: parse-once-lay-out-many is the thing a consumer actually
+     needs, and having it opaque means the block tree never has to be frozen.
+     Add `cargo semver-checks` to CI once there is a published version to use
+     as a baseline.
 3. **Tag `v0.1.0` and publish.** `packaging/README.md` has the sequence.
 
 Beyond that, the deferrals below are the backlog — images, a scrollable wide
@@ -223,7 +226,9 @@ the design:
 - **Workspace split.** One crate with a strict lib/bin split, with the render
   isolation test keeping extraction mechanical. Split only if someone actually
   wants to depend on the renderer.
-- **A short binary alias.** See the decisions above.
+- **A workspace split.** The layering test keeps extracting `render` into its
+  own crate a move rather than an excavation. Do it if someone actually wants
+  to depend on the renderer without the reader.
 - **A scrollable key reference.** Below about 22 rows the overlay clips its
   last few bindings. `marquee-markdown keys` shows all of them, so nothing is
   unreachable, but the overlay should scroll.

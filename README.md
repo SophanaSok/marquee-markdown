@@ -295,17 +295,54 @@ caution = "#dd7a6d"
 shell — a test enforces that — so it can be used to build other frontends.
 
 ```rust
-use marquee_markdown::render::{self, LayoutOptions};
+use marquee_markdown::render::{self, Document, LayoutOptions};
 use marquee_markdown::theme::{Theme, ThemeVariant};
 
-let doc = render::render(
-    "# Title\n\nSome prose.",
-    &Theme::new(ThemeVariant::Slate),
-    LayoutOptions { width: 80, code_line_numbers: false },
-);
+let options = LayoutOptions {
+    width: 80,
+    code_line_numbers: false,
+    preserve_new_lines: false,
+};
+let theme = Theme::new(ThemeVariant::Slate);
+
+// One call, when you only need the document once.
+let doc = render::render("# Title\n\nSome prose.", &theme, options);
 assert_eq!(doc.outline[0].text, "Title");
-assert!(doc.lines.iter().all(|l| l.width() == 80));
+assert!(doc.lines.iter().all(|line| line.width() == 80));
+
+// Or parse once and lay out repeatedly — what a reader that resizes wants.
+// Parsing is the expensive half and does not depend on the width.
+let parsed = Document::parse("# Title\n\nSome prose.");
+for width in [40, 80, 120] {
+    let doc = parsed.layout(&theme, LayoutOptions { width, ..options });
+    assert_eq!(doc.width, width);
+}
 ```
+
+A `RenderedDoc` is a buffer of `ratatui` lines, each exactly the content width,
+plus the outline, the links with their column ranges, per-line source offsets,
+and a plain-text mirror for searching. Two serializers take it from there:
+`render::tui` writes it into a `ratatui` buffer, and `render::ansi` writes SGR
+bytes with real OSC 8 hyperlinks.
+
+### What is stable
+
+The promised API is deliberately small, and from 1.0 it follows semantic
+versioning:
+
+- `render::{render, Document, RenderedDoc, LineMeta, LineKind, Anchor, LayoutOptions}`
+- `render::{ansi, tui, overlay, measure}`
+- all of `theme`
+
+The pipeline behind them — parsing, fragmentation, wrapping, the block tree,
+the per-block emitters — stays public so the binary and the tests can reach it,
+and because it is worth reading, but it is marked `#[doc(hidden)]` and may
+change in any release. `Document` is opaque for exactly this reason: it is the
+part of the pipeline a consumer genuinely needs, without freezing the shape of
+what is behind it.
+
+If you find yourself reaching for a hidden module, please open an issue — it
+means the stable surface is missing something.
 
 ## Contributing
 

@@ -4,7 +4,13 @@ All notable changes to this project are documented here.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-Until 1.0 the `render` module's public API may change within minor versions.
+
+The library API is in two halves. **Stable**, and covered by semver from 1.0:
+`render::{render, Document, RenderedDoc, LineMeta, LineKind, Anchor,
+LayoutOptions}`, `render::{ansi, tui, overlay, measure}`, and all of `theme`.
+**Internal**, marked `#[doc(hidden)]` and free to change in any release: the
+pipeline — `parse`, `block`, `frag`, `wrap`, `sink`, `layout`, `highlight`.
+Until 1.0 both halves may change.
 
 ## [Unreleased]
 
@@ -14,6 +20,11 @@ configuration file with rebindable keys.
 ### Added
 
 #### Rendering engine (`src/render/`)
+
+- `Document`: markdown parsed once and laid out at any number of widths, which
+  is what a reader that resizes needs. Opaque on purpose — it is the part of
+  the pipeline a consumer needs, without freezing the shape of what is behind
+  it.
 
 - Markdown → fixed-width styled line buffer, built on `pulldown-cmark` with
   GFM tables, footnotes, strikethrough, task lists, alerts, and smart
@@ -194,6 +205,14 @@ configuration file with rebindable keys.
   `--style` as a path, with no recompile. Built-ins and user themes are built
   through the same constructor.
 - `--style auto` (default), plus `notty` for unstyled output.
+
+#### Two names
+
+- `mmd` is installed alongside `marquee-markdown` and is the same program.
+  Both binaries are stubs over one implementation, so they cannot drift.
+- The generated man page and completions are named after whichever name was
+  invoked: completions registered for a name the reader does not type would
+  simply never fire.
 
 #### Release engineering
 

@@ -11,7 +11,10 @@
       "extract_dir": "marquee-markdown-v0.1.0-x86_64-windows"
     }
   },
-  "bin": "marquee-markdown.exe",
+  "bin": [
+    "marquee-markdown.exe",
+    "mmd.exe"
+  ],
   "checkver": "github",
   "autoupdate": {
     "architecture": {

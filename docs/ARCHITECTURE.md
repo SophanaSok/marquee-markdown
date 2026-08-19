@@ -53,6 +53,14 @@ extracting it into its own crate would be a move rather than an excavation.
                  plain mirror, and the width it was built at.
 ```
 
+`Document` is the parsed half held on its own, so a resize re-runs only the
+layout. It is opaque: the block tree behind it is the renderer's working
+representation and changes as the pipeline does, and keeping it behind a type
+is what lets the promised API stay small. That split is the stability boundary
+— `render::{render, Document, RenderedDoc, LayoutOptions, ansi, tui, overlay,
+measure}` and `theme` are stable from 1.0; the pipeline modules are
+`#[doc(hidden)]` and free to change.
+
 Two serializers take it from there: `tui.rs` writes into a ratatui buffer for
 the reader, `ansi.rs` writes SGR bytes and real OSC 8 hyperlinks for standard
 output. One layout engine, two destinations — which is why `marquee-markdown
@@ -90,6 +98,8 @@ family is one cluster with one width, and splitting inside one tears it apart.
 
 ```
 cli/         clap derive; the full glow flag surface; pure run-mode dispatch.
+             `run.rs` is the whole program, so the `marquee-markdown` and
+             `mmd` binaries are stubs rather than two copies.
 config/      A file, the environment, and the command line, resolved into one
              set of settings. `Layer::over` is the ONE definition of precedence.
 source/      What an argument means (classify, pure, behind FsProbe) and how to

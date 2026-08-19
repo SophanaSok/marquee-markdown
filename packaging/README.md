@@ -27,3 +27,8 @@ The release workflow generates them into every archive.
    the Debian and RPM packages, and the checksums, and drafts the release.
 4. `cargo publish`.
 5. Update the Homebrew formula and the Scoop manifest with the new checksums.
+
+Both `marquee-markdown` and `mmd` are shipped, as two real binaries rather than
+a binary and a symlink. That costs about 12 MB, and buys the same result from
+every install method — `cargo install` cannot make a symlink, so anything else
+would mean the alias existing in some installs and not others.

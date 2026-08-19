@@ -68,6 +68,13 @@ jobs:
           BIN=target/release/marquee-markdown
           "$BIN" --version
 
+          # The short alias is the same program, and names itself correctly:
+          # completions registered for the wrong name never fire.
+          target/release/mmd --version
+          target/release/mmd completion bash | head -1 | grep -q _mmd
+          target/release/mmd man | head -20 | grep -q 'TH mmd'
+          test "$("$BIN" -w 60 README.md)" = "$(target/release/mmd -w 60 README.md)"
+
           # Rendering a file, and the width flag being honored exactly.
           "$BIN" -w 60 README.md | head -5
           test "$("$BIN" -w 60 README.md | head -1 | wc -c)" -eq 61

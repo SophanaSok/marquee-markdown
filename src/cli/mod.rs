@@ -4,6 +4,8 @@
 //! additions (a table-of-contents sidebar, in-document search) live on keys
 //! and config rather than new flags.
 
+pub mod run;
+
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};

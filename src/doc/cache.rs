@@ -9,8 +9,7 @@
 //! Parsing is width- and theme-independent and stays cached across every
 //! re-layout, which is what makes resizing cheap.
 
-use crate::render::block::{Block, BlockKind};
-use crate::render::{self, LayoutOptions, RenderedDoc};
+use crate::render::{Document, LayoutOptions, RenderedDoc};
 use crate::source::Source;
 use crate::theme::Theme;
 
@@ -22,13 +21,9 @@ use super::view::Extent;
 pub struct DocCache {
     /// The document this was built from.
     pub source: Source,
-    blocks: Vec<Block>,
+    document: Document,
     doc: RenderedDoc,
     outline: Outline,
-    /// How many headings the document has. Counted from the block tree rather
-    /// than from a layout, because pane geometry depends on it and the panes
-    /// are settled before anything is laid out.
-    headings: usize,
     /// What `doc` was laid out from; `None` until the first layout.
     built_from: Option<(LayoutOptions, Theme)>,
     /// Heading to land on after a reload, in preference to a byte offset.
@@ -42,12 +37,10 @@ impl DocCache {
     /// layout path rather than one for startup and one for everything after.
     #[must_use]
     pub fn new(source: Source) -> Self {
-        let blocks = render::parse::parse(&source.text);
-        let headings = count_headings(&blocks);
+        let document = Document::parse(&source.text);
         Self {
             source,
-            blocks,
-            headings,
+            document,
             doc: RenderedDoc::default(),
             outline: Outline::default(),
             built_from: None,
@@ -70,7 +63,7 @@ impl DocCache {
     /// immediately and lose the reader a line.
     #[must_use]
     pub fn heading_count(&self) -> usize {
-        self.headings
+        self.document.heading_count()
     }
 
     /// The heading tree for the current layout.
@@ -104,8 +97,7 @@ impl DocCache {
             .active_anchor(top)
             .and_then(|index| self.doc.outline.get(index))
             .map(|anchor| anchor.id.clone());
-        self.blocks = render::parse::parse(&source.text);
-        self.headings = count_headings(&self.blocks);
+        self.document = Document::parse(&source.text);
         self.source = source;
         self.built_from = None;
     }
@@ -139,7 +131,7 @@ impl DocCache {
 
         let target = self.source_offset_of(top);
         let keep_heading = self.keep_heading.take();
-        self.doc = render::layout::layout(&self.blocks, theme, options);
+        self.doc = self.document.layout(theme, options);
         self.outline = Outline::build(&self.doc.outline);
         self.built_from = Some((options, theme.clone()));
         self.revision += 1;
@@ -206,23 +198,6 @@ impl DocCache {
             })
             .unwrap_or_else(|| self.doc.lines.len().saturating_sub(1))
     }
-}
-
-/// Count headings anywhere in the tree, including inside quotes and lists.
-fn count_headings(blocks: &[Block]) -> usize {
-    blocks
-        .iter()
-        .map(|block| match &block.kind {
-            BlockKind::Heading { .. } => 1,
-            BlockKind::BlockQuote { children, .. }
-            | BlockKind::FootnoteDefinition { children, .. } => count_headings(children),
-            BlockKind::List { items, .. } => items
-                .iter()
-                .map(|item| count_headings(&item.children))
-                .sum(),
-            _ => 0,
-        })
-        .sum()
 }
 
 #[cfg(test)]

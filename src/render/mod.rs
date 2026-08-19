@@ -4,49 +4,84 @@
 //! dependency on the application shell (`app`, `ui`, `browser`, `doc`) — the
 //! test in `tests/layering.rs` enforces that.
 //!
+//! # What is stable
+//!
+//! The API this module promises is deliberately small: [`render`],
+//! [`Document`], [`RenderedDoc`] and the metadata hanging off it,
+//! [`LayoutOptions`], the two serializers ([`ansi`] and [`tui`]), [`overlay`],
+//! [`measure`], and the whole of [`theme`](crate::theme). From 1.0 those
+//! follow semantic versioning.
+//!
+//! The pipeline behind them — parsing, fragmentation, wrapping, the block
+//! tree, the per-block emitters — is public so the binary and the tests can
+//! reach it, and because it is worth reading. It is marked `#[doc(hidden)]`
+//! and may change in any release. If you find yourself needing something from
+//! it, that is worth an issue: it probably means the stable surface is missing
+//! something.
+//!
 //! # Example
 //!
 //! ```
-//! use marquee_markdown::render::{self, LayoutOptions};
+//! use marquee_markdown::render::{self, Document, LayoutOptions};
 //! use marquee_markdown::theme::{Theme, ThemeVariant};
 //!
-//! let doc = render::render(
-//!     "# Title\n\nSome prose.",
-//!     &Theme::new(ThemeVariant::Slate),
-//!     LayoutOptions {
-//!         width: 40,
-//!         code_line_numbers: false,
-//!         preserve_new_lines: false,
-//!     },
-//! );
+//! let options = LayoutOptions {
+//!     width: 40,
+//!     code_line_numbers: false,
+//!     preserve_new_lines: false,
+//! };
+//! let theme = Theme::new(ThemeVariant::Slate);
+//!
+//! let doc = render::render("# Title\n\nSome prose.", &theme, options);
 //! assert_eq!(doc.outline[0].text, "Title");
-//! assert!(doc.lines.iter().all(|l| l.width() == 40));
+//! assert!(doc.lines.iter().all(|line| line.width() == 40));
+//!
+//! // Parse once, lay out as often as the window changes size.
+//! let parsed = Document::parse("# Title\n\nSome prose.");
+//! for width in [20, 40, 80] {
+//!     let doc = parsed.layout(&theme, LayoutOptions { width, ..options });
+//!     assert_eq!(doc.width, width);
+//! }
 //! ```
 
 pub mod ansi;
-pub mod block;
 pub mod doc;
-pub mod frag;
-pub mod highlight;
-pub mod layout;
+pub mod document;
 pub mod measure;
 pub mod overlay;
-pub mod parse;
-pub mod sink;
 pub mod tui;
+
+// The pipeline. Public because the binary, the tests and the example reach
+// into it, and because it is worth reading — but not part of the promised API:
+// its shape changes whenever the renderer does. Everything a consumer needs is
+// re-exported above, or reachable through `Document`.
+#[doc(hidden)]
+pub mod block;
+#[doc(hidden)]
+pub mod frag;
+#[doc(hidden)]
+pub mod highlight;
+#[doc(hidden)]
+pub mod layout;
+#[doc(hidden)]
+pub mod parse;
+#[doc(hidden)]
+pub mod sink;
+#[doc(hidden)]
 pub mod wrap;
 
 pub use doc::{Anchor, LineKind, LineMeta, RenderedDoc};
+pub use document::Document;
 pub use layout::LayoutOptions;
 
 use crate::theme::Theme;
 
 /// Parse and lay out a markdown document in one call.
 ///
-/// For repeated re-layout at different widths, parse once with
-/// [`parse::parse`] and call [`layout::layout`] directly — parsing is the
-/// expensive half and its result is width-independent.
+/// For repeated re-layout at different widths — a reader that resizes — parse
+/// once into a [`Document`] and lay that out instead. Parsing is the expensive
+/// half and its result does not depend on the width.
 #[must_use]
 pub fn render(source: &str, theme: &Theme, options: LayoutOptions) -> RenderedDoc {
-    layout::layout(&parse::parse(source), theme, options)
+    Document::parse(source).layout(theme, options)
 }
