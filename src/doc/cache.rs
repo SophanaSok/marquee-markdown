@@ -9,11 +9,12 @@
 //! Parsing is width- and theme-independent and stays cached across every
 //! re-layout, which is what makes resizing cheap.
 
-use crate::render::block::Block;
+use crate::render::block::{Block, BlockKind};
 use crate::render::{self, LayoutOptions, RenderedDoc};
 use crate::source::Source;
 use crate::theme::Theme;
 
+use super::outline::Outline;
 use super::view::Extent;
 
 /// A parsed document plus its current layout.
@@ -23,6 +24,11 @@ pub struct DocCache {
     pub source: Source,
     blocks: Vec<Block>,
     doc: RenderedDoc,
+    outline: Outline,
+    /// How many headings the document has. Counted from the block tree rather
+    /// than from a layout, because pane geometry depends on it and the panes
+    /// are settled before anything is laid out.
+    headings: usize,
     /// What `doc` was laid out from; `None` until the first layout.
     built_from: Option<(LayoutOptions, Theme)>,
     revision: u64,
@@ -35,10 +41,13 @@ impl DocCache {
     #[must_use]
     pub fn new(source: Source) -> Self {
         let blocks = render::parse::parse(&source.text);
+        let headings = count_headings(&blocks);
         Self {
             source,
             blocks,
+            headings,
             doc: RenderedDoc::default(),
+            outline: Outline::default(),
             built_from: None,
             revision: 0,
         }
@@ -48,6 +57,26 @@ impl DocCache {
     #[must_use]
     pub fn doc(&self) -> &RenderedDoc {
         &self.doc
+    }
+
+    /// How many headings the document has.
+    ///
+    /// Available before the first layout, unlike [`Self::outline`], which
+    /// needs line numbers. Pane geometry asks this instead: a contents pane
+    /// that appeared only after the first frame would re-lay out the document
+    /// immediately and lose the reader a line.
+    #[must_use]
+    pub fn heading_count(&self) -> usize {
+        self.headings
+    }
+
+    /// The heading tree for the current layout.
+    ///
+    /// Built here rather than by the caller so it cannot go stale: it is
+    /// replaced by the same call that replaces the lines it points into.
+    #[must_use]
+    pub fn outline(&self) -> &Outline {
+        &self.outline
     }
 
     /// How many times the document has been laid out. State derived from line
@@ -86,6 +115,7 @@ impl DocCache {
 
         let target = self.source_offset_of(top);
         self.doc = render::layout::layout(&self.blocks, theme, options);
+        self.outline = Outline::build(&self.doc.outline);
         self.built_from = Some((options, theme.clone()));
         self.revision += 1;
         self.line_at_source_offset(target)
@@ -118,6 +148,23 @@ impl DocCache {
             })
             .unwrap_or_else(|| self.doc.lines.len().saturating_sub(1))
     }
+}
+
+/// Count headings anywhere in the tree, including inside quotes and lists.
+fn count_headings(blocks: &[Block]) -> usize {
+    blocks
+        .iter()
+        .map(|block| match &block.kind {
+            BlockKind::Heading { .. } => 1,
+            BlockKind::BlockQuote { children, .. }
+            | BlockKind::FootnoteDefinition { children, .. } => count_headings(children),
+            BlockKind::List { items, .. } => items
+                .iter()
+                .map(|item| count_headings(&item.children))
+                .sum(),
+            _ => 0,
+        })
+        .sum()
 }
 
 #[cfg(test)]
@@ -217,5 +264,31 @@ mod tests {
         let theme = Theme::new(ThemeVariant::Slate);
         assert_eq!(cache.ensure_rendered(options(40), &theme, 0), 0);
         assert_eq!(cache.extent(20, 40).max_top(), 0);
+    }
+
+    #[test]
+    fn the_heading_tree_is_replaced_with_the_lines_it_points_into() {
+        let mut cache = cache("# One\n\n## Two\n\nbody\n");
+        assert!(cache.outline().is_empty(), "built before any layout");
+        cache.ensure_rendered(options(40), &Theme::new(ThemeVariant::Slate), 0);
+        assert_eq!(cache.outline().len(), 2);
+        assert_eq!(cache.outline().rows()[1].depth, 1);
+        for row in cache.outline().rows() {
+            assert!(cache.doc().outline.get(row.anchor).is_some());
+        }
+    }
+
+    #[test]
+    fn headings_are_counted_before_anything_is_laid_out() {
+        let cache = cache("# One\n\n## Two\n\n> ### Quoted\n\nbody\n");
+        assert_eq!(cache.heading_count(), 3);
+        assert!(cache.outline().is_empty(), "counted from a layout");
+    }
+
+    #[test]
+    fn the_count_agrees_with_the_outline_once_there_is_one() {
+        let mut cache = cache("# One\n\n## Two\n\n### Three\n\nbody\n");
+        cache.ensure_rendered(options(40), &Theme::new(ThemeVariant::Slate), 0);
+        assert_eq!(cache.heading_count(), cache.outline().len());
     }
 }

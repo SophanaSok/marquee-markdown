@@ -11,6 +11,7 @@ use ratatui::text::{Line, Span};
 
 use super::doc::RenderedDoc;
 use super::measure;
+use super::overlay::{self, Overlay};
 
 /// Clip a line to the column window `[left, left + width)`, padding the result
 /// out to exactly `width` cells.
@@ -78,7 +79,18 @@ pub fn clip(line: &Line<'_>, left: u16, width: u16, fill: Style) -> Line<'static
 /// The content column is centered in `area` and the whole area — gutters
 /// included — is painted with `fill` first, so the page reads as one surface
 /// rather than as text on the terminal's own background.
-pub fn render(buf: &mut Buffer, area: Rect, doc: &RenderedDoc, top: usize, left: u16, fill: Style) {
+///
+/// `overlay` restyles column ranges of individual lines on their way to the
+/// buffer; pass [`Plain`](super::overlay::Plain) for none.
+pub fn render(
+    buf: &mut Buffer,
+    area: Rect,
+    doc: &RenderedDoc,
+    top: usize,
+    left: u16,
+    fill: Style,
+    overlay: &dyn Overlay,
+) {
     // Clamp to the buffer: a resize can leave pane geometry a frame behind,
     // and drawing outside the buffer would panic rather than look wrong.
     let area = area.intersection(buf.area);
@@ -88,9 +100,20 @@ pub fn render(buf: &mut Buffer, area: Rect, doc: &RenderedDoc, top: usize, left:
     }
     let visible = doc.width.min(area.width);
     let gutter = area.width.saturating_sub(visible) / 2;
+    let mut patches = Vec::new();
     for row in 0..area.height {
-        let Some(line) = doc.lines.get(top + usize::from(row)) else {
+        let index = top + usize::from(row);
+        let Some(line) = doc.lines.get(index) else {
             break;
+        };
+        patches.clear();
+        overlay.patches(index, &mut patches);
+        let patched;
+        let line = if patches.is_empty() {
+            line
+        } else {
+            patched = overlay::apply(line, &patches);
+            &patched
         };
         let clipped = clip(line, left, visible, fill);
         // `set_line` clips to both `visible` and the buffer, and leaves the
@@ -198,7 +221,7 @@ mod tests {
         );
         let area = Rect::new(0, 0, 20, 3);
         let mut buf = Buffer::empty(area);
-        render(&mut buf, area, &doc, 0, 0, theme.page());
+        render(&mut buf, area, &doc, 0, 0, theme.page(), &overlay::Plain);
         for x in 0..20 {
             assert_eq!(buf[(x, 0)].style().bg, theme.page().bg, "column {x}");
         }
@@ -217,6 +240,14 @@ mod tests {
         );
         // Pane geometry from before a resize, against a buffer from after it.
         let mut buf = Buffer::empty(Rect::new(0, 0, 20, 6));
-        render(&mut buf, Rect::new(0, 0, 80, 24), &doc, 0, 0, theme.page());
+        render(
+            &mut buf,
+            Rect::new(0, 0, 80, 24),
+            &doc,
+            0,
+            0,
+            theme.page(),
+            &overlay::Plain,
+        );
     }
 }

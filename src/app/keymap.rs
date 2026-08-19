@@ -24,19 +24,25 @@ use super::action::Action;
 pub enum Mode {
     /// Reading a document.
     Document,
+    /// The table of contents has focus.
+    Toc,
+    /// Text is being typed at a prompt.
+    Prompt,
     /// The key reference is open.
     Help,
 }
 
 impl Mode {
     /// Every mode, for iteration in tests and in the help overlay.
-    pub const ALL: &'static [Self] = &[Self::Document, Self::Help];
+    pub const ALL: &'static [Self] = &[Self::Document, Self::Toc, Self::Prompt, Self::Help];
 
     /// Name used in configuration files (`[keys.document]`).
     #[must_use]
     pub const fn name(self) -> &'static str {
         match self {
             Self::Document => "document",
+            Self::Toc => "toc",
+            Self::Prompt => "prompt",
             Self::Help => "help",
         }
     }
@@ -242,11 +248,47 @@ const DEFAULTS: &[(Mode, &str, Action)] = &[
     (Mode::Document, "left", Action::ScrollLeft),
     (Mode::Document, "l", Action::ScrollRight),
     (Mode::Document, "right", Action::ScrollRight),
+    (Mode::Document, "/", Action::SearchStart),
+    (Mode::Document, "n", Action::SearchNext),
+    (Mode::Document, "N", Action::SearchPrevious),
+    (Mode::Document, "t", Action::ToggleToc),
+    (Mode::Document, "tab", Action::FocusNext),
     (Mode::Document, "T", Action::ToggleTheme),
     (Mode::Document, "?", Action::ToggleHelp),
     (Mode::Document, "esc", Action::Escape),
     (Mode::Document, "q", Action::Quit),
     (Mode::Document, "ctrl+c", Action::Quit),
+    // The contents pane takes the same movement keys, pointed at itself. `h`
+    // and `l` fold and unfold here, which is what those keys mean in every
+    // tree view; in the document they still scroll sideways.
+    (Mode::Toc, "j", Action::TocDown),
+    (Mode::Toc, "down", Action::TocDown),
+    (Mode::Toc, "k", Action::TocUp),
+    (Mode::Toc, "up", Action::TocUp),
+    (Mode::Toc, "g", Action::TocTop),
+    (Mode::Toc, "home", Action::TocTop),
+    (Mode::Toc, "G", Action::TocBottom),
+    (Mode::Toc, "end", Action::TocBottom),
+    (Mode::Toc, "h", Action::TocCollapse),
+    (Mode::Toc, "left", Action::TocCollapse),
+    (Mode::Toc, "l", Action::TocExpand),
+    (Mode::Toc, "right", Action::TocExpand),
+    (Mode::Toc, "enter", Action::TocOpen),
+    (Mode::Toc, "tab", Action::FocusNext),
+    (Mode::Toc, "t", Action::ToggleToc),
+    (Mode::Toc, "/", Action::SearchStart),
+    (Mode::Toc, "T", Action::ToggleTheme),
+    (Mode::Toc, "?", Action::ToggleHelp),
+    (Mode::Toc, "esc", Action::Escape),
+    (Mode::Toc, "q", Action::Quit),
+    (Mode::Toc, "ctrl+c", Action::Quit),
+    // A prompt binds almost nothing on purpose: every other printable key has
+    // to reach the text being typed, or `q` in a search box quits the reader.
+    (Mode::Prompt, "enter", Action::PromptAccept),
+    (Mode::Prompt, "backspace", Action::PromptBackspace),
+    (Mode::Prompt, "ctrl+u", Action::PromptClear),
+    (Mode::Prompt, "esc", Action::Escape),
+    (Mode::Prompt, "ctrl+c", Action::Quit),
     (Mode::Help, "?", Action::ToggleHelp),
     (Mode::Help, "esc", Action::Escape),
     (Mode::Help, "q", Action::Escape),

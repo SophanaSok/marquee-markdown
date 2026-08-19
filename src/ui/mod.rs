@@ -9,6 +9,7 @@
 pub mod document;
 pub mod help;
 pub mod status;
+pub mod toc;
 
 use ratatui::Frame;
 
@@ -17,6 +18,7 @@ use crate::app::state::{App, Overlay};
 /// Draw one frame.
 pub fn draw(frame: &mut Frame, app: &App) {
     document::draw(frame, app);
+    toc::draw(frame, app);
     status::draw(frame, app);
     match app.overlay {
         Some(Overlay::Help) => help::draw(frame, app),

@@ -8,7 +8,6 @@ use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Clear, Paragraph};
 
-use crate::app::keymap::Mode;
 use crate::app::state::App;
 use crate::render::measure;
 
@@ -69,7 +68,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
 /// looking the overlay up for.
 fn rows(app: &App) -> Vec<(String, String)> {
     app.keymap
-        .help_rows(Mode::Document)
+        .help_rows(app.pane_mode())
         .into_iter()
         .map(|(keys, action)| (keys, action.describe().to_owned()))
         .collect()
@@ -91,7 +90,7 @@ fn centered(area: Rect, width: u16, height: u16) -> Rect {
 mod tests {
     use super::*;
     use crate::app::action::Action;
-    use crate::app::keymap::Keymap;
+    use crate::app::keymap::{Keymap, Mode};
     use crate::app::state::{App, Options, Overlay};
     use crate::source::{Base, Source};
     use crate::theme::{Theme, ThemeVariant};

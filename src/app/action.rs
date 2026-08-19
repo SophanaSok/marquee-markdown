@@ -41,6 +41,36 @@ pub enum Action {
     ScrollLeft,
     /// Shift the view one column right; only does anything when wrapping is off.
     ScrollRight,
+    /// Show or hide the table of contents.
+    ToggleToc,
+    /// Move focus between the document and the table of contents.
+    FocusNext,
+    /// Move the table-of-contents cursor down one entry.
+    TocDown,
+    /// Move the table-of-contents cursor up one entry.
+    TocUp,
+    /// Move the table-of-contents cursor to the first entry.
+    TocTop,
+    /// Move the table-of-contents cursor to the last entry.
+    TocBottom,
+    /// Fold the selected section shut, or move to its parent if it is a leaf.
+    TocCollapse,
+    /// Unfold the selected section, or move to its first child if it is open.
+    TocExpand,
+    /// Jump the document to the selected entry.
+    TocOpen,
+    /// Begin an in-document search.
+    SearchStart,
+    /// Go to the next hit.
+    SearchNext,
+    /// Go to the previous hit.
+    SearchPrevious,
+    /// Accept what has been typed at a prompt.
+    PromptAccept,
+    /// Delete the character before the cursor, cancelling on an empty prompt.
+    PromptBackspace,
+    /// Clear the prompt without cancelling it.
+    PromptClear,
 }
 
 impl Action {
@@ -56,6 +86,21 @@ impl Action {
         Self::Bottom,
         Self::ScrollLeft,
         Self::ScrollRight,
+        Self::SearchStart,
+        Self::SearchNext,
+        Self::SearchPrevious,
+        Self::ToggleToc,
+        Self::FocusNext,
+        Self::TocDown,
+        Self::TocUp,
+        Self::TocTop,
+        Self::TocBottom,
+        Self::TocCollapse,
+        Self::TocExpand,
+        Self::TocOpen,
+        Self::PromptAccept,
+        Self::PromptBackspace,
+        Self::PromptClear,
         Self::ToggleTheme,
         Self::ToggleHelp,
         Self::Escape,
@@ -80,6 +125,21 @@ impl Action {
             Self::Bottom => "bottom",
             Self::ScrollLeft => "scroll-left",
             Self::ScrollRight => "scroll-right",
+            Self::ToggleToc => "toggle-toc",
+            Self::FocusNext => "focus-next",
+            Self::TocDown => "toc-down",
+            Self::TocUp => "toc-up",
+            Self::TocTop => "toc-top",
+            Self::TocBottom => "toc-bottom",
+            Self::TocCollapse => "toc-collapse",
+            Self::TocExpand => "toc-expand",
+            Self::TocOpen => "toc-open",
+            Self::SearchStart => "search-start",
+            Self::SearchNext => "search-next",
+            Self::SearchPrevious => "search-previous",
+            Self::PromptAccept => "prompt-accept",
+            Self::PromptBackspace => "prompt-backspace",
+            Self::PromptClear => "prompt-clear",
         }
     }
 
@@ -101,6 +161,21 @@ impl Action {
             Self::Bottom => "go to bottom",
             Self::ScrollLeft => "scroll left",
             Self::ScrollRight => "scroll right",
+            Self::ToggleToc => "show / hide contents",
+            Self::FocusNext => "focus contents / document",
+            Self::TocDown => "next entry",
+            Self::TocUp => "previous entry",
+            Self::TocTop => "first entry",
+            Self::TocBottom => "last entry",
+            Self::TocCollapse => "fold section",
+            Self::TocExpand => "unfold section",
+            Self::TocOpen => "go to entry",
+            Self::SearchStart => "search",
+            Self::SearchNext => "next hit",
+            Self::SearchPrevious => "previous hit",
+            Self::PromptAccept => "accept",
+            Self::PromptBackspace => "delete back",
+            Self::PromptClear => "clear",
         }
     }
 }
@@ -158,13 +233,28 @@ mod tests {
             | Action::Top
             | Action::Bottom
             | Action::ScrollLeft
-            | Action::ScrollRight => {}
+            | Action::ScrollRight
+            | Action::ToggleToc
+            | Action::FocusNext
+            | Action::TocDown
+            | Action::TocUp
+            | Action::TocTop
+            | Action::TocBottom
+            | Action::TocCollapse
+            | Action::TocExpand
+            | Action::TocOpen
+            | Action::SearchStart
+            | Action::SearchNext
+            | Action::SearchPrevious
+            | Action::PromptAccept
+            | Action::PromptBackspace
+            | Action::PromptClear => {}
         }
     }
 
     #[test]
     fn every_variant_reaches_the_list() {
-        assert_eq!(Action::ALL.len(), 14, "Action::ALL is out of date");
+        assert_eq!(Action::ALL.len(), 29, "Action::ALL is out of date");
     }
 
     #[test]

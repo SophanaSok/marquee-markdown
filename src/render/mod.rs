@@ -26,6 +26,7 @@ pub mod frag;
 pub mod highlight;
 pub mod layout;
 pub mod measure;
+pub mod overlay;
 pub mod parse;
 pub mod sink;
 pub mod tui;

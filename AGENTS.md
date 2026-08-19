@@ -70,7 +70,9 @@ sink.rs      LineSink: the ONLY emitter of lines. Owns the width invariant.
 layout/      Per-block emitters: heading, para, list, quote, rule, code, table.
 highlight.rs syntect -> ratatui styles directly, surface background forced.
 doc.rs       RenderedDoc: lines, per-line meta, outline, links, plain mirror.
+overlay.rs   Draw-time restyling of column ranges (search highlight).
 ansi.rs      RenderedDoc -> SGR bytes + OSC 8, for the stdout path.
+tui.rs       RenderedDoc -> a ratatui buffer, for the reader.
 ```
 
 Pipeline: `source -> parse -> layout (fragment, wrap, emit) -> RenderedDoc`,
@@ -96,10 +98,23 @@ app/         The reader: state, input, and the loop.
   derived.rs   Recomputed once per iteration: clamping, active section.
   terminal.rs  RAII alternate-screen guard and the panic hook.
 doc/         Document state, independent of any terminal.
-  cache.rs     The ONLY caller of the layout engine.
+  cache.rs     The ONLY caller of the layout engine; owns the heading tree.
+  outline.rs   Headings as a tree, flattened into rows that know their subtree.
+  search.rs    Hits over the plain mirror, as line-and-column ranges.
   view.rs      Scroll arithmetic, pure.
 ui/          Draw-only widgets, each taking &App.
 ```
+
+Two rules in the reader that are easy to undo by accident:
+
+- **Pane geometry may not depend on anything only a layout can produce.** The
+  contents pane asks `DocCache::heading_count`, counted from the block tree at
+  parse time, rather than the outline, which does not exist until the first
+  layout. Deciding from the outline made the pane appear on frame two, which
+  changed the content width, re-laid out the document, and moved the reader.
+- **The contents cursor and the active entry are different state.** The active
+  entry follows the scroll position; the cursor is where the reader put it.
+  Writing either into the other makes the pane feel broken.
 
 ### The reader's loop
 
@@ -114,7 +129,7 @@ Reconciling *before* drawing rather than during it is what lets the draw path
 take `&App`. Two consequences to preserve:
 
 - **`doc::cache::ensure_rendered` is the only path to a layout.** Scroll
-  position, outline anchors, and (later) search matches are all indices into
+  position, outline anchors, and search matches are all indices into
   `RenderedDoc.lines`, and every one is invalidated together by a resize or a
   theme switch. Remapping them in one place is why resizing keeps the reader's
   position instead of teleporting them. Do not call `render::layout` elsewhere.
@@ -182,5 +197,13 @@ whose text contains escapes.
       ./target/debug/marquee-markdown -t README.md" /dev/null
   ```
 
-  Remember that `q` closes an open overlay rather than quitting, so a script
-  ending in `?q` will hang waiting for input rather than exiting.
+  Three things to know before writing one of these:
+
+  - `q` closes an open overlay rather than quitting, so a script ending in `?q`
+    hangs waiting for input rather than exiting.
+  - Enter is `\r`. In raw mode `\n` is Ctrl+J, which crossterm correctly
+    reports as a different key, so a script using `\n` types into a prompt
+    forever.
+  - Feed the keys with a delay between them. Sent in one burst, `esc` followed
+    by a letter is indistinguishable from Alt+letter, which is exactly the
+    ambiguity a real terminal has.

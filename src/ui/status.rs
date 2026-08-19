@@ -1,6 +1,7 @@
 //! The status bar: where the reader is, and what just happened.
 
 use ratatui::Frame;
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 
 use crate::app::state::App;
@@ -28,34 +29,76 @@ pub fn compose(app: &App, width: u16) -> Line<'static> {
     let theme = &app.theme;
     let total = usize::from(width);
 
-    let (right, right_style) = match &app.message {
-        Some(message) => (format!(" {message} "), theme.status_message()),
-        None => (
-            format!(" {}%  ? help ", app.view.progress(app.extent())),
-            theme.status_bar(),
-        ),
-    };
+    let (right, right_style) = right_side(app);
     let right = measure::truncate(&right, total, "…");
     let right_width = measure::width(&right);
-
-    // The document name is the last thing to give way; the section heading
-    // yields first, since the document is still visible on screen above it.
     let budget = total - right_width;
-    let name = measure::truncate(&format!(" {} ", app.doc.source.display_name), budget, "… ");
-    let name_width = measure::width(&name);
-    let section = app
-        .active_heading()
-        .map(|anchor| measure::truncate(&format!("› {} ", anchor.text), budget - name_width, "… "))
-        .unwrap_or_default();
-    let section_width = measure::width(&section);
-    let gap = budget - name_width - section_width;
+
+    let (left, left_style, trailing) = left_side(app);
+    let left = measure::truncate(&left, budget, "… ");
+    let left_width = measure::width(&left);
+    let trailing = measure::truncate(&trailing, budget - left_width, "… ");
+    let trailing_width = measure::width(&trailing);
+    let gap = budget - left_width - trailing_width;
 
     Line::from(vec![
-        Span::styled(name, theme.status_active()),
-        Span::styled(section, theme.status_bar()),
+        Span::styled(left, left_style),
+        Span::styled(trailing, theme.status_bar()),
         Span::styled(" ".repeat(gap), theme.status_bar()),
         Span::styled(right, right_style),
     ])
+}
+
+/// The left of the bar: what is being typed, or where the reader is.
+///
+/// The document name is the last thing to give way; the section heading yields
+/// first, since the document itself is still on screen above it.
+fn left_side(app: &App) -> (String, Style, String) {
+    if let Some(prompt) = &app.prompt {
+        // A block stands in for the cursor: the real one is hidden, and a
+        // prompt with no visible caret does not look like it is taking input.
+        return (
+            format!(" {}{}▏", prompt.kind.sigil(), prompt.input),
+            app.theme.status_active(),
+            String::new(),
+        );
+    }
+    let section = app
+        .active_heading()
+        .map(|anchor| format!("› {} ", anchor.text))
+        .unwrap_or_default();
+    (
+        format!(" {} ", app.doc.source.display_name),
+        app.theme.status_active(),
+        section,
+    )
+}
+
+/// The right of the bar: a message, the search, or how far through we are.
+fn right_side(app: &App) -> (String, Style) {
+    if let Some(message) = &app.message {
+        return (format!(" {message} "), app.theme.status_message());
+    }
+    if app.prompt.is_some() {
+        return (" enter to search ".to_owned(), app.theme.status_bar());
+    }
+    if app.search.is_active() {
+        let count = app.search.matches().len();
+        let text = if count == 0 {
+            format!(" /{} no matches ", app.search.query())
+        } else {
+            format!(
+                " /{} {}/{count} ",
+                app.search.query(),
+                app.search.current().map_or(0, |index| index + 1)
+            )
+        };
+        return (text, app.theme.status_message());
+    }
+    (
+        format!(" {}%  ? help ", app.view.progress(app.extent())),
+        app.theme.status_bar(),
+    )
 }
 
 #[cfg(test)]
@@ -108,6 +151,39 @@ mod tests {
         let text = text_of(&compose(&app, 60));
         assert!(text.contains("press q to quit"), "{text:?}");
         assert!(!text.contains("help"), "{text:?}");
+    }
+
+    #[test]
+    fn an_open_prompt_shows_what_is_being_typed() {
+        let mut app = app("# T\n", "doc.md");
+        app.prompt = Some(crate::app::state::Prompt {
+            kind: crate::app::state::PromptKind::Search,
+            input: "needle".to_owned(),
+        });
+        let text = text_of(&compose(&app, 60));
+        assert!(text.contains("/needle"), "{text:?}");
+        assert!(
+            !text.contains("doc.md"),
+            "the prompt shares the bar: {text:?}"
+        );
+    }
+
+    #[test]
+    fn an_active_search_shows_which_hit_is_selected() {
+        let mut app = app("needle one\n\nneedle two\n", "doc.md");
+        app.search
+            .search(app.doc.doc(), app.doc.revision(), "needle", 0);
+        let text = text_of(&compose(&app, 60));
+        assert!(text.contains("/needle"), "{text:?}");
+        assert!(text.contains("1/2"), "{text:?}");
+    }
+
+    #[test]
+    fn a_search_with_no_hits_says_so() {
+        let mut app = app("nothing\n", "doc.md");
+        app.search
+            .search(app.doc.doc(), app.doc.revision(), "absent", 0);
+        assert!(text_of(&compose(&app, 60)).contains("no matches"));
     }
 
     #[test]

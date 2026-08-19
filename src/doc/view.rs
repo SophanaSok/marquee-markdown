@@ -86,6 +86,26 @@ impl View {
         self.clamp(extent);
     }
 
+    /// Put `line` at the top of the view.
+    pub fn go_to(&mut self, line: usize, extent: Extent) {
+        self.top = line;
+        self.clamp(extent);
+    }
+
+    /// Bring `line` into view, leaving the position alone if it already is.
+    ///
+    /// A line that has to be scrolled to lands a third of the way down rather
+    /// than at the very edge, so there is context above it — which is what you
+    /// want when the line is a search hit.
+    pub fn reveal(&mut self, line: usize, extent: Extent) {
+        let height = usize::from(extent.height).max(1);
+        if (self.top..self.top + height).contains(&line) {
+            return;
+        }
+        self.top = line.saturating_sub(height / 3);
+        self.clamp(extent);
+    }
+
     /// Pull the position back inside the document.
     ///
     /// Called after every mutation and once per frame, so a resize or a
@@ -208,5 +228,41 @@ mod tests {
     #[test]
     fn progress_reads_zero_at_the_top_of_a_long_document() {
         assert_eq!(View::default().progress(extent(1_000, 20)), 0);
+    }
+
+    #[test]
+    fn revealing_a_line_already_on_screen_does_not_move_the_view() {
+        let e = extent(100, 20);
+        let mut view = View { top: 30, left: 0 };
+        view.reveal(35, e);
+        assert_eq!(view.top, 30);
+        view.reveal(30, e);
+        assert_eq!(view.top, 30);
+        view.reveal(49, e);
+        assert_eq!(view.top, 30);
+    }
+
+    #[test]
+    fn revealing_a_line_off_screen_leaves_context_above_it() {
+        let e = extent(100, 30);
+        let mut view = View::default();
+        view.reveal(60, e);
+        assert!(view.top < 60, "the hit landed at the very top");
+        assert!((view.top..view.top + 30).contains(&60), "not revealed");
+    }
+
+    #[test]
+    fn revealing_a_line_near_the_start_does_not_underflow() {
+        let mut view = View { top: 50, left: 0 };
+        view.reveal(1, extent(100, 20));
+        assert_eq!(view.top, 0);
+    }
+
+    #[test]
+    fn going_to_a_line_past_the_end_lands_on_the_last_screenful() {
+        let e = extent(100, 20);
+        let mut view = View::default();
+        view.go_to(9_000, e);
+        assert_eq!(view.top, e.max_top());
     }
 }

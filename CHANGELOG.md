@@ -8,9 +8,9 @@ Until 1.0 the `render` module's public API may change within minor versions.
 
 ## [Unreleased]
 
-Pre-release. The rendering engine, the non-interactive reader, and the
-full-screen reader are complete; the table-of-contents sidebar, in-document
-search, and the file browser are not built yet.
+Pre-release. The rendering engine and the full-screen reader — contents pane
+and search included — are complete; the file browser and remote sources are not
+built yet.
 
 ### Added
 
@@ -66,6 +66,33 @@ search, and the file browser are not built yet.
 - `-t` into a pipe or a file renders once instead of writing cursor movements
   into it.
 
+#### Contents pane and search
+
+- A scroll-tracking table-of-contents pane beside the document, with folding
+  (`h`/`l`), movement on the same keys the document uses, and `enter` to go to
+  an entry.
+- Nesting comes from the order headings appear in, so a document that jumps
+  from `#` to `###` nests sensibly instead of producing an orphan.
+- The pane distinguishes the **active** entry, which follows the scroll
+  position, from the **cursor**, which is where the reader left it. Scrolling
+  never drags the cursor away and moving the cursor never pretends the reader
+  scrolled.
+- The pane hides itself on a terminal under 60 columns and on a document with
+  fewer than two headings, where it would cost a quarter of the screen to say
+  nothing.
+- In-document search on `/`, with `n` and `N` to step through hits and a count
+  in the status bar. Lowercase queries ignore case; a capital makes the query
+  case-sensitive.
+- Hits are highlighted through a draw-time overlay, so searching never re-lays
+  out the document, and a background-only highlight keeps the syntax colors
+  underneath it.
+- Hits are re-found whenever the document is laid out again, so a resize or a
+  theme switch cannot leave the highlight pointing at a stale line.
+- A prompt captures every printable key: typing `q` into a search box types a
+  `q` rather than quitting the reader.
+- `esc` unwinds one layer at a time — overlay, then prompt, then focus, then
+  the search highlight — and hints rather than quitting at the bottom.
+
 #### Theming
 
 - Two Claude palettes, `paper` (light) and `slate` (dark), compiled in as
@@ -91,10 +118,13 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
 
 ### Known gaps
 
-- The table-of-contents sidebar and in-document search are not built yet, so
-  the reader currently has no navigation beyond scrolling.
 - `-p` and bare invocation (the file browser) exit with a clear message rather
   than doing something unexpected.
+- Search matches the rendered text, so a phrase broken across a soft wrap does
+  not match. Searching is deliberately not incremental: the query runs when
+  `enter` is pressed.
+- The key reference does not scroll, so on a terminal shorter than about 22
+  rows the last few bindings are cut off.
 - URL and forge (`github.com/owner/repo`) sources report that they are not
   implemented yet.
 - `--config` is parsed but no configuration file is read yet.

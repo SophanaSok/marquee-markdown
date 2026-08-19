@@ -6,7 +6,7 @@
 //! cannot disagree — the bug where a closed prompt still swallows keys is not
 //! reachable.
 
-use crate::doc::{DocCache, View};
+use crate::doc::{DocCache, Search, View};
 use crate::source::Source;
 use crate::theme::{Appearance, Theme, ThemeVariant};
 
@@ -31,6 +31,63 @@ pub enum Overlay {
     Help,
 }
 
+/// Which pane the keyboard is talking to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Focus {
+    /// The document.
+    #[default]
+    Document,
+    /// The table of contents.
+    Toc,
+}
+
+/// What a prompt is collecting text for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PromptKind {
+    /// An in-document search.
+    Search,
+}
+
+impl PromptKind {
+    /// The sigil shown in front of the text being typed.
+    ///
+    /// Distinct per prompt on purpose: the browser's filter and the document
+    /// search both live on `/`, and the sigil is what tells a reader which one
+    /// they are typing into.
+    #[must_use]
+    pub const fn sigil(self) -> &'static str {
+        match self {
+            Self::Search => "/",
+        }
+    }
+}
+
+/// Text being typed at the status bar.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Prompt {
+    /// What the text is for.
+    pub kind: PromptKind,
+    /// What has been typed so far.
+    pub input: String,
+}
+
+/// The table of contents, as the reader has arranged it.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Toc {
+    /// The selected row, as an index into the outline's rows. Distinct from
+    /// the active section, which follows the scroll position: moving the
+    /// cursor must not be undone by scrolling, and scrolling must not drag the
+    /// cursor around.
+    pub cursor: usize,
+    /// Which rows are folded shut, indexed by row. Survives re-layout because
+    /// the set of headings does not depend on the width.
+    pub collapsed: Vec<bool>,
+    /// First visible row of the pane; derived from the cursor each frame.
+    pub offset: usize,
+    /// Row indices currently on show, with folded subtrees left out. Derived.
+    pub visible: Vec<usize>,
+}
+
 /// Everything the reader knows.
 #[derive(Debug)]
 pub struct App {
@@ -49,6 +106,17 @@ pub struct App {
     pub overlay: Option<Overlay>,
     /// Pane geometry, recomputed once per iteration before drawing.
     pub panes: Panes,
+    /// Which pane the keyboard is talking to.
+    pub focus: Focus,
+    /// Whether the reader has asked for the contents pane. It can still be
+    /// hidden by a narrow terminal or a document with no headings.
+    pub toc_visible: bool,
+    /// The contents pane.
+    pub toc: Toc,
+    /// The in-document search.
+    pub search: Search,
+    /// Text being typed, if a prompt is open.
+    pub prompt: Option<Prompt>,
     /// Index into the outline of the section being read; derived from `view`.
     pub active: Option<usize>,
     /// A transient line shown in the status bar until the next key.
@@ -75,6 +143,11 @@ impl App {
             keymap: Keymap::defaults(),
             overlay: None,
             panes: Panes::default(),
+            focus: Focus::Document,
+            toc_visible: true,
+            toc: Toc::default(),
+            search: Search::default(),
+            prompt: None,
             active: None,
             message: None,
             options,
@@ -82,13 +155,39 @@ impl App {
         }
     }
 
-    /// Which bindings are in force, derived from what is open.
+    /// Which bindings are in force, derived from what is open and what has
+    /// focus. Never stored: a mode kept alongside the state it describes is
+    /// how a closed prompt ends up still swallowing keys.
     #[must_use]
     pub fn mode(&self) -> Mode {
         match self.overlay {
             Some(Overlay::Help) => Mode::Help,
-            None => Mode::Document,
+            None if self.prompt.is_some() => Mode::Prompt,
+            None => self.pane_mode(),
         }
+    }
+
+    /// The mode of the pane underneath any overlay — what the key reference
+    /// should describe, since opening it does not move focus.
+    #[must_use]
+    pub fn pane_mode(&self) -> Mode {
+        match self.focus {
+            Focus::Document => Mode::Document,
+            Focus::Toc => Mode::Toc,
+        }
+    }
+
+    /// The outline row the cursor is on.
+    #[must_use]
+    pub fn toc_row(&self) -> Option<&crate::doc::outline::Row> {
+        self.doc.outline().rows().get(self.toc.cursor)
+    }
+
+    /// The heading an outline row points at.
+    #[must_use]
+    pub fn anchor_of(&self, row: usize) -> Option<&crate::render::Anchor> {
+        let row = self.doc.outline().rows().get(row)?;
+        self.doc.doc().outline.get(row.anchor)
     }
 
     /// The scrolling bounds for the current pane geometry.
@@ -112,8 +211,24 @@ impl App {
     #[must_use]
     pub fn summary(&self) -> String {
         let section = self.active_heading().map_or("-", |anchor| &anchor.id);
+        let toc = if self.panes.sidebar.is_none() {
+            "off".to_owned()
+        } else {
+            self.anchor_of(self.toc.cursor)
+                .map_or_else(|| "-".to_owned(), |anchor| anchor.id.clone())
+        };
+        let search = match (self.prompt.as_ref(), self.search.is_active()) {
+            (Some(prompt), _) => format!("{}{}|", prompt.kind.sigil(), prompt.input),
+            (None, true) => format!(
+                "{}[{}/{}]",
+                self.search.query(),
+                self.search.current().map_or(0, |index| index + 1),
+                self.search.matches().len()
+            ),
+            (None, false) => "-".to_owned(),
+        };
         format!(
-            "mode={} top={} left={} section={section} theme={} quit={}",
+            "mode={} top={} left={} section={section} toc={toc} search={search} theme={} quit={}",
             self.mode(),
             self.view.top,
             self.view.left,
@@ -157,7 +272,7 @@ mod tests {
     fn a_summary_is_produced_before_anything_is_laid_out() {
         assert_eq!(
             app().summary(),
-            "mode=document top=0 left=0 section=- theme=slate quit=false"
+            "mode=document top=0 left=0 section=- toc=off search=- theme=slate quit=false"
         );
     }
 }

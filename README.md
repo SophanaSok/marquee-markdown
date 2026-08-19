@@ -5,10 +5,9 @@ A terminal markdown reader with the functionality of
 Claude artifacts do — a centered reading column on a painted page, typographic
 headings, sealed code cards — with a table-of-contents panel for navigation.
 
-> **Status: pre-release.** The rendering engine, the non-interactive reader, and
-> the full-screen reader (`-t`) work today. The table-of-contents sidebar,
-> in-document search, and the file browser are not built yet; see
-> [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status: pre-release.** The rendering engine and the full-screen reader —
+> contents pane and search included — work today. The file browser and remote
+> sources are not built yet; see [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## What it looks different from
 
@@ -24,7 +23,7 @@ Rendering the same document through glow 3.0.0 shows what this fixes:
 | Long code lines wrap *out* of the block | they stay sealed inside the card |
 | OSC 8 escapes counted as width, leaving ragged lines | escapes cannot reach width math |
 | 2-space margin | a centered reading column, page painted edge to edge |
-| No outline, no in-document search | both (sidebar and search still to land) |
+| No outline, no in-document search | a scroll-tracking contents pane, and `/` `n` `N` |
 | Keys hardcoded, cannot be rebound | every key resolves through a rebindable action table |
 
 ## Install
@@ -61,9 +60,11 @@ hyperlinks, so `marquee-markdown doc.md > out.txt` contains just the text.
 
 ## Reading
 
-`-t` opens the full-screen reader. Keys follow glow, so muscle memory carries
-over; `?` shows the list, rendered from the keymap that is actually in force
-rather than from a fixed page, so it stays honest once keys become rebindable.
+`-t` opens the full-screen reader: the document in a centered column, a
+table-of-contents pane beside it, and a status bar that says where you are.
+Keys follow glow, so muscle memory carries over; `?` shows the list, rendered
+from the keymap that is actually in force rather than from a fixed page, so it
+stays honest once keys become rebindable.
 
 Keys are written here the way a configuration file will spell them.
 
@@ -74,14 +75,44 @@ Keys are written here the way a configuration file will spell them.
 | `f` `b` · `space` `pgdn` `pgup` | page down, page up |
 | `g` `G` · `home` `end` | top, bottom |
 | `h` `l` · `left` `right` | scroll sideways (only with `-w 0`) |
+| `/` | search |
+| `n` `N` | next hit, previous hit |
+| `t` | show / hide the contents pane |
+| `tab` | move focus between the panes |
 | `T` | switch light / dark |
 | `?` | key reference |
 | `esc` | close what is open |
 | `q` · `ctrl+c` | quit |
 
+The contents pane takes the same movement keys, pointed at itself. `h` and `l`
+fold and unfold there, which is what they mean in any tree; in the document
+they still scroll sideways.
+
+| Key | |
+| --- | --- |
+| `j` `k` · `down` `up` | next entry, previous entry |
+| `g` `G` · `home` `end` | first entry, last entry |
+| `h` `l` · `left` `right` | fold, unfold |
+| `enter` | go to the entry |
+| `tab` · `esc` | back to the document |
+
+The pane highlights two different things and they are deliberately not the
+same: the **active** entry is the section the document is scrolled to, and it
+follows you as you read, while the **cursor** is where you left it. Scrolling
+never drags the cursor away mid-keystroke. The pane hides itself on a narrow
+terminal, and on a document with fewer than two headings, where it would cost
+a quarter of the screen to say nothing.
+
+Search runs over the rendered text, so a hit is already a place on the page and
+highlighting costs nothing. A lowercase query ignores case; a query with any
+capital in it does not. `esc` clears the highlight. One consequence of
+searching what is on screen: a phrase broken across a soft wrap will not match,
+because on the page it genuinely is two lines.
+
 Resizing the terminal or switching theme re-lays out the document and keeps
 your place: the position is carried by source offset, not by line number, so a
-narrower column does not teleport you.
+narrower column does not teleport you. Search hits are re-found at the same
+time, so the highlight never points at a stale line.
 
 ## Themes
 

@@ -141,9 +141,68 @@ fn scrolling_to_the_end_still_paints_the_rows_past_the_last_line() {
 fn a_document_narrower_than_the_terminal_is_centered() {
     let mut app = fixture();
     app.options.width = Some(40);
+    app.toc_visible = false;
     let buf = frame(&mut app, 80, 24);
     // Twenty columns of page either side of a forty-column reading column.
     assert_eq!(buf[(0, 0)].style().bg, app.theme.page().bg);
     assert_eq!(buf[(79, 0)].style().bg, app.theme.page().bg);
     assert_eq!(app.panes.content_width, 40);
+}
+
+#[test]
+fn the_contents_pane_is_divided_from_the_document() {
+    let mut app = fixture();
+    let buf = frame(&mut app, 100, 30);
+    let sidebar = app
+        .panes
+        .sidebar
+        .expect("a sidebar over a document with headings");
+    let divider = sidebar.x + sidebar.width - 1;
+    for y in 0..sidebar.height {
+        assert_eq!(buf[(divider, y)].symbol(), "│", "row {y}");
+    }
+    assert_eq!(app.panes.body.x, sidebar.width);
+}
+
+#[test]
+fn hiding_the_contents_pane_gives_its_columns_to_the_document() {
+    let mut app = fixture();
+    let with = frame(&mut app, 100, 30);
+    let divider = app.panes.sidebar.expect("a sidebar").width - 1;
+    app.toc_visible = false;
+    let without = frame(&mut app, 100, 30);
+    assert!(app.panes.sidebar.is_none());
+    assert_ne!(
+        with[(divider, 0)].symbol(),
+        without[(divider, 0)].symbol(),
+        "the divider is still drawn"
+    );
+    assert_fully_painted(&without, "contents hidden");
+}
+
+#[test]
+fn a_search_hit_is_highlighted_where_it_sits() {
+    let mut app = fixture();
+    app.toc_visible = false;
+    frame(&mut app, 80, 24);
+    app.search
+        .search(app.doc.doc(), app.doc.revision(), "unicode", 0);
+    let hit = app
+        .search
+        .current_match()
+        .expect("the fixture contains `unicode`")
+        .clone();
+    app.view.top = hit.line;
+    let buf = frame(&mut app, 80, 24);
+
+    let gutter = app.panes.body.x + (app.panes.body.width - app.doc.doc().width) / 2;
+    let x = gutter + hit.cols.start;
+    assert_eq!(
+        buf[(x, 0)].style().bg,
+        app.theme.search_current().bg,
+        "the selected hit is not highlighted"
+    );
+    // And the cell just past it is not.
+    let past = x + (hit.cols.end - hit.cols.start);
+    assert_ne!(buf[(past, 0)].style().bg, app.theme.search_current().bg);
 }

@@ -449,6 +449,33 @@ impl Theme {
             .add_modifier(Modifier::BOLD)
     }
 
+    /// The contents entry the cursor is on. Distinct from
+    /// [`Self::toc_active`]: the cursor is where the reader put it, the active
+    /// entry is where the document is scrolled to, and they are often
+    /// different rows.
+    #[must_use]
+    pub fn toc_cursor(&self) -> Style {
+        Style::new()
+            .bg(self.palette.surface.color())
+            .fg(self.palette.fg.color())
+    }
+
+    /// The bar marking the cursor row while the contents pane has focus.
+    #[must_use]
+    pub fn toc_cursor_marker(&self) -> Style {
+        Style::new()
+            .bg(self.palette.surface.color())
+            .fg(self.palette.accent.color())
+    }
+
+    /// The fold marker in front of a contents entry with children.
+    #[must_use]
+    pub fn toc_fold(&self) -> Style {
+        Style::new()
+            .bg(self.palette.bg.color())
+            .fg(self.palette.muted.color())
+    }
+
     /// Name of the bundled syntect theme paired with this palette.
     #[must_use]
     pub fn syntax_theme_name(&self) -> &str {
@@ -574,6 +601,9 @@ mod tests {
             theme.search_current(),
             theme.toc_item(),
             theme.toc_active(),
+            theme.toc_cursor(),
+            theme.toc_cursor_marker(),
+            theme.toc_fold(),
             theme.sidebar_divider(),
         ];
         for style in styles {

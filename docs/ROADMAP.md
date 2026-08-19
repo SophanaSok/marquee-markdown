@@ -16,8 +16,8 @@ scroll-tracking table-of-contents sidebar and in-document search.
 | **P0** Skeleton | Manifest with crates.io + deb/rpm metadata, lib/bin split, clippy config, pure-Rust syntect backend, layering test | 2 | **Done** (CI and contributor docs still open) |
 | **P1** One-shot render + theming | Source classification, frontmatter, code-file wrapping, ANSI output, `-l -n -w -s`, theme loader, `themes`/`man`/`completion` | 3 | **Done** except `-n` |
 | **P2** Document reader | Terminal guard + panic hook, event loop, view/anchor/render cache, pager keys via `Action`, status bar, keymap-rendered help, `-t` | 3 | **Done** (resize debounce open) |
-| **P3** TOC + search | Outline tree, active-section derivation, focus model, filter/collapse/auto-hide, `/` `n` `N` | 3 | Next |
-| **P4** Browser | Streaming gitignore-aware walk, paging, fuzzy filter with Unicode normalization, humanized modtimes, `-a` | 3 | |
+| **P3** TOC + search | Outline tree, active-section derivation, focus model, filter/collapse/auto-hide, `/` `n` `N` | 3 | **Done** (no TOC filter) |
+| **P4** Browser | Streaming gitignore-aware walk, paging, fuzzy filter with Unicode normalization, humanized modtimes, `-a` | 3 | Next |
 | **P5** Remote sources | `Fetcher` trait, http(s), `github://`/`gitlab://`, bare-host README API | 2 | |
 | **P6** Parity polish | Live reload, `e` at scroll line, `c` copy, `-p` pager, `-m` mouse, `ctrl+z`, link following, `y`, theme cycling | 2 | |
 | **P7** Config + keymaps | TOML schema, `MARQUEE_` env layer, precedence, user keymap merge, `config` subcommand | 2 | |
@@ -33,42 +33,33 @@ Themes load from TOML. Output degrades correctly when redirected.
 status bar, a key reference rendered from the live keymap, light/dark switching,
 and a resize that keeps your place instead of teleporting you.
 
-269 tests; `cargo clippy --all-targets -- -D warnings` and `cargo doc --no-deps`
+348 tests; `cargo clippy --all-targets -- -D warnings` and `cargo doc --no-deps`
 clean.
 
-## Immediate next steps (P3)
+## Immediate next steps (P4)
 
-The sidebar is the reason the project exists, and it is where the risks below
-stop being theoretical.
+The file browser. It is the last piece of glow parity that changes the shape of
+the application, because it adds a second screen.
 
-1. `doc/outline.rs` — the flat `Vec<Anchor>` the renderer already produces,
-   folded into a tree with skipped levels handled (`#` straight to `###` is
-   common and must not produce an orphan).
-2. `app/state.rs` — add `Focus`, and keep `Mode` **derived** from it the way it
-   is derived from the overlay today. Adding a stored mode alongside is how the
-   two start disagreeing.
-3. `keymap.rs` — a `Mode::Toc` block. Per the collision table: `h`/`l` collapse
-   and expand there, `/` filters, and neither steals what those keys do in the
-   document.
-4. `app/layout.rs` — the sidebar pane, with auto-hide below a width threshold.
-   `Panes` already exists to be extended; a hidden sidebar must be `None`, not
-   a zero-width rectangle, so widgets cannot draw into nothing.
-5. `ui/toc.rs` — **slice rows manually.** `ListState` mutates its offset during
-   render and would take `&mut App` into the draw path, which is the one thing
-   the architecture does not allow.
-6. `doc/search.rs` — scan `RenderedDoc::plain` once, convert byte matches to
-   `(line, column range)`, and highlight at draw time through an overlay
-   primitive. Do not re-lay out to search.
-7. `/` `n` `N` through `Action`, and a prompt mode that **captures all
-   printable input** — a `q` typed into a filter must not quit.
+1. `browser/walk.rs` — a streaming `ignore`-crate walk on a worker thread,
+   feeding results through the existing `Event` enum. It must stream: a walk of
+   a large tree that blocks the first frame is the thing that makes a browser
+   feel broken.
+2. `app/state.rs` — a `Screen` enum. Keep `Mode` derived from it the way it is
+   derived from focus today.
+3. `keymap.rs` — `Mode::Browser`. Per the collision table, glow's browser paging
+   keys (`b`/`u`/`f`/`d` full-page there, half-page in the pager) are reproduced
+   verbatim and mode-scoped. That inconsistency is glow's, and `[keys.*]` is the
+   fix glow cannot offer — document it as a quirk rather than silently
+   improving it.
+4. `browser/filter.rs` — fuzzy matching with `nucleo-matcher`, over
+   NFC-normalized names, so a filename typed with combining marks still
+   matches.
+5. The filter prompt is a second `PromptKind`. It shares `Mode::Prompt`, which
+   already captures all printable input; the sigil is what tells the two apart.
+6. `ui/browser.rs` — draw-only, slicing rows by hand as the contents pane does.
 
-Two things to watch, both recorded here because they are cheap now and
-expensive later: the TOC cursor (user-moved) and the active section
-(scroll-derived) are separate pieces of state and must stay that way, and
-search matches are line indices, so they belong in the `ensure_rendered`
-remapping alongside the scroll anchor.
-
-## What P2 built, and why it is shaped that way
+## What P2 and P3 built, and why it is shaped that way
 
 - `app/terminal.rs` — an RAII alternate-screen/raw-mode guard, plus a panic
   hook that restores the terminal *before* the message is printed. Without the
@@ -77,21 +68,47 @@ remapping alongside the scroll anchor.
   code anywhere matches on a `KeyCode` except the keymap, which is what makes
   P7 a data swap. A test forces a new variant to be added to `Action::ALL`, so
   it cannot be unbindable and invisible in the help overlay.
-- `app/keymap.rs` — the single table of default bindings. Duplicate chords in a
-  mode are an error rather than a silent overwrite, because the loser would
-  still appear in the help overlay.
-- `app/state.rs` — `Mode` is *derived* from what is open, never stored. The
-  "closed prompt still swallows keys" bug is unreachable rather than fixed.
+- `app/keymap.rs` — the single table of default bindings, per mode. Duplicate
+  chords in a mode are an error rather than a silent overwrite, because the
+  loser would still appear in the help overlay.
+- `app/state.rs` — `Mode` is *derived* from what is open and what has focus,
+  never stored. The "closed prompt still swallows keys" bug is unreachable
+  rather than fixed. A prompt binds almost nothing on purpose: any printable
+  key it has not bound is text, which is what keeps `q` in a search box from
+  quitting.
 - `app/event.rs` — the loop consumes its own `Event` enum, so a headless test
-  feeds exactly what a terminal would, and later producers (file watcher,
-  directory walk) plug in without touching the update logic.
+  feeds exactly what a terminal would, and P4's directory walk plugs in as
+  another producer without touching the update logic.
 - `app/update.rs` — the only mutation site.
 - `app/mod.rs` — `reconcile` before `draw`: pane geometry, then the layout
   cache, then derived state.
-- `doc/cache.rs` — the single re-render funnel.
+- `app/layout.rs` — pure pane geometry. The contents pane is `Option<Rect>`
+  rather than a zero-width rectangle, so a widget cannot draw into a pane that
+  is not there.
+- `doc/cache.rs` — the single re-render funnel, which also owns the heading
+  tree so the tree cannot outlive the lines it points into.
+- `doc/outline.rs` — the heading tree, flattened back into rows that know
+  their own subtree extent, so folding is a range skip.
+- `doc/search.rs` — hits found over the plain mirror, as line-and-column
+  ranges. Re-found rather than remapped when the document is laid out again.
+- `render/overlay.rs` — draw-time restyling of column ranges, which is what
+  lets search highlight without re-laying anything out.
 - `render/tui.rs` — the buffer serializer, paired with `render/ansi.rs`. One
   layout engine, two destinations.
 - `ui/` — draw-only widgets taking `&App`.
+
+Two things that cost a debugging session each, recorded so they are not
+rediscovered:
+
+- **Pane geometry may not depend on anything only a layout can produce.** The
+  contents pane first decided whether to show itself from the outline, which
+  does not exist until the first layout — so it appeared on frame two, changed
+  the content width, re-laid out the document and moved the reader a line. It
+  now asks `DocCache::heading_count`, counted from the block tree at parse
+  time. Anything else pane geometry needs must be available equally early.
+- **The cursor and the active entry are different state.** Collapsing them is
+  the single easiest way to make the contents pane feel broken: scrolling would
+  drag the selection out from under the reader mid-keystroke.
 
 Tests worth knowing about before changing any of it:
 
@@ -101,7 +118,9 @@ Tests worth knowing about before changing any of it:
 - `tests/frame.rs` draws at seven terminal sizes down to 1×1 and asserts every
   cell carries an explicit background — the painted page has no other
   mechanical guard.
-- `tests/docs.rs` fails if a bound key is missing from the README table.
+- `tests/docs.rs` fails if a bound key is missing from the README tables.
+- `tests/layering.rs` enforces the module boundaries and that no widget takes
+  `&mut App`.
 
 ## Sequencing constraints
 
@@ -135,8 +154,9 @@ the design:
    `LineMeta.source` byte offsets, re-lays out, remaps the position, and bumps
    a revision counter. Nothing else may assign to `lines`, and P3's search
    matches must join the remapping rather than being remapped separately.
-   **Still open:** a resize debounce (~80 ms), or dragging a window edge
-   re-renders a large document on every event.
+   P3 joined search hits to it by re-finding them on a revision change rather
+   than remapping them separately. **Still open:** a resize debounce (~80 ms),
+   or dragging a window edge re-renders a large document on every event.
 
 3. **Purity vs. layout-dependent state.** Half-page scroll, TOC auto-scroll,
    clamping, and TOC auto-hide all need pane dimensions that naturally only
@@ -144,9 +164,10 @@ the design:
    to mutate offsets during render. Taking `&mut App` in draw destroys headless
    testability. **In place since P2:** `app::reconcile` computes
    `layout::compute(area, &App) -> Panes` and the derived state before drawing,
-   and `ui::draw(&mut Frame, &App)` has no `&mut` to abuse. The remaining half
-   of the mitigation is P3's: slice TOC rows manually instead of reaching for
-   `ListState`.
+   and `ui::draw(&mut Frame, &App)` has no `&mut` to abuse. The contents pane
+   slices its rows by hand rather than using `ListState`, and
+   `tests/layering.rs` fails the build if a widget takes `&mut App`. P4's
+   browser list must do the same.
 
 4. **Syntax theme clash.** Syntect themes carry their own background and
    foreground, which fight the palette. `highlight.rs` already forces the
