@@ -10,6 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/SophanaSok/marquee-markdown/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/SophanaSok/marquee-markdown/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://crates.io/crates/marquee-markdown"><img alt="crates.io" src="https://img.shields.io/crates/v/marquee-markdown"></a>
   <img alt="Rust 1.88+" src="https://img.shields.io/badge/rust-1.88%2B-b7410e">
   <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
   <img alt="Linux, macOS, Windows" src="https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-lightgrey">
@@ -24,9 +25,8 @@
   <code>python3 scripts/screenshot.py</code>.
 </sub></p>
 
-> **Status: pre-release.** Everything documented here works today. There has
-> been no tagged release yet, so for now install from source. See
-> [docs/ROADMAP.md](docs/ROADMAP.md) for what is left before 1.0.
+> **Status: 0.1.0 is out.** Everything documented here works today. See
+> [docs/ROADMAP.md](docs/ROADMAP.md) for what is planned before 1.0.
 
 ## What it does
 
@@ -67,35 +67,45 @@ rendering details that add up.
 
 ## Install
 
-### From source
+### With cargo
 
-Works today, and needs Rust 1.88 or newer — the code uses let-chains, which
-that release stabilized for the 2024 edition. Nothing else: syntax highlighting
-uses a pure-Rust regex backend on purpose, so there is no C toolchain and no
-system library to find.
+```sh
+cargo install marquee-markdown
+```
+
+Needs Rust 1.88 or newer — the code uses let-chains, which that release
+stabilized for the 2024 edition. Nothing else: syntax highlighting uses a
+pure-Rust regex backend on purpose, so there is no C toolchain and no system
+library to find.
+
+That installs two commands: **`marquee-markdown`** and **`mmd`**, which are the
+same program under a shorter name.
+
+### Prebuilt
+
+Each [GitHub release](https://github.com/SophanaSok/marquee-markdown/releases)
+carries binaries for Linux, macOS (Intel and Apple Silicon) and Windows, plus
+`.deb` and `.rpm` packages, with man pages and shell completions in the
+archives and SHA-256 checksums alongside.
+
+```sh
+# Debian and derivatives
+sudo dpkg -i marquee-markdown_0.1.0-1_amd64.deb
+
+# Fedora and derivatives
+sudo rpm -i marquee-markdown-0.1.0-1.x86_64.rpm
+```
+
+Homebrew and Scoop manifests live in [`packaging/`](packaging/); there is no
+tap or bucket yet.
+
+### From source
 
 ```sh
 git clone https://github.com/SophanaSok/marquee-markdown
 cd marquee-markdown
 cargo install --path .
 ```
-
-That installs two commands: **`marquee-markdown`** and **`mmd`**, which are the
-same program under a shorter name.
-
-### Once released
-
-Not available yet — there has been no tagged release. When there is:
-
-```sh
-cargo install marquee-markdown              # from crates.io
-brew install marquee-markdown               # macOS and Linux
-scoop install marquee-markdown              # Windows
-```
-
-Prebuilt binaries, `.deb` and `.rpm` packages, man pages and shell completions
-will be attached to each [GitHub
-release](https://github.com/SophanaSok/marquee-markdown/releases).
 
 ### Fonts
 

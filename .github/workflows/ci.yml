@@ -178,6 +178,18 @@ jobs:
           cd "target/package/marquee-markdown-$version"
           cargo test --no-run
 
+  semver:
+    # The stable API surface is a promise, and this is the machine holding it:
+    # every push is compared against the latest published version. It could
+    # not exist before 0.1.0 was on crates.io, because it needs a baseline.
+    name: API compatibility
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: obi1kenobi/cargo-semver-checks-action@v2
+
   audit:
     name: Advisories
     runs-on: ubuntu-latest

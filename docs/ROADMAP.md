@@ -21,7 +21,7 @@ scroll-tracking table-of-contents sidebar and in-document search.
 | **P5** Remote sources | `Fetcher` trait, http(s), `github://`/`gitlab://`, bare-host README API | 2 | **Done** |
 | **P6** Parity polish | Live reload, `e` at scroll line, `c` copy, `-p` pager, `ctrl+z`, link following, `y` | 2 | **Done** |
 | **P7** Config + keymaps | TOML schema, `MARQUEE_` env layer, precedence, user keymap merge, `config` subcommand | 2 | **Done** |
-| **P8** Release | `packaging/`, deb/rpm, release workflow, `docs/ARCHITECTURE.md`, crates.io | 2 | **Done** bar the first publish |
+| **P8** Release | `packaging/`, deb/rpm, release workflow, `docs/ARCHITECTURE.md`, crates.io | 2 | **Done** |
 
 ## What works today
 
@@ -60,11 +60,10 @@ commit:
      `#[doc(hidden)]` and free to change. `Document` was added to make that
      split possible: parse-once-lay-out-many is the thing a consumer actually
      needs, and having it opaque means the block tree never has to be frozen.
-     Add `cargo semver-checks` to CI once there is a published version to use
-     as a baseline.
-3. **Tag `v0.1.0` and publish.** `packaging/README.md` has the sequence. The
-   release workflow has not been exercised yet — it only runs on a tag, so the
-   first tag is also its first test.
+     `cargo semver-checks` now runs in CI against the published version.
+3. ~~Tag `v0.1.0` and publish.~~ **Done.** On crates.io and GitHub releases,
+   verified by installing from both. The release workflow's first run found
+   the retired Intel macOS runners; the Intel build is now cross-compiled.
 
 Beyond that, the deferrals below are the backlog — images, a scrollable wide
 table, and a scrollable key reference are the three most likely to be asked

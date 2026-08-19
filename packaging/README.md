@@ -37,8 +37,8 @@ release build. Regenerate it when the rendering changes visibly.
    the Debian and RPM packages, and the checksums, and drafts the release.
 4. `cargo publish`.
 5. Update the Homebrew formula and the Scoop manifest with the new checksums.
-6. Add the crates.io badge to the README, and add `cargo semver-checks` to CI —
-   both need a published version to point at.
+6. ~~Add the crates.io badge to the README, and `cargo semver-checks` to CI.~~
+   Done after 0.1.0.
 
 Both `marquee-markdown` and `mmd` are shipped, as two real binaries rather than
 a binary and a symlink. That costs about 12 MB, and buys the same result from
