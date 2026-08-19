@@ -6,7 +6,7 @@
 
 use std::io::Write;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use crate::render::ansi::{self, AnsiOptions};
 use crate::render::{self, LayoutOptions};
@@ -92,6 +92,89 @@ pub fn render_to(
         },
     )?;
     Ok(())
+}
+
+/// Render `source` through the reader's pager.
+///
+/// The pager inherits the terminal, so the rendering is exactly what it would
+/// be without one — colors and centering included, since `less -R` and its
+/// kin pass ANSI through.
+///
+/// # Errors
+/// Returns an error when the pager cannot be started. A pager closed early is
+/// not an error: that is how a reader says they have seen enough.
+pub fn page(source: &Source, theme: &Theme, settings: Settings) -> Result<()> {
+    page_with(&pager(), source, theme, settings)
+}
+
+/// Render `source` through a named pager.
+///
+/// # Errors
+/// Returns an error when the pager cannot be started.
+pub fn page_with(
+    pager: &(String, Vec<String>),
+    source: &Source,
+    theme: &Theme,
+    settings: Settings,
+) -> Result<()> {
+    use std::process::{Command, Stdio};
+
+    let (program, arguments) = pager;
+    let mut child = Command::new(program)
+        .args(arguments)
+        .stdin(Stdio::piped())
+        .spawn()
+        .with_context(|| format!("cannot run {program}"))?;
+
+    let written = match child.stdin.as_mut() {
+        Some(stdin) => render_to(stdin, source, theme, settings),
+        None => Ok(()),
+    };
+    // Close the pipe so the pager knows the document has ended, then wait for
+    // the reader to finish with it.
+    drop(child.stdin.take());
+    child.wait().with_context(|| format!("{program} failed"))?;
+
+    match written {
+        // The reader quit the pager before we finished writing, which is a
+        // normal way to use one.
+        Err(error) if is_broken_pipe(&error) => Ok(()),
+        other => other,
+    }
+}
+
+/// Which pager to use, and its arguments.
+#[must_use]
+pub fn pager() -> (String, Vec<String>) {
+    pager_from(std::env::var("PAGER").ok().as_deref())
+}
+
+/// Work out the pager from a `PAGER` setting.
+///
+/// Pure, so the fallbacks are testable without a library that forbids unsafe
+/// code having to reach for the unsafe environment-setting functions.
+///
+/// `less` needs `-R` or it prints escape sequences as text, which is worse
+/// than no color at all.
+#[must_use]
+pub fn pager_from(setting: Option<&str>) -> (String, Vec<String>) {
+    match setting {
+        Some(value) if !value.trim().is_empty() => {
+            let mut parts = value.split_whitespace().map(str::to_owned);
+            let program = parts.next().unwrap_or_else(|| "less".to_owned());
+            (program, parts.collect())
+        }
+        _ => ("less".to_owned(), vec!["-R".to_owned()]),
+    }
+}
+
+/// Whether an error chain bottoms out in a closed output pipe.
+fn is_broken_pipe(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| {
+        cause
+            .downcast_ref::<std::io::Error>()
+            .is_some_and(|io| io.kind() == std::io::ErrorKind::BrokenPipe)
+    })
 }
 
 #[cfg(test)]
@@ -180,5 +263,42 @@ mod tests {
                 assert_eq!(line.chars().count(), usize::from(width));
             }
         }
+    }
+
+    #[test]
+    fn the_default_pager_can_show_color() {
+        // Without -R, less prints the escape sequences as text.
+        assert_eq!(pager_from(None), ("less".to_owned(), vec!["-R".to_owned()]));
+    }
+
+    #[test]
+    fn a_pager_with_arguments_is_split_into_program_and_arguments() {
+        assert_eq!(
+            pager_from(Some("less -F -X")),
+            ("less".to_owned(), vec!["-F".to_owned(), "-X".to_owned()])
+        );
+    }
+
+    #[test]
+    fn an_empty_pager_setting_falls_back_rather_than_running_nothing() {
+        assert_eq!(pager_from(Some("   ")).0, "less");
+        assert_eq!(pager_from(Some("")).0, "less");
+    }
+
+    #[test]
+    fn a_document_can_be_paged_through_a_program_that_reads_it() {
+        // `cat` is a pager that never blocks, which is what makes this safe to
+        // run in a test.
+        let cat = ("cat".to_owned(), Vec::new());
+        let result = page_with(&cat, &markdown("# Title\n"), &Theme::plain(), settings());
+        assert!(result.is_ok(), "{result:?}");
+    }
+
+    #[test]
+    fn a_pager_that_does_not_exist_says_so() {
+        let missing = ("definitely-not-a-real-pager".to_owned(), Vec::new());
+        let error =
+            page_with(&missing, &markdown("# T\n"), &Theme::plain(), settings()).unwrap_err();
+        assert!(error.to_string().contains("definitely-not-a-real-pager"));
     }
 }

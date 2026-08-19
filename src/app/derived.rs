@@ -30,6 +30,7 @@ pub fn sync(app: &mut App) {
     // keeps them in step with the scroll position.
     app.search
         .refresh(app.doc.doc(), app.doc.revision(), app.view.top);
+    app.links.refresh(app.doc.doc(), app.doc.revision());
 }
 
 /// Re-filter the file list and keep its cursor on screen.

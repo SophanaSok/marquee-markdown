@@ -8,9 +8,9 @@ Until 1.0 the `render` module's public API may change within minor versions.
 
 ## [Unreleased]
 
-Pre-release. The rendering engine, the full-screen reader, the contents pane,
-search, the file browser, and remote sources are all complete. What remains is
-the polish phase: live reload, link following, copying, and configuration.
+Pre-release. Feature-complete against `glow`, plus the contents pane and
+search. What remains is a configuration file with rebindable keys, and
+packaging.
 
 ### Added
 
@@ -133,6 +133,35 @@ the polish phase: live reload, link following, copying, and configuration.
   remote path is unit-tested with no network. Live checks against the real
   forges exist as `#[ignore]`d tests in `tests/network.rs`.
 
+#### Live reload, links, and the rest of glow's keys
+
+- The open document is watched and re-renders when it changes on disk. The
+  reader keeps the *section* they were in rather than the line number, because
+  an edit above them moves every line below it. `r` reloads by hand.
+- The watch is on the containing directory, not the file: most editors save by
+  writing a temporary file and renaming it over the original, and a watch on
+  the file itself survives exactly one save.
+- `]` and `[` step through the document's links, `enter` opens the selected
+  one, and `y` copies its address. Relative links resolve against wherever the
+  document came from.
+- `c` copies the markdown as written rather than as rendered — the source is
+  what a reader wants to paste elsewhere.
+- Copying goes through the terminal (OSC 52) before the system clipboard, so it
+  works over SSH: the text lands on the machine the reader is at rather than on
+  the server. In tmux this needs `set -g set-clipboard on`.
+- `e` opens the document in `$VISUAL`, `$EDITOR`, or `vi`, at the line on
+  screen, and reloads when the editor exits. Editor settings carrying arguments
+  (`EDITOR="emacsclient -nw"`) are split properly, and line arguments are
+  spelled the way each editor wants them; an unrecognized editor gets the path
+  alone rather than a flag it would take for a second filename.
+- `ctrl+z` suspends to the shell, on unix. The action does not exist on other
+  platforms rather than existing and doing nothing, so the key reference stays
+  truthful.
+- `-p` renders through `$PAGER`, defaulting to `less -R` — without `-R` it
+  would print the escape sequences as text.
+- Bursts of events are coalesced: dragging a window edge costs one re-layout
+  and one frame per batch rather than per event.
+
 #### Theming
 
 - Two Claude palettes, `paper` (light) and `slate` (dark), compiled in as
@@ -158,9 +187,11 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
 
 ### Known gaps
 
-- `-p` exits with a clear message rather than doing something unexpected.
-- A fetch failure at startup exits with a message. Once links can be followed
-  from inside the reader, failures will belong in the status bar instead.
+- A fetch failure at startup exits with a message rather than opening the
+  reader with an explanation in the status bar.
+- Opening a link hands off to the system handler; a link that is relative to a
+  fetched document is resolved by joining, without normalizing `..`.
+- `ctrl+z` needs a shell with job control, as any suspend does.
 - A fetched document cannot be reloaded or opened in an editor, because it has
   no path on this machine.
 - The browser scans once at startup: files created while it is open do not

@@ -27,6 +27,10 @@ pub fn handle(app: &mut App, event: Event) {
         Event::Paste(text) => paste(app, text),
         Event::Mouse(mouse) => mouse_event(app, mouse),
         Event::Scan(scan) => scan_reported(app, scan),
+        // The document changed on disk. Silent when it worked: a reader
+        // editing in another window does not need to be told each time they
+        // save, only when it failed.
+        Event::Reload => reload(app, false),
         // Resizes are handled by recomputing pane geometry before the next
         // draw, which happens for every iteration anyway.
         Event::Resize(_, _) => {}
@@ -94,6 +98,15 @@ pub fn apply(app: &mut App, action: Action) {
         Action::BrowserTop => with_browser(app, crate::browser::Browser::to_first),
         Action::BrowserBottom => with_browser(app, crate::browser::Browser::to_last),
         Action::BrowserOpen => open_selected_file(app),
+        Action::Reload => reload(app, true),
+        Action::LinkNext => step_link(app, 1),
+        Action::LinkPrevious => step_link(app, -1),
+        Action::LinkOpen => open_link(app),
+        Action::LinkCopy => copy_link(app),
+        Action::CopyDocument => copy_document(app),
+        Action::Edit => request_edit(app),
+        #[cfg(unix)]
+        Action::Suspend => app.pending = Some(crate::app::external::Request::Suspend),
         Action::FilterStart => {
             app.prompt = Some(Prompt {
                 kind: PromptKind::Filter,
@@ -142,6 +155,94 @@ fn open_selected_file(app: &mut App) {
         // A file that vanished mid-scan, or one that is not readable, is not
         // worth ending the session over.
         Err(error) => app.message = Some(format!("cannot open {}: {error}", path.display())),
+    }
+}
+
+/// Step to the next or previous link, bringing it into view.
+fn step_link(app: &mut App, direction: isize) {
+    match app.links.step(direction, app.view.top) {
+        Some(line) => {
+            let extent = app.extent();
+            app.view.reveal(line, extent);
+        }
+        None => app.message = Some("no links in this document".to_owned()),
+    }
+}
+
+/// Open the selected link in whatever the system opens it with.
+fn open_link(app: &mut App) {
+    let Some(url) = app.links.selected_url(app.doc.doc()) else {
+        app.message = Some("press ] to pick a link".to_owned());
+        return;
+    };
+    let url = resolve_link(app, url);
+    // Opening hands off to another program entirely; that it failed is worth
+    // saying, but never worth ending the session over.
+    match open::that_detached(&url) {
+        Ok(()) => app.message = Some(format!("opening {url}")),
+        Err(error) => app.message = Some(format!("cannot open {url}: {error}")),
+    }
+}
+
+/// Copy the selected link's address.
+fn copy_link(app: &mut App) {
+    let Some(url) = app.links.selected_url(app.doc.doc()) else {
+        app.message = Some("press ] to pick a link".to_owned());
+        return;
+    };
+    let url = resolve_link(app, url);
+    copy(app, &url);
+}
+
+/// Copy the document as it was written, not as it was rendered: what a reader
+/// wants to paste elsewhere is the markdown.
+fn copy_document(app: &mut App) {
+    let text = app.doc.source.text.clone();
+    copy(app, &text);
+}
+
+/// Put text on the clipboard, reporting either way.
+fn copy(app: &mut App, text: &str) {
+    match crate::util::clipboard::copy(text) {
+        Ok(method) => app.message = Some(method.describe().to_owned()),
+        // A clipboard failure must never escape the loop: it can fail for
+        // reasons — a headless session, no compositor — that have nothing to
+        // do with the document being read.
+        Err(error) => app.message = Some(format!("cannot copy: {error}")),
+    }
+}
+
+/// Turn a link into something openable, resolving a relative one against
+/// wherever the document came from.
+fn resolve_link(app: &App, link: &str) -> String {
+    use crate::source::Base;
+
+    if link.contains("://") || link.starts_with("mailto:") {
+        return link.to_owned();
+    }
+    match &app.doc.source.base {
+        Base::Url(base) => format!("{base}{link}"),
+        Base::Dir(dir) => dir.join(link).display().to_string(),
+        Base::Cwd => link.to_owned(),
+    }
+}
+
+/// Ask the loop to open the document in an editor, at the line on screen.
+fn request_edit(app: &mut App) {
+    let Some(path) = app.doc.source.path.clone() else {
+        app.message = Some("this document is not a file on this machine".to_owned());
+        return;
+    };
+    let line = app.doc.source_line_of(app.view.top);
+    app.pending = Some(crate::app::external::Request::Edit { path, line });
+}
+
+/// Re-read the document from disk.
+fn reload(app: &mut App, announce: bool) {
+    match app.reload_from_disk() {
+        Ok(()) if announce => app.message = Some("reloaded".to_owned()),
+        Ok(()) => {}
+        Err(error) => app.message = Some(format!("cannot reload: {error}")),
     }
 }
 

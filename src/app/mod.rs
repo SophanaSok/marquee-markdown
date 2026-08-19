@@ -16,6 +16,7 @@
 pub mod action;
 pub mod derived;
 pub mod event;
+pub mod external;
 pub mod keymap;
 pub mod layout;
 pub mod state;
@@ -74,6 +75,8 @@ fn take_over(
     terminal::install_panic_hook();
     let mut screen = terminal::Screen::enter(options.mouse)?;
     let (mut events, sender) = event::Events::new();
+    app.events = Some(sender.clone());
+    app.start_watching();
     start(sender);
     drive(&mut app, screen.terminal(), &mut events)
 }
@@ -92,6 +95,7 @@ where
     B: ratatui::backend::Backend,
     B::Error: std::error::Error + Send + Sync + 'static,
 {
+    let mut batch = Vec::new();
     loop {
         reconcile(app, terminal.get_frame().area());
         terminal.draw(|frame| crate::ui::draw(frame, app))?;
@@ -101,7 +105,51 @@ where
         let Some(event) = events.next()? else {
             return Ok(());
         };
-        update::handle(app, event);
+        // Everything already waiting is applied before the next frame. A
+        // window being dragged produces a resize per pixel column, and
+        // re-laying the document out for each one — then throwing all but the
+        // last away — is the difference between a smooth drag and a stuttering
+        // one on a large document.
+        batch.clear();
+        batch.push(event);
+        events.drain(&mut batch)?;
+        for event in batch.drain(..) {
+            update::handle(app, event);
+        }
+        // Only a run with a real terminal carries these out; a headless one
+        // leaves the request recorded so a test can see what was asked for
+        // without an editor opening in the middle of `cargo test`.
+        if app.events.is_some()
+            && let Some(request) = app.pending.take()
+        {
+            perform(app, &request);
+            // The other program has been all over the screen, so every cell
+            // has to be written again.
+            //
+            // `Terminal::clear` is the obvious call and the wrong one: it
+            // snapshots the cursor position first, and that query is a
+            // round-trip through the terminal that can never be answered —
+            // the event thread owns standard input and swallows the reply.
+            // Resetting both buffers instead makes the next diff write
+            // everything, with nothing asked of the terminal.
+            terminal.swap_buffers();
+            terminal.swap_buffers();
+        }
+    }
+}
+
+/// Carry out a request that needed the terminal to itself.
+fn perform(app: &mut App, request: &external::Request) {
+    if let Err(error) = external::run(request, app.options.mouse) {
+        app.message = Some(format!("{error:#}"));
+        return;
+    }
+    // An edit is almost always a change, and waiting for the watcher to notice
+    // would show the reader a document they know is out of date.
+    if matches!(request, external::Request::Edit { .. })
+        && let Err(error) = app.reload_from_disk()
+    {
+        app.message = Some(format!("cannot reload: {error}"));
     }
 }
 

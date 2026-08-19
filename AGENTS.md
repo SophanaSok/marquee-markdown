@@ -99,6 +99,7 @@ app/         The reader: state, input, and the loop.
   layout.rs    Pure: terminal size + state -> Panes.
   derived.rs   Recomputed once per iteration: clamping, active section.
   terminal.rs  RAII alternate-screen guard and the panic hook.
+  external.rs  Editing and suspending: hand the terminal over, take it back.
 browser/     The file list, independent of any terminal.
   walk.rs      Streaming ignore-aware directory walk, on its own thread.
   filter.rs    Fuzzy matching, NFC-normalized on both sides.
@@ -107,6 +108,8 @@ doc/         Document state, independent of any terminal.
   cache.rs     The ONLY caller of the layout engine; owns the heading tree.
   outline.rs   Headings as a tree, flattened into rows that know their subtree.
   search.rs    Hits over the plain mirror, as line-and-column ranges.
+  links.rs     The document's links, and which one is stepped to.
+  watch.rs     Noticing the file changed, on the directory not the file.
   view.rs      Scroll arithmetic, pure.
 ui/          Draw-only widgets, each taking &App.
 ```
@@ -121,6 +124,12 @@ Two rules in the reader that are easy to undo by accident:
 - **The contents cursor and the active entry are different state.** The active
   entry follows the scroll position; the cursor is where the reader put it.
   Writing either into the other makes the pane feel broken.
+- **The event thread owns standard input, so nothing may ask the terminal a
+  question.** Any call that round-trips — `Terminal::clear`, which snapshots
+  the cursor position, or `crossterm::cursor::position` — waits for a reply the
+  event thread has already swallowed, and fails after a timeout. To force a
+  full redraw after an external program, reset both ratatui buffers with two
+  `swap_buffers` calls instead.
 - **Reordering a list invalidates every index into it.** `Browser::extend` only
   appends; sorting happens in `refresh`, which rebuilds the match indices and
   re-finds the selected file by path in the same breath. Sorting anywhere else
@@ -221,3 +230,8 @@ whose text contains escapes.
   - Feed the keys with a delay between them. Sent in one burst, `esc` followed
     by a letter is indistinguishable from Alt+letter, which is exactly the
     ambiguity a real terminal has.
+
+  Two P6 bugs were invisible to 470 passing tests and obvious on the first run:
+  the file watch never fired for a relative path, and restoring the screen
+  after an editor timed out on a terminal query. Neither is reachable from a
+  test.

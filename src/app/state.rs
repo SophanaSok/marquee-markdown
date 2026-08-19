@@ -6,11 +6,15 @@
 //! cannot disagree — the bug where a closed prompt still swallows keys is not
 //! reachable.
 
+use std::fmt;
+use std::sync::mpsc::Sender;
+
 use crate::browser::Browser;
-use crate::doc::{DocCache, Search, View};
+use crate::doc::{DocCache, Links, Search, View};
 use crate::source::Source;
 use crate::theme::{Appearance, Theme, ThemeVariant};
 
+use super::event::Event;
 use super::keymap::{Keymap, Mode};
 use super::layout::Panes;
 
@@ -32,6 +36,23 @@ pub struct Options {
 pub enum Overlay {
     /// The key reference.
     Help,
+}
+
+/// A running file watch, or none.
+///
+/// A newtype only so [`App`] can still derive `Debug`: the debouncer behind it
+/// does not.
+#[derive(Default)]
+pub struct FileWatch(Option<crate::doc::watch::Watch>);
+
+impl fmt::Debug for FileWatch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(if self.0.is_some() {
+            "FileWatch(watching)"
+        } else {
+            "FileWatch(idle)"
+        })
+    }
 }
 
 /// Which screen the reader is on.
@@ -137,6 +158,8 @@ pub struct App {
     pub toc: Toc,
     /// The in-document search.
     pub search: Search,
+    /// The links in the document, and which one is stepped to.
+    pub links: Links,
     /// Text being typed, if a prompt is open.
     pub prompt: Option<Prompt>,
     /// Index into the outline of the section being read; derived from `view`.
@@ -145,8 +168,17 @@ pub struct App {
     pub message: Option<String>,
     /// Command-line settings.
     pub options: Options,
+    /// Something that needs the terminal to itself, waiting for the loop to
+    /// carry it out. Left recorded and unperformed in a headless run, which is
+    /// what lets a test check that the right thing was asked for.
+    pub pending: Option<crate::app::external::Request>,
     /// Set when the reader should exit.
     pub should_quit: bool,
+    /// Where background producers post. `None` in headless tests, which is
+    /// also what makes them free of threads.
+    pub events: Option<Sender<Event>>,
+    /// The watch on the open document, if it has a path and watching worked.
+    watch: FileWatch,
 }
 
 impl App {
@@ -171,11 +203,15 @@ impl App {
             toc_visible: true,
             toc: Toc::default(),
             search: Search::default(),
+            links: Links::default(),
             prompt: None,
             active: None,
             message: None,
             options,
+            pending: None,
             should_quit: false,
+            events: None,
+            watch: FileWatch::default(),
         }
     }
 
@@ -199,8 +235,55 @@ impl App {
         self.view = View::default();
         self.toc = Toc::default();
         self.search.clear();
+        self.links = Links::default();
         self.screen = Screen::Document;
         self.focus = Focus::Document;
+        self.start_watching();
+    }
+
+    /// Watch the open document for changes, replacing any previous watch.
+    ///
+    /// Does nothing without an event queue to report to, which is what keeps
+    /// headless tests free of threads and of the filesystem.
+    pub fn start_watching(&mut self) {
+        self.watch = FileWatch::default();
+        let (Some(path), Some(sender)) = (self.doc.source.path.clone(), self.events.clone()) else {
+            return;
+        };
+        // Watching is a convenience; a platform that will not do it should not
+        // stop the reader from opening the file.
+        self.watch = FileWatch(
+            crate::doc::watch::spawn(&path, move || sender.send(Event::Reload).is_ok()).ok(),
+        );
+    }
+
+    /// Whether the open document is being watched for changes.
+    #[must_use]
+    pub fn is_watching(&self) -> bool {
+        self.watch.0.is_some()
+    }
+
+    /// Re-read the open document from disk.
+    ///
+    /// # Errors
+    /// Returns an error when the document did not come from a file, or the
+    /// file can no longer be read.
+    pub fn reload_from_disk(&mut self) -> anyhow::Result<()> {
+        let path = self
+            .doc
+            .source
+            .path
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("this document did not come from a file"))?;
+        let source = crate::source::resolve(
+            &crate::source::SourceSpec::File(path),
+            &crate::source::HttpFetcher::new(),
+        )?;
+        self.doc.reload(source, self.view.top);
+        // Which sections exist may have changed, so which are folded cannot be
+        // carried over by position.
+        self.toc.collapsed.clear();
+        Ok(())
     }
 
     /// Which bindings are in force, derived from what is open and what has

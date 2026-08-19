@@ -260,6 +260,13 @@ const DEFAULTS: &[(Mode, &str, Action)] = &[
     (Mode::Document, "/", Action::SearchStart),
     (Mode::Document, "n", Action::SearchNext),
     (Mode::Document, "N", Action::SearchPrevious),
+    (Mode::Document, "]", Action::LinkNext),
+    (Mode::Document, "[", Action::LinkPrevious),
+    (Mode::Document, "enter", Action::LinkOpen),
+    (Mode::Document, "y", Action::LinkCopy),
+    (Mode::Document, "c", Action::CopyDocument),
+    (Mode::Document, "e", Action::Edit),
+    (Mode::Document, "r", Action::Reload),
     (Mode::Document, "t", Action::ToggleToc),
     (Mode::Document, "tab", Action::FocusNext),
     (Mode::Document, "T", Action::ToggleTheme),
@@ -334,6 +341,13 @@ const DEFAULTS: &[(Mode, &str, Action)] = &[
     (Mode::Help, "ctrl+c", Action::Quit),
 ];
 
+/// Bindings that only make sense on some platforms. Absent rather than inert,
+/// so the key reference never offers a key that does nothing.
+#[cfg(unix)]
+const PLATFORM: &[(Mode, &str, Action)] = &[(Mode::Document, "ctrl+z", Action::Suspend)];
+#[cfg(not(unix))]
+const PLATFORM: &[(Mode, &str, Action)] = &[];
+
 impl Keymap {
     /// The built-in bindings.
     ///
@@ -343,7 +357,7 @@ impl Keymap {
     #[must_use]
     pub fn defaults() -> Self {
         let mut map = Self::default();
-        for &(mode, chord, action) in DEFAULTS {
+        for &(mode, chord, action) in DEFAULTS.iter().chain(PLATFORM) {
             let chord = chord.parse().expect("built-in chord parses");
             map.bind(mode, chord, action)
                 .expect("built-in bindings are unique");

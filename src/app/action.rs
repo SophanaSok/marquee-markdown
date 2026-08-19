@@ -87,6 +87,23 @@ pub enum Action {
     BrowserOpen,
     /// Begin filtering the file list.
     FilterStart,
+    /// Re-read the document from disk.
+    Reload,
+    /// Step to the next link.
+    LinkNext,
+    /// Step to the previous link.
+    LinkPrevious,
+    /// Open the selected link.
+    LinkOpen,
+    /// Copy the selected link's address.
+    LinkCopy,
+    /// Copy the whole document.
+    CopyDocument,
+    /// Open the document in the reader's editor, at the line on screen.
+    Edit,
+    /// Stop, and let the shell have the terminal back.
+    #[cfg(unix)]
+    Suspend,
 }
 
 impl Action {
@@ -125,6 +142,15 @@ impl Action {
         Self::PromptAccept,
         Self::PromptBackspace,
         Self::PromptClear,
+        Self::LinkNext,
+        Self::LinkPrevious,
+        Self::LinkOpen,
+        Self::LinkCopy,
+        Self::CopyDocument,
+        Self::Edit,
+        #[cfg(unix)]
+        Self::Suspend,
+        Self::Reload,
         Self::ToggleTheme,
         Self::ToggleHelp,
         Self::Escape,
@@ -172,6 +198,15 @@ impl Action {
             Self::BrowserBottom => "browser-bottom",
             Self::BrowserOpen => "browser-open",
             Self::FilterStart => "filter-start",
+            Self::Reload => "reload",
+            Self::LinkNext => "link-next",
+            Self::LinkPrevious => "link-previous",
+            Self::LinkOpen => "link-open",
+            Self::LinkCopy => "link-copy",
+            Self::CopyDocument => "copy-document",
+            Self::Edit => "edit",
+            #[cfg(unix)]
+            Self::Suspend => "suspend",
         }
     }
 
@@ -216,6 +251,15 @@ impl Action {
             Self::BrowserBottom => "last file",
             Self::BrowserOpen => "read this file",
             Self::FilterStart => "filter the list",
+            Self::Reload => "reload from disk",
+            Self::LinkNext => "next link",
+            Self::LinkPrevious => "previous link",
+            Self::LinkOpen => "open the link",
+            Self::LinkCopy => "copy the link",
+            Self::CopyDocument => "copy the document",
+            Self::Edit => "edit this document",
+            #[cfg(unix)]
+            Self::Suspend => "suspend to the shell",
         }
     }
 }
@@ -296,13 +340,26 @@ mod tests {
             | Action::BrowserTop
             | Action::BrowserBottom
             | Action::BrowserOpen
-            | Action::FilterStart => {}
+            | Action::FilterStart
+            | Action::Reload
+            | Action::LinkNext
+            | Action::LinkPrevious
+            | Action::LinkOpen
+            | Action::LinkCopy
+            | Action::CopyDocument
+            | Action::Edit => {}
+            #[cfg(unix)]
+            Action::Suspend => {}
         }
     }
 
     #[test]
     fn every_variant_reaches_the_list() {
-        assert_eq!(Action::ALL.len(), 37, "Action::ALL is out of date");
+        // Suspending is a unix idea, and the action does not exist elsewhere
+        // rather than existing and doing nothing — the key reference is
+        // generated from what is bound, so an inert entry would be a lie.
+        let expected = if cfg!(unix) { 45 } else { 44 };
+        assert_eq!(Action::ALL.len(), expected, "Action::ALL is out of date");
     }
 
     #[test]

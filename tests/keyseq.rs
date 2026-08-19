@@ -546,3 +546,180 @@ fn paging_moves_a_whole_screen_in_the_browser() {
         two.summary()
     );
 }
+
+/// A document with links, on disk, so reloading and editing have something
+/// real to work with.
+fn linked_document() -> String {
+    let mut text = String::new();
+    for n in 1..=12 {
+        text.push_str(&format!("# Chapter {n}\n\n"));
+        text.push_str(&format!(
+            "Body with [link {n}](https://example.com/{n}) in it.\n\n"
+        ));
+    }
+    text
+}
+
+#[test]
+fn stepping_through_links_wraps_and_reveals() {
+    let text = linked_document();
+    let first = run(&text, "]");
+    assert_eq!(first.links.position(), Some(0));
+    let second = run(&text, "]]");
+    assert_eq!(second.links.position(), Some(1));
+    // Backwards from the first wraps to the last.
+    let last = run(&text, "][");
+    assert_eq!(last.links.position(), Some(11));
+    let line = last.links.selected().expect("a link").line;
+    let height = usize::from(last.panes.body.height);
+    assert!(
+        (last.view.top..last.view.top + height).contains(&line),
+        "the link was not brought into view"
+    );
+}
+
+#[test]
+fn a_document_with_no_links_says_so_rather_than_doing_nothing() {
+    let app = run(&document(), "]");
+    assert!(app.links.selected().is_none());
+    assert!(app.message.is_some(), "no explanation for the reader");
+}
+
+#[test]
+fn opening_a_link_before_picking_one_explains_what_to_press() {
+    let app = run(&linked_document(), "\n");
+    assert!(app.message.is_some());
+    assert!(!app.should_quit);
+}
+
+#[test]
+fn a_theme_change_keeps_the_selected_link() {
+    // The layout changes under it, so the line moves but the link should not.
+    let app = run(&linked_document(), "]]T");
+    assert_eq!(app.links.position(), Some(1));
+    let link = app.links.selected().expect("a link");
+    assert!(link.line < app.doc.doc().lines.len(), "stale line index");
+}
+
+#[test]
+fn editing_asks_for_the_right_file_and_the_line_on_screen() {
+    use marquee_markdown::app::external::Request;
+
+    let dir = tempfile::tempdir().expect("temp dir");
+    let path = dir.path().join("doc.md");
+    let text: String = (1..=60).map(|n| format!("Paragraph {n}.\n\n")).collect();
+    std::fs::write(&path, &text).expect("write");
+
+    let mut app = App::new(
+        Source::from_text(&text, Some(path.clone()), "doc.md".into(), Base::Cwd),
+        Theme::new(ThemeVariant::Slate),
+        Options::default(),
+    );
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).expect("test terminal");
+    let mut events = ScriptedEvents::new(keys("ddde"));
+    drive(&mut app, &mut terminal, &mut events).expect("the loop runs");
+
+    // Headless, so the request is recorded rather than carried out: no editor
+    // opens in the middle of a test run.
+    let Some(Request::Edit { path: asked, line }) = app.pending else {
+        panic!("no edit was asked for: {:?}", app.pending);
+    };
+    assert_eq!(asked, path);
+    assert!(
+        line > 1,
+        "the editor would open at the top, not at line {line}"
+    );
+}
+
+#[test]
+fn editing_a_document_that_is_not_a_file_explains_itself() {
+    let app = run(&document(), "e");
+    assert!(app.pending.is_none());
+    assert!(app.message.is_some());
+}
+
+#[test]
+fn reloading_picks_up_what_changed_on_disk() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let path = dir.path().join("doc.md");
+    std::fs::write(&path, "# One\n\nBody.\n").expect("write");
+
+    let mut app = App::new(
+        Source::from_text(
+            "# One\n\nBody.\n",
+            Some(path.clone()),
+            "doc.md".into(),
+            Base::Cwd,
+        ),
+        Theme::new(ThemeVariant::Slate),
+        Options::default(),
+    );
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).expect("test terminal");
+
+    std::fs::write(&path, "# One\n\nBody.\n\n# Two\n\nMore.\n").expect("write");
+    let mut events = ScriptedEvents::new(keys("r"));
+    drive(&mut app, &mut terminal, &mut events).expect("the loop runs");
+
+    assert_eq!(app.doc.outline().len(), 2, "the new heading did not arrive");
+    assert_eq!(app.message.as_deref(), Some("reloaded"));
+}
+
+#[test]
+fn reloading_keeps_the_reader_in_the_section_they_were_in() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let path = dir.path().join("doc.md");
+    let body: String = (1..=12)
+        .map(|n| format!("# Chapter {n}\n\nBody of chapter {n}.\n\n"))
+        .collect();
+    std::fs::write(&path, &body).expect("write");
+
+    let mut app = App::new(
+        Source::from_text(&body, Some(path.clone()), "doc.md".into(), Base::Cwd),
+        Theme::new(ThemeVariant::Slate),
+        Options::default(),
+    );
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).expect("test terminal");
+    let mut events = ScriptedEvents::new(keys("\t"));
+    drive(&mut app, &mut terminal, &mut events).expect("focus the contents");
+
+    // Jump to chapter 6, then have the file grow at the top.
+    let mut events = ScriptedEvents::new(keys("jjjjj\n"));
+    drive(&mut app, &mut terminal, &mut events).expect("open the entry");
+    let before = app.active_heading().map(|anchor| anchor.id.clone());
+    assert_eq!(before.as_deref(), Some("chapter-6"));
+
+    std::fs::write(&path, format!("A new opening paragraph.\n\n{body}")).expect("write");
+    let mut events = ScriptedEvents::new(keys("r"));
+    drive(&mut app, &mut terminal, &mut events).expect("reload");
+
+    assert_eq!(
+        app.active_heading().map(|anchor| anchor.id.clone()),
+        before,
+        "the reader was moved to a different section"
+    );
+}
+
+#[test]
+fn a_reload_that_fails_leaves_the_reader_reading() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let path = dir.path().join("doc.md");
+    std::fs::write(&path, "# One\n").expect("write");
+
+    let mut app = App::new(
+        Source::from_text("# One\n", Some(path.clone()), "doc.md".into(), Base::Cwd),
+        Theme::new(ThemeVariant::Slate),
+        Options::default(),
+    );
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).expect("test terminal");
+    std::fs::remove_file(&path).expect("remove");
+
+    let mut events = ScriptedEvents::new(keys("r"));
+    drive(&mut app, &mut terminal, &mut events).expect("the loop survives");
+    assert!(!app.should_quit);
+    assert!(
+        app.message.as_deref().is_some_and(|m| m.contains("reload")),
+        "{:?}",
+        app.message
+    );
+    assert!(!app.doc.doc().lines.is_empty(), "the document was lost");
+}

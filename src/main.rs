@@ -69,7 +69,11 @@ fn run() -> Result<()> {
             };
             app::browse(root, theme, options(&cli))
         }
-        RunMode::Pager => anyhow::bail!("--pager is not built yet; run without -p for now"),
+        RunMode::Pager => {
+            let source = source::resolve(&spec, &HttpFetcher::new())?;
+            let settings = oneshot::Settings::detect(cli.width, cli.line_numbers);
+            oneshot::page(&source, &theme, settings)
+        }
     }
 }
 

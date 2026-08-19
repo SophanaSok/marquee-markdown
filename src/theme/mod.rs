@@ -355,6 +355,15 @@ impl Theme {
             .fg(self.palette.accent_soft.color())
     }
 
+    /// The link the reader has stepped to, picked out from the rest.
+    #[must_use]
+    pub fn link_active(&self) -> Style {
+        Style::new()
+            .bg(self.palette.accent.color())
+            .fg(self.palette.bg.color())
+            .add_modifier(Modifier::BOLD)
+    }
+
     /// A search hit in the document body.
     #[must_use]
     pub fn search_match(&self) -> Style {
@@ -595,6 +604,7 @@ mod tests {
             theme.quote_bar(),
             theme.quote_text(),
             theme.link(),
+            theme.link_active(),
             theme.table_border(),
             theme.status_bar(),
             theme.status_active(),

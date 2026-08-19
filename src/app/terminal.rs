@@ -31,18 +31,7 @@ impl Screen {
     /// Returns an error when the terminal cannot be switched into raw mode or
     /// the alternate screen.
     pub fn enter(mouse: bool) -> Result<Self> {
-        enable_raw_mode().context("cannot put the terminal into raw mode")?;
-        let mut stdout = io::stdout();
-        if let Err(error) = queue!(stdout, EnterAlternateScreen, Hide) {
-            // Undo the half-applied state rather than leaving the shell in it.
-            let _ = disable_raw_mode();
-            return Err(error).context("cannot open the alternate screen");
-        }
-        if mouse {
-            let _ = queue!(stdout, EnableMouseCapture);
-        }
-        stdout.flush().context("cannot set up the terminal")?;
-
+        enter(mouse)?;
         let terminal = Terminal::new(CrosstermBackend::new(io::stdout()))
             .context("cannot drive the terminal")?;
         Ok(Self { terminal, mouse })
@@ -62,7 +51,29 @@ impl Drop for Screen {
     }
 }
 
-/// Undo everything [`Screen::enter`] did.
+/// Put the terminal into raw mode and onto the alternate screen.
+///
+/// Separate from [`Screen`] so it can be called again after another program
+/// has had the terminal — an editor, or the shell after a suspend.
+///
+/// # Errors
+/// Returns an error when the terminal will not switch modes.
+pub fn enter(mouse: bool) -> Result<()> {
+    enable_raw_mode().context("cannot put the terminal into raw mode")?;
+    let mut stdout = io::stdout();
+    if let Err(error) = queue!(stdout, EnterAlternateScreen, Hide) {
+        // Undo the half-applied state rather than leaving the shell in it.
+        let _ = disable_raw_mode();
+        return Err(error).context("cannot open the alternate screen");
+    }
+    if mouse {
+        let _ = queue!(stdout, EnableMouseCapture);
+    }
+    stdout.flush().context("cannot set up the terminal")?;
+    Ok(())
+}
+
+/// Undo everything [`enter`] did.
 ///
 /// Safe to call when the terminal was never taken over, which is what lets the
 /// panic hook call it unconditionally.

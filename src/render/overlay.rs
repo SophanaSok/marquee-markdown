@@ -33,8 +33,21 @@ pub struct Patch {
 pub trait Overlay {
     /// Append the patches for `line` to `out`, which the caller has cleared.
     ///
-    /// Patches must be ordered by column and must not overlap.
+    /// Order does not matter. Where two patches overlap, the one appended
+    /// first wins, so a caller layering several overlays puts the one that
+    /// should show through on top of the list.
     fn patches(&self, line: usize, out: &mut Vec<Patch>);
+}
+
+/// Several overlays at once, earliest winning where they overlap.
+pub struct Layered<'a>(pub &'a [&'a dyn Overlay]);
+
+impl Overlay for Layered<'_> {
+    fn patches(&self, line: usize, out: &mut Vec<Patch>) {
+        for overlay in self.0 {
+            overlay.patches(line, out);
+        }
+    }
 }
 
 /// An overlay that changes nothing.
@@ -67,10 +80,12 @@ pub fn apply(line: &Line<'_>, patches: &[Patch]) -> Line<'static> {
             // the start of the next one, or the end of the span.
             let boundary = match covering {
                 Some(patch) => patch.cols.end,
+                // The nearest patch ahead, whatever order they arrived in.
                 None => patches
                     .iter()
                     .map(|patch| patch.cols.start)
-                    .find(|&start| start > col)
+                    .filter(|&start| start > col)
+                    .min()
                     .unwrap_or(span_end),
             }
             .min(span_end);
@@ -215,5 +230,53 @@ mod tests {
     fn an_empty_line_survives_being_patched() {
         let out = apply(&Line::from(Vec::<Span>::new()), &[patch(0..4)]);
         assert_eq!(text_of(&out), "");
+    }
+
+    #[test]
+    fn patches_do_not_have_to_arrive_in_order() {
+        let out_of_order = apply(&line(), &[patch(8..10), patch(1..3)]);
+        let in_order = apply(&line(), &[patch(1..3), patch(8..10)]);
+        for col in 0..11 {
+            assert_eq!(
+                style_at(&out_of_order, col),
+                style_at(&in_order, col),
+                "column {col}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_first_of_two_overlapping_patches_wins() {
+        let first = Patch {
+            cols: 0..5,
+            style: Style::new().bg(Color::Yellow),
+        };
+        let second = Patch {
+            cols: 0..5,
+            style: Style::new().bg(Color::Blue),
+        };
+        let out = apply(&line(), &[first, second]);
+        assert_eq!(style_at(&out, 2).bg, Some(Color::Yellow));
+    }
+
+    #[test]
+    fn layering_asks_each_overlay_in_turn() {
+        struct At(u16);
+        impl Overlay for At {
+            fn patches(&self, _line: usize, out: &mut Vec<Patch>) {
+                out.push(Patch {
+                    cols: self.0..self.0 + 1,
+                    style: Style::new().bg(Color::Yellow),
+                });
+            }
+        }
+        let first = At(1);
+        let second = At(7);
+        let layered = Layered(&[&first, &second]);
+        let mut out = Vec::new();
+        layered.patches(0, &mut out);
+        assert_eq!(out.len(), 2);
+        assert_eq!(out[0].cols, 1..2);
+        assert_eq!(out[1].cols, 7..8);
     }
 }

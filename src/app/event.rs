@@ -27,6 +27,8 @@ pub enum Event {
     Paste(String),
     /// The directory walk reported in.
     Scan(Scan),
+    /// The document changed on disk.
+    Reload,
 }
 
 /// Where events come from.
@@ -39,6 +41,20 @@ pub trait EventSource {
     /// # Errors
     /// Propagates failures from the underlying input stream.
     fn next(&mut self) -> Result<Option<Event>>;
+
+    /// Take every event already waiting, without blocking.
+    ///
+    /// The loop drains after each blocking receive so a burst — a window being
+    /// dragged, a directory walk reporting in — costs one re-layout and one
+    /// frame rather than one of each per event. Sources with nothing to
+    /// coalesce may leave this alone.
+    ///
+    /// # Errors
+    /// Propagates failures from the underlying input stream.
+    fn drain(&mut self, out: &mut Vec<Event>) -> Result<()> {
+        let _ = out;
+        Ok(())
+    }
 }
 
 /// Everything that can wake the reader, funnelled into one queue.
@@ -84,6 +100,13 @@ impl EventSource for Events {
     fn next(&mut self) -> Result<Option<Event>> {
         Ok(self.queue.recv().ok())
     }
+
+    fn drain(&mut self, out: &mut Vec<Event>) -> Result<()> {
+        while let Ok(event) = self.queue.try_recv() {
+            out.push(event);
+        }
+        Ok(())
+    }
 }
 
 /// Convert a crossterm event, dropping the ones the reader ignores.
@@ -120,6 +143,8 @@ impl EventSource for ScriptedEvents {
     fn next(&mut self) -> Result<Option<Event>> {
         Ok(self.queue.pop_front())
     }
+    // Deliberately not draining: a scripted run applies one event per
+    // iteration, so a test sees every intermediate frame the reader would.
 }
 
 #[cfg(test)]
@@ -169,5 +194,19 @@ mod tests {
         let mut scripted = ScriptedEvents::default();
         assert_eq!(scripted.next().unwrap(), None);
         drop(events);
+    }
+
+    #[test]
+    fn draining_takes_everything_waiting_and_stops() {
+        let (mut events, sender) = Events::new();
+        for _ in 0..3 {
+            sender.send(Event::Scan(Scan::Done)).expect("send");
+        }
+        let mut batch = Vec::new();
+        events.drain(&mut batch).expect("drain");
+        assert_eq!(batch.len(), 3);
+        batch.clear();
+        events.drain(&mut batch).expect("drain");
+        assert!(batch.is_empty(), "drain blocked or invented events");
     }
 }

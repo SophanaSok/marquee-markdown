@@ -5,8 +5,8 @@ A terminal markdown reader with the functionality of
 Claude artifacts do — a centered reading column on a painted page, typographic
 headings, sealed code cards — with a table-of-contents panel for navigation.
 
-> **Status: pre-release.** Everything below works today. Still to come: live
-> reload, opening links, copying, and a configuration file — see
+> **Status: pre-release.** Everything below works today. Still to come: a
+> configuration file with rebindable keys, and packaging — see
 > [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## What it looks different from
@@ -54,6 +54,7 @@ marquee-markdown -w 80 doc.md       # fixed width (0 disables wrapping)
 marquee-markdown -s paper doc.md    # light theme
 marquee-markdown -l doc.md          # line numbers
 
+marquee-markdown -p doc.md          # through your pager
 marquee-markdown themes             # list available themes
 marquee-markdown man                # man page to stdout
 marquee-markdown completion fish    # shell completions
@@ -82,10 +83,17 @@ Keys are written here the way a configuration file will spell them.
 | `h` `l` · `left` `right` | scroll sideways (only with `-w 0`) |
 | `/` | search |
 | `n` `N` | next hit, previous hit |
+| `]` `[` | next link, previous link |
+| `enter` | open the selected link |
+| `y` | copy the selected link |
+| `c` | copy the document |
+| `e` | edit, at the line on screen |
+| `r` | reload from disk |
 | `t` | show / hide the contents pane |
 | `tab` | move focus between the panes |
 | `T` | switch light / dark |
 | `?` | key reference |
+| `ctrl+z` | suspend to the shell (unix) |
 | `esc` | close what is open |
 | `q` · `ctrl+c` | quit |
 
@@ -145,6 +153,24 @@ highlighting costs nothing. A lowercase query ignores case; a query with any
 capital in it does not. `esc` clears the highlight. One consequence of
 searching what is on screen: a phrase broken across a soft wrap will not match,
 because on the page it genuinely is two lines.
+
+## Editing, reloading, and copying
+
+The open document is watched, so saving it in another window re-renders it
+where you are — the *section* you were reading, not the line number, which an
+edit above you would have moved. `r` reloads by hand if a filesystem does not
+report changes.
+
+`e` opens the document in `$VISUAL`, `$EDITOR`, or `vi`, at the line on screen,
+and reloads when the editor exits. Line arguments are spelled the way each
+editor wants them; an editor that is not recognized is handed the path alone
+rather than a flag it would take for a second filename.
+
+`c` copies the markdown as written, not as rendered — what you want to paste
+elsewhere is the source. `y` copies the address of the selected link. Both go
+through the terminal (OSC 52) before the system clipboard, so copying works
+over SSH: the text lands on the machine you are sitting at rather than on the
+server. In tmux this needs `set -g set-clipboard on`.
 
 Resizing the terminal or switching theme re-lays out the document and keeps
 your place: the position is carried by source offset, not by line number, so a

@@ -19,8 +19,8 @@ scroll-tracking table-of-contents sidebar and in-document search.
 | **P3** TOC + search | Outline tree, active-section derivation, focus model, filter/collapse/auto-hide, `/` `n` `N` | 3 | **Done** (no TOC filter) |
 | **P4** Browser | Streaming gitignore-aware walk, paging, fuzzy filter with Unicode normalization, humanized modtimes, `-a` | 3 | **Done** (no rescan) |
 | **P5** Remote sources | `Fetcher` trait, http(s), `github://`/`gitlab://`, bare-host README API | 2 | **Done** |
-| **P6** Parity polish | Live reload, `e` at scroll line, `c` copy, `-p` pager, `ctrl+z`, link following, `y` | 2 | Next |
-| **P7** Config + keymaps | TOML schema, `MARQUEE_` env layer, precedence, user keymap merge, `config` subcommand | 2 | |
+| **P6** Parity polish | Live reload, `e` at scroll line, `c` copy, `-p` pager, `ctrl+z`, link following, `y` | 2 | **Done** |
+| **P7** Config + keymaps | TOML schema, `MARQUEE_` env layer, precedence, user keymap merge, `config` subcommand | 2 | Next |
 | **P8** Release | `packaging/`, deb/rpm, release workflow, `docs/ARCHITECTURE.md`, crates.io | 2 | |
 
 ## What works today
@@ -33,41 +33,34 @@ Themes load from TOML. Output degrades correctly when redirected.
 status bar, a key reference rendered from the live keymap, light/dark switching,
 and a resize that keeps your place instead of teleporting you.
 
-425 tests, plus four `#[ignore]`d live checks against the real forges;
+479 tests, plus four `#[ignore]`d live checks against the real forges;
 `cargo clippy --all-targets -- -D warnings` and `cargo doc --no-deps`
 clean.
 
-## Immediate next steps (P6)
+## Immediate next steps (P7)
 
-Parity polish. Each of these is small on its own; the order below puts the ones
-that touch the event loop first, while it is still fresh.
+Configuration, which is the last thing standing between this and a release.
 
-1. **Live reload.** A `notify` watcher on `Source::path`, debounced through
-   `notify-debouncer-full`, posting into the same queue the walk uses. Reload
-   goes through `DocCache`, which means re-parsing — the one thing
-   `ensure_rendered` does not currently do. Give it a `reload` that swaps the
-   block tree and then takes the same remapping path, or the scroll position
-   and the search hits will diverge from each other.
-2. **A resize debounce** (~80 ms), which is the outstanding line-index risk and
-   naturally belongs with the same timer machinery.
-3. **Link following.** `tab` cycles the links on screen, `enter` opens, `y`
-   yanks. `RenderedDoc` already records link column ranges per line, so this is
-   a selection model over data that exists, not new layout.
-4. **Copy** — `c` for the document, `y` for the link under the cursor. OSC 52
-   first so it works over SSH and inside tmux, `arboard` only as a fallback,
-   and a clipboard failure must never escape the event loop: `arboard` links
-   X11/Wayland and can hang on a headless session.
-5. **`e` to edit** at the current line, `$VISUAL` then `$EDITOR` then `vi`
-   (`notepad` on Windows), restoring the terminal around the child process.
-6. **`-p`**, which is the one remaining flag that does nothing.
-7. **`ctrl+z`**, unix only. It must be absent from the keymap on Windows rather
-   than present and inert, or the key reference stops being true.
+1. `config/schema.rs` — the TOML shape, with `#[serde(default)]` throughout and
+   **unknown keys warned about rather than rejected**. Once other people are
+   running releases, a config written for a newer version must not brick an
+   older binary.
+2. `config/layer.rs` — precedence as `flags.or(env).or(file).or(defaults)`, one
+   `or` per field in one function. That function is the definition of
+   precedence for the whole program, and it is testable without touching disk.
+3. Two-pass bootstrap, because `--config` and `MARQUEE_CONFIG` decide which
+   file gets loaded.
+4. `[keys.<mode>]` merged over the defaults. `Keymap::bind` already rejects a
+   chord bound twice in a mode, so a bad user keymap is an error with a line
+   number rather than a binding that silently loses.
+5. A `config` subcommand that prints the effective configuration, which is the
+   only practical way to debug a precedence question.
+6. `docs/KEYBINDINGS.md` generated from the default keymap rather than written
+   by hand, the way the help overlay already is.
 
-Fetch failures should move to the status bar as part of step 3: once a link can
-be followed from inside the reader, a mistyped or dead URL must not end the
-session.
+Then P8: packaging, `docs/ARCHITECTURE.md`, and the release workflow.
 
-## What P2 to P5 built, and why it is shaped that way
+## What P2 to P6 built, and why it is shaped that way
 
 - `app/terminal.rs` — an RAII alternate-screen/raw-mode guard, plus a panic
   hook that restores the terminal *before* the message is printed. Without the
@@ -114,7 +107,7 @@ session.
   browser does not depend on the application's event type either.
 - `ui/` — draw-only widgets taking `&App`.
 
-Three things that cost a debugging session each, recorded so they are not
+Five things that cost a debugging session each, recorded so they are not
 rediscovered:
 
 - **Pane geometry may not depend on anything only a layout can produce.** The
@@ -126,6 +119,17 @@ rediscovered:
 - **The cursor and the active entry are different state.** Collapsing them is
   the single easiest way to make the contents pane feel broken: scrolling would
   drag the selection out from under the reader mid-keystroke.
+- **A background reader thread owns standard input, so nothing may ask the
+  terminal a question.** `Terminal::clear` snapshots the cursor position first,
+  which is a round trip the event thread swallows the reply to; it times out
+  and fails. Forcing a redraw after an external program means resetting both
+  ratatui buffers instead. Anything else that round-trips — `cursor::position`,
+  a colour query — has the same problem.
+- **A watch matched on the whole path never fires for a relative argument.**
+  `marquee-markdown README.md` gives a relative path and the events come back
+  absolute. Matching on the file name is enough, because exactly one directory
+  is watched and not recursively. The unit tests missed it by using absolute
+  temporary paths; running the binary caught it.
 - **Reordering a list invalidates every index into it.** The browser sorts by
   modification time, so results arriving mid-scan insert themselves above the
   cursor. Sorting inside `extend` left `matches` — and the cursor with it —
