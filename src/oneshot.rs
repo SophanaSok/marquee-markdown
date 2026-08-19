@@ -21,6 +21,8 @@ pub struct Settings {
     pub requested_width: Option<u16>,
     /// The `-l` flag; forced on for source files.
     pub line_numbers: bool,
+    /// The `-n` flag: keep the line breaks the author typed.
+    pub preserve_new_lines: bool,
     /// Whether the destination is a terminal.
     pub is_terminal: bool,
     /// Whether color should be emitted.
@@ -32,11 +34,16 @@ pub struct Settings {
 impl Settings {
     /// Detect settings from the current process environment.
     #[must_use]
-    pub fn detect(requested_width: Option<u16>, line_numbers: bool) -> Self {
+    pub fn detect(
+        requested_width: Option<u16>,
+        line_numbers: bool,
+        preserve_new_lines: bool,
+    ) -> Self {
         let is_terminal = tty::stdout_is_terminal();
         Self {
             requested_width,
             line_numbers,
+            preserve_new_lines,
             is_terminal,
             color: !tty::color_disabled(),
             terminal_width: tty::terminal_width(),
@@ -68,6 +75,7 @@ pub fn render_to(
             width: content_width,
             // Source files always get line numbers, matching glow.
             code_line_numbers: settings.line_numbers || source.is_code,
+            preserve_new_lines: settings.preserve_new_lines,
         },
     );
 
@@ -187,6 +195,7 @@ mod tests {
         Settings {
             requested_width: Some(40),
             line_numbers: false,
+            preserve_new_lines: false,
             is_terminal: false,
             color: false,
             terminal_width: None,

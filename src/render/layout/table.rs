@@ -15,7 +15,7 @@ use ratatui::text::Span;
 use super::Context;
 use crate::render::block::{Alignment, Inline};
 use crate::render::doc::LineKind;
-use crate::render::frag::{self, Frag, FragKind, IgnoreLinks};
+use crate::render::frag::{self, Breaks, Frag, FragKind, IgnoreLinks};
 use crate::render::measure;
 use crate::render::wrap::{self, WrapMode};
 
@@ -195,7 +195,13 @@ fn cells_rows(
     let wrapped: Vec<Vec<Vec<Frag>>> = (0..widths.len())
         .map(|col| {
             let content = row.get(col).map(Vec::as_slice).unwrap_or(&[]);
-            let frags = frag::fragment(content, text_style, ctx.theme, &mut IgnoreLinks);
+            let frags = frag::fragment(
+                content,
+                text_style,
+                ctx.theme,
+                &mut IgnoreLinks,
+                Breaks::Collapse,
+            );
             // Cell text inherits the row background (header band vs page).
             let frags: Vec<Frag> = frags
                 .into_iter()

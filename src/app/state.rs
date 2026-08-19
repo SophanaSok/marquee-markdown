@@ -19,7 +19,7 @@ use super::keymap::{Keymap, Mode};
 use super::layout::Panes;
 
 /// Settings that come from the command line rather than from interaction.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Options {
     /// The `-w` flag: `Some(0)` disables wrapping.
     pub width: Option<u16>,
@@ -29,6 +29,23 @@ pub struct Options {
     pub mouse: bool,
     /// The `-a` flag: list hidden and ignored files when browsing.
     pub all: bool,
+    /// The `-n` flag: keep the line breaks the author typed.
+    pub preserve_new_lines: bool,
+    /// Start with the contents pane showing.
+    pub contents: bool,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            width: None,
+            line_numbers: false,
+            mouse: false,
+            all: false,
+            preserve_new_lines: false,
+            contents: true,
+        }
+    }
 }
 
 /// A view layered over the document.
@@ -200,7 +217,7 @@ impl App {
             screen: Screen::Document,
             browser: None,
             focus: Focus::Document,
-            toc_visible: true,
+            toc_visible: options.contents,
             toc: Toc::default(),
             search: Search::default(),
             links: Links::default(),

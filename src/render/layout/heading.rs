@@ -11,7 +11,7 @@ use ratatui::text::Span;
 use super::Context;
 use crate::render::block::Inline;
 use crate::render::doc::LineKind;
-use crate::render::frag::{self, IgnoreLinks};
+use crate::render::frag::{self, Breaks, IgnoreLinks};
 use crate::render::wrap::{self, WrapMode};
 
 pub(super) fn emit(
@@ -28,7 +28,8 @@ pub(super) fn emit(
         .push_anchor(level, id.to_owned(), Inline::plain_text(content));
 
     let style = ctx.theme.heading(level);
-    let frags = frag::fragment(content, style, ctx.theme, &mut IgnoreLinks);
+    let frags = // A heading is one line whatever the author typed.
+    frag::fragment(content, style, ctx.theme, &mut IgnoreLinks, Breaks::Collapse);
     let avail = ctx.available_width();
     for line in wrap::wrap(frags, avail, WrapMode::Word) {
         let lead = ctx.lead();

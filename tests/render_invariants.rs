@@ -14,6 +14,7 @@ fn opts(width: u16) -> LayoutOptions {
     LayoutOptions {
         width,
         code_line_numbers: false,
+        preserve_new_lines: false,
     }
 }
 

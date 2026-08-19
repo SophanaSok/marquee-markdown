@@ -49,3 +49,20 @@ fn key_tables() -> Vec<&'static str> {
     assert!(!tables.is_empty(), "the README has no key table");
     tables
 }
+
+#[test]
+#[cfg_attr(
+    not(unix),
+    ignore = "the checked-in reference is generated on unix, where ctrl+z exists"
+)]
+fn the_keybindings_reference_is_current() {
+    // Generated rather than written, for the same reason the help overlay is:
+    // a key reference that has drifted is worse than none at all.
+    let checked_in = include_str!("../docs/KEYBINDINGS.md");
+    let generated = marquee_markdown::config::keys::reference(&Keymap::defaults());
+    assert_eq!(
+        checked_in, generated,
+        "docs/KEYBINDINGS.md is out of date — regenerate it with \
+         `cargo run -- keys > docs/KEYBINDINGS.md`"
+    );
+}

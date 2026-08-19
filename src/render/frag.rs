@@ -65,15 +65,28 @@ impl LinkSink for IgnoreLinks {
     }
 }
 
+/// What a single newline inside a paragraph means.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Breaks {
+    /// Markdown's own rule: a newline inside a paragraph is a space, and the
+    /// paragraph is re-wrapped to the column.
+    #[default]
+    Collapse,
+    /// Keep the line breaks the author typed. This is `glow`'s `-n`, and it is
+    /// what a document written one-sentence-per-line wants.
+    Preserve,
+}
+
 /// Flatten inline content into fragments under `base` style.
 pub fn fragment(
     content: &[Inline],
     base: Style,
     theme: &Theme,
     links: &mut dyn LinkSink,
+    breaks: Breaks,
 ) -> Vec<Frag> {
     let mut out = Vec::new();
-    walk(content, base, None, theme, links, &mut out);
+    walk(content, base, None, theme, links, breaks, &mut out);
     out
 }
 
@@ -83,6 +96,7 @@ fn walk(
     link: Option<u32>,
     theme: &Theme,
     links: &mut dyn LinkSink,
+    breaks: Breaks,
     out: &mut Vec<Frag>,
 ) {
     for inline in content {
@@ -108,6 +122,7 @@ fn walk(
                     link,
                     theme,
                     links,
+                    breaks,
                     out,
                 );
             }
@@ -118,6 +133,7 @@ fn walk(
                     link,
                     theme,
                     links,
+                    breaks,
                     out,
                 );
             }
@@ -128,26 +144,34 @@ fn walk(
                     link,
                     theme,
                     links,
+                    breaks,
                     out,
                 );
             }
             Inline::Link { dest, content } => {
                 let idx = links.intern(dest);
                 let style = theme.link().patch(style_only_modifiers(style));
-                walk(content, style, Some(idx), theme, links, out);
+                walk(content, style, Some(idx), theme, links, breaks, out);
             }
             Inline::Image { dest, alt } => {
                 // Terminal-safe placeholder: alt text as a link to the image.
                 let idx = links.intern(dest);
                 let style = theme.link().patch(style_only_modifiers(style));
                 out.push(Frag::new("\u{f03e} ", style, Some(idx), FragKind::Word));
-                walk(alt, style, Some(idx), theme, links, out);
+                walk(alt, style, Some(idx), theme, links, breaks, out);
             }
             Inline::FootnoteReference(label) => {
                 let sup = theme.muted().add_modifier(Modifier::BOLD);
                 out.push(Frag::new(format!("[{label}]"), sup, link, FragKind::Glue));
             }
-            Inline::SoftBreak => out.push(Frag::new(" ", style, link, FragKind::Space)),
+            Inline::SoftBreak => {
+                let kind = match breaks {
+                    Breaks::Collapse => FragKind::Space,
+                    Breaks::Preserve => FragKind::Break,
+                };
+                let text = if kind == FragKind::Break { "" } else { " " };
+                out.push(Frag::new(text, style, link, kind));
+            }
             Inline::HardBreak => out.push(Frag::new("", style, link, FragKind::Break)),
         }
     }
@@ -196,7 +220,7 @@ mod tests {
 
     fn frags(content: &[Inline]) -> Vec<Frag> {
         let t = theme();
-        fragment(content, t.body(), &t, &mut IgnoreLinks)
+        fragment(content, t.body(), &t, &mut IgnoreLinks, Breaks::Collapse)
     }
 
     #[test]
@@ -282,11 +306,61 @@ mod tests {
             t.body(),
             &t,
             &mut sink,
+            Breaks::Collapse,
         );
         assert_eq!(sink.0, ["https://a", "https://b"]);
         assert_eq!(
             out.iter().filter_map(|f| f.link).collect::<Vec<_>>(),
             [0, 1]
+        );
+    }
+
+    #[test]
+    fn a_newline_inside_a_paragraph_is_a_space_by_default() {
+        let t = theme();
+        let out = fragment(
+            &[
+                Inline::Text("one".into()),
+                Inline::SoftBreak,
+                Inline::Text("two".into()),
+            ],
+            t.body(),
+            &t,
+            &mut IgnoreLinks,
+            Breaks::Collapse,
+        );
+        assert!(out.iter().all(|frag| frag.kind != FragKind::Break));
+        let text: String = out.iter().map(|frag| frag.text.as_str()).collect();
+        assert_eq!(text, "one two");
+    }
+
+    #[test]
+    fn preserving_newlines_turns_them_into_line_breaks() {
+        // What `-n` is for: a document written one sentence per line keeps its
+        // shape instead of being re-flowed into a wall.
+        let t = theme();
+        let out = fragment(
+            &[
+                Inline::Text("one".into()),
+                Inline::SoftBreak,
+                Inline::Text("two".into()),
+            ],
+            t.body(),
+            &t,
+            &mut IgnoreLinks,
+            Breaks::Preserve,
+        );
+        assert_eq!(
+            out.iter()
+                .filter(|frag| frag.kind == FragKind::Break)
+                .count(),
+            1
+        );
+        // And the break contributes no width of its own.
+        assert!(
+            out.iter()
+                .filter(|frag| frag.kind == FragKind::Break)
+                .all(|frag| frag.width == 0)
         );
     }
 }

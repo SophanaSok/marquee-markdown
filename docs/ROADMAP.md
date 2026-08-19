@@ -14,14 +14,14 @@ scroll-tracking table-of-contents sidebar and in-document search.
 | Phase | Contents | Effort | State |
 | --- | --- | --- | --- |
 | **P0** Skeleton | Manifest with crates.io + deb/rpm metadata, lib/bin split, clippy config, pure-Rust syntect backend, layering test | 2 | **Done** (CI and contributor docs still open) |
-| **P1** One-shot render + theming | Source classification, frontmatter, code-file wrapping, ANSI output, `-l -n -w -s`, theme loader, `themes`/`man`/`completion` | 3 | **Done** except `-n` |
+| **P1** One-shot render + theming | Source classification, frontmatter, code-file wrapping, ANSI output, `-l -n -w -s`, theme loader, `themes`/`man`/`completion` | 3 | **Done** |
 | **P2** Document reader | Terminal guard + panic hook, event loop, view/anchor/render cache, pager keys via `Action`, status bar, keymap-rendered help, `-t` | 3 | **Done** (resize debounce open) |
 | **P3** TOC + search | Outline tree, active-section derivation, focus model, filter/collapse/auto-hide, `/` `n` `N` | 3 | **Done** (no TOC filter) |
 | **P4** Browser | Streaming gitignore-aware walk, paging, fuzzy filter with Unicode normalization, humanized modtimes, `-a` | 3 | **Done** (no rescan) |
 | **P5** Remote sources | `Fetcher` trait, http(s), `github://`/`gitlab://`, bare-host README API | 2 | **Done** |
 | **P6** Parity polish | Live reload, `e` at scroll line, `c` copy, `-p` pager, `ctrl+z`, link following, `y` | 2 | **Done** |
-| **P7** Config + keymaps | TOML schema, `MARQUEE_` env layer, precedence, user keymap merge, `config` subcommand | 2 | Next |
-| **P8** Release | `packaging/`, deb/rpm, release workflow, `docs/ARCHITECTURE.md`, crates.io | 2 | |
+| **P7** Config + keymaps | TOML schema, `MARQUEE_` env layer, precedence, user keymap merge, `config` subcommand | 2 | **Done** |
+| **P8** Release | `packaging/`, deb/rpm, release workflow, `docs/ARCHITECTURE.md`, crates.io | 2 | Next |
 
 ## What works today
 
@@ -33,34 +33,36 @@ Themes load from TOML. Output degrades correctly when redirected.
 status bar, a key reference rendered from the live keymap, light/dark switching,
 and a resize that keeps your place instead of teleporting you.
 
-479 tests, plus four `#[ignore]`d live checks against the real forges;
+523 tests, plus four `#[ignore]`d live checks against the real forges;
 `cargo clippy --all-targets -- -D warnings` and `cargo doc --no-deps`
 clean.
 
-## Immediate next steps (P7)
+## Immediate next steps (P8)
 
-Configuration, which is the last thing standing between this and a release.
+Release. Nothing here changes behavior; it is all about other people being able
+to install and contribute to this.
 
-1. `config/schema.rs` — the TOML shape, with `#[serde(default)]` throughout and
-   **unknown keys warned about rather than rejected**. Once other people are
-   running releases, a config written for a newer version must not brick an
-   older binary.
-2. `config/layer.rs` — precedence as `flags.or(env).or(file).or(defaults)`, one
-   `or` per field in one function. That function is the definition of
-   precedence for the whole program, and it is testable without touching disk.
-3. Two-pass bootstrap, because `--config` and `MARQUEE_CONFIG` decide which
-   file gets loaded.
-4. `[keys.<mode>]` merged over the defaults. `Keymap::bind` already rejects a
-   chord bound twice in a mode, so a bad user keymap is an error with a line
-   number rather than a binding that silently loses.
-5. A `config` subcommand that prints the effective configuration, which is the
-   only practical way to debug a precedence question.
-6. `docs/KEYBINDINGS.md` generated from the default keymap rather than written
-   by hand, the way the help overlay already is.
+1. **CI**, which has been outstanding since P0 and is the one that matters:
+   `fmt --check`, `clippy -D warnings`, `test`, `doc --no-deps`, an MSRV job
+   pinned to `rust-version`, across ubuntu/macos/windows. The network is never
+   touched — `tests/network.rs` is `#[ignore]`d and must stay that way.
+2. **`docs/ARCHITECTURE.md`** — the highest-value file in the repository for a
+   newcomer. The module map, the render pipeline, and the invariants. Much of
+   it can be lifted from `AGENTS.md`, which has been kept current deliberately.
+3. **CONTRIBUTING.md, CODE_OF_CONDUCT.md, SECURITY.md**, and issue templates.
+4. **`packaging/`** — deb and rpm metadata already exist in `Cargo.toml`; wire
+   them up along with man pages and completions, which the binary can already
+   generate.
+5. **A release workflow**, and the first crates.io publish.
 
-Then P8: packaging, `docs/ARCHITECTURE.md`, and the release workflow.
+Two things to decide before 1.0 rather than after, because both are hard to
+change once people depend on them: whether to ship a short binary alias
+(`marquee-markdown` is long to type for something invoked constantly), and
+whether `render` is stable enough to promise. The changelog currently says the
+`render` API may change within minor versions — either commit to that or drop
+the caveat.
 
-## What P2 to P6 built, and why it is shaped that way
+## What P2 to P7 built, and why it is shaped that way
 
 - `app/terminal.rs` — an RAII alternate-screen/raw-mode guard, plus a panic
   hook that restores the terminal *before* the message is printed. Without the
@@ -105,6 +107,11 @@ Then P8: packaging, `docs/ARCHITECTURE.md`, and the release workflow.
 - `browser/` — the walk, the filter and the selection, none of which know
   about a terminal. The walk reports in batches through a callback, so the
   browser does not depend on the application's event type either.
+- `config/` — the file schema, the environment, and precedence, each a pure
+  function of its input. `Layer::over` is the single definition of precedence
+  for the whole program; defining it per field at each call site is how a
+  program ends up with a flag that beats the config in one place and loses in
+  another.
 - `ui/` — draw-only widgets taking `&App`.
 
 Five things that cost a debugging session each, recorded so they are not

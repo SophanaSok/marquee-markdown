@@ -8,9 +8,9 @@ Until 1.0 the `render` module's public API may change within minor versions.
 
 ## [Unreleased]
 
-Pre-release. Feature-complete against `glow`, plus the contents pane and
-search. What remains is a configuration file with rebindable keys, and
-packaging.
+Pre-release. Feature-complete against `glow`, plus the contents pane, search,
+and a configuration file with rebindable keys. What remains is packaging and a
+release workflow.
 
 ### Added
 
@@ -162,6 +162,30 @@ packaging.
 - Bursts of events are coalesced: dragging a window edge costs one re-layout
   and one frame per batch rather than per event.
 
+#### Configuration
+
+- `~/.config/marquee-markdown/config.toml`, with `--config` and
+  `MARQUEE_CONFIG` naming a different file.
+- Precedence is defined in exactly one function: command line, then
+  environment, then file, then defaults. A switch that was not given
+  contributes nothing rather than `false`, so a setting turned on in a file is
+  not undone by every invocation that omits the flag.
+- `[keys.<mode>]` rebinds any key in any mode, and an action of `none` takes a
+  key away.
+- Unknown settings, keys, and actions are reported and ignored rather than
+  refused: a file written for a newer version has to keep working with an older
+  binary, and one typo should cost one key rather than the whole keymap. A file
+  that is not valid TOML is still an error, because that is a mistake rather
+  than version skew.
+- `marquee-markdown config` prints the settings in force as a file that would
+  produce them — the only practical way to answer "why is this setting what it
+  is?" — and the output round-trips.
+- `marquee-markdown keys` prints every binding as markdown;
+  `docs/KEYBINDINGS.md` is generated from it and a test fails if it drifts.
+- `-n` (`--preserve-new-lines`) is now honored, closing the last flag that was
+  parsed but ignored. A document written one sentence per line keeps its shape
+  instead of being re-flowed.
+
 #### Theming
 
 - Two Claude palettes, `paper` (light) and `slate` (dark), compiled in as
@@ -202,7 +226,5 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
   `enter` is pressed.
 - The key reference does not scroll, so on a terminal shorter than about 22
   rows the last few bindings are cut off.
-- `--config` is parsed but no configuration file is read yet.
-- `-n` (`--preserve-new-lines`) is parsed but not yet honored.
 - Resizing re-lays out on every event; a large document dragged by a window
   edge will work harder than it needs to until a debounce lands.

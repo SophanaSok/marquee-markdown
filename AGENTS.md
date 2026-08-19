@@ -82,6 +82,10 @@ then either a ratatui buffer (reader) or ANSI bytes (`ansi.rs`).
 
 ```
 cli/         clap derive with the full glow flag surface; pure run-mode dispatch.
+config/      The file schema, the environment layer, and precedence.
+  layer.rs     `Layer::over` — the ONE definition of precedence.
+  schema.rs    The TOML shape; unknown keys warn rather than fail.
+  keys.rs      `[keys.*]` merged over the defaults; generates KEYBINDINGS.md.
 source/      classify (pure, behind FsProbe) + resolve (I/O); frontmatter; kind.
   fetch.rs     The Fetcher seam: HttpFetcher for real, FakeFetcher for tests.
   remote.rs    URLs and the two forge APIs, written against Fetcher.
@@ -191,6 +195,17 @@ whose text contains escapes.
 - Themes are data. Any new palette entry must be expressible in the TOML theme
   format, not hardcoded in layout code. Layout reads styles from `Theme`, never
   a named color.
+- **Precedence is defined once**, in `config::layer::Layer::over`. Adding a
+  setting means adding one field and one `or`, never a comparison at a call
+  site.
+- **Unknown configuration is a warning, not a failure.** A file written for a
+  newer version must keep working with an older binary. Malformed TOML is still
+  an error — that is a mistake, not version skew.
+- A command-line switch that was not given must contribute `None`, not
+  `Some(false)`, or it silently overrides the config file on every invocation.
+- **`docs/KEYBINDINGS.md` is generated.** Regenerate with
+  `cargo run -- keys > docs/KEYBINDINGS.md`; `tests/docs.rs` fails if it has
+  drifted.
 - New keys must go through the `Action` enum, never a hardcoded `KeyCode` match
   — otherwise the configurable keymap becomes a rewrite.
 

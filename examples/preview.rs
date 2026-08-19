@@ -27,6 +27,7 @@ fn main() -> std::io::Result<()> {
         LayoutOptions {
             width,
             code_line_numbers: false,
+            preserve_new_lines: false,
         },
     );
 

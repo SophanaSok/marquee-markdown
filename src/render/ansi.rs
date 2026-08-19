@@ -161,6 +161,7 @@ mod tests {
             LayoutOptions {
                 width: 40,
                 code_line_numbers: false,
+                preserve_new_lines: false,
             },
         );
         let mut buf = Vec::new();

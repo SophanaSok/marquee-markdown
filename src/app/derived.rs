@@ -123,6 +123,7 @@ mod tests {
         let options = LayoutOptions {
             width: app.panes.content_width,
             code_line_numbers: false,
+            preserve_new_lines: false,
         };
         app.view.top = app.doc.ensure_rendered(options, &app.theme, 0);
         app

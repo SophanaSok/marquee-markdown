@@ -165,6 +165,7 @@ mod tests {
             LayoutOptions {
                 width,
                 code_line_numbers: false,
+                preserve_new_lines: false,
             },
         )
     }

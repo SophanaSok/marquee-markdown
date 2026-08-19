@@ -5,6 +5,7 @@ use clap::{CommandFactory, Parser};
 
 use marquee_markdown::app;
 use marquee_markdown::cli::{self, Cli, Command, RunMode};
+use marquee_markdown::config::Config;
 use marquee_markdown::source::{self, HttpFetcher, RealFs};
 use marquee_markdown::theme::registry;
 use marquee_markdown::{oneshot, util};
@@ -35,7 +36,14 @@ fn run() -> Result<()> {
     cli.validate()?;
 
     if let Some(command) = &cli.command {
-        return run_command(command);
+        return run_command(command, &cli);
+    }
+
+    let config = load_config(&cli)?;
+    // Warnings go to standard error before anything takes over the screen, so
+    // they are still there after the reader quits.
+    for warning in &config.warnings {
+        eprintln!("warning: {warning}");
     }
 
     let spec = source::classify(cli.source.as_deref(), util::tty::stdin_is_pipe(), &RealFs);
@@ -44,7 +52,7 @@ fn run() -> Result<()> {
 
     // Redirected output gets no styling, matching glow.
     let theme = if stdout_is_tty {
-        registry::resolve(&cli.style, None)?
+        registry::resolve(&config.style, None)?
     } else {
         marquee_markdown::theme::Theme::plain()
     };
@@ -52,7 +60,7 @@ fn run() -> Result<()> {
     match mode {
         RunMode::OneShot => {
             let source = source::resolve(&spec, &HttpFetcher::new())?;
-            let settings = oneshot::Settings::detect(cli.width, cli.line_numbers);
+            let settings = settings(&config);
             let stdout = std::io::stdout();
             let mut out = stdout.lock();
             oneshot::render_to(&mut out, &source, &theme, settings)?;
@@ -60,35 +68,65 @@ fn run() -> Result<()> {
         }
         RunMode::Tui => {
             let source = source::resolve(&spec, &HttpFetcher::new())?;
-            app::run(source, theme, options(&cli))
+            app::run(source, theme, options(&config), config.keymap)
         }
         RunMode::Browser => {
             let root = match &spec {
                 source::SourceSpec::Dir(path) => path.clone(),
                 _ => std::env::current_dir()?,
             };
-            app::browse(root, theme, options(&cli))
+            app::browse(root, theme, options(&config), config.keymap)
         }
         RunMode::Pager => {
             let source = source::resolve(&spec, &HttpFetcher::new())?;
-            let settings = oneshot::Settings::detect(cli.width, cli.line_numbers);
-            oneshot::page(&source, &theme, settings)
+            oneshot::page(&source, &theme, settings(&config))
         }
     }
 }
 
-/// The command-line settings the reader cares about.
-fn options(cli: &Cli) -> app::Options {
+/// Resolve the configuration: the command line over the environment over a
+/// file over the defaults.
+fn load_config(cli: &Cli) -> Result<Config> {
+    Config::load(cli.layer(), cli.config.as_deref(), &|name| {
+        std::env::var(name).ok()
+    })
+}
+
+/// The one-shot renderer's settings.
+fn settings(config: &Config) -> oneshot::Settings {
+    oneshot::Settings::detect(config.width, config.line_numbers, config.preserve_new_lines)
+}
+
+/// The settings the reader cares about.
+fn options(config: &Config) -> app::Options {
     app::Options {
-        width: cli.width,
-        line_numbers: cli.line_numbers,
-        mouse: cli.mouse,
-        all: cli.all,
+        width: config.width,
+        line_numbers: config.line_numbers,
+        mouse: config.mouse,
+        all: config.all,
+        preserve_new_lines: config.preserve_new_lines,
+        contents: config.contents,
     }
 }
 
-fn run_command(command: &Command) -> Result<()> {
+fn run_command(command: &Command, cli: &Cli) -> Result<()> {
     match command {
+        Command::Config => {
+            let config = load_config(cli)?;
+            for warning in &config.warnings {
+                eprintln!("warning: {warning}");
+            }
+            print!("{}", config.to_toml());
+            Ok(())
+        }
+        Command::Keys => {
+            let config = load_config(cli)?;
+            print!(
+                "{}",
+                marquee_markdown::config::keys::reference(&config.keymap)
+            );
+            Ok(())
+        }
         Command::Themes => {
             for entry in registry::list() {
                 let origin = match &entry.origin {

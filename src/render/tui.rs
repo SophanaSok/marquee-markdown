@@ -188,6 +188,7 @@ mod tests {
             LayoutOptions {
                 width: 60,
                 code_line_numbers: false,
+                preserve_new_lines: false,
             },
         );
         for line in &doc.lines {
@@ -217,6 +218,7 @@ mod tests {
             LayoutOptions {
                 width: 10,
                 code_line_numbers: false,
+                preserve_new_lines: false,
             },
         );
         let area = Rect::new(0, 0, 20, 3);
@@ -236,6 +238,7 @@ mod tests {
             LayoutOptions {
                 width: 80,
                 code_line_numbers: false,
+                preserve_new_lines: false,
             },
         );
         // Pane geometry from before a resize, against a buffer from after it.

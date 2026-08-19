@@ -44,6 +44,12 @@ impl Mode {
         Self::Help,
     ];
 
+    /// The mode a configuration file's `[keys.<name>]` section refers to.
+    #[must_use]
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.iter().copied().find(|mode| mode.name() == name)
+    }
+
     /// Name used in configuration files (`[keys.document]`).
     #[must_use]
     pub const fn name(self) -> &'static str {
@@ -390,6 +396,23 @@ impl Keymap {
         Ok(())
     }
 
+    /// Remove a binding, returning what it was.
+    pub fn unbind(&mut self, mode: Mode, chord: Chord) -> Option<Action> {
+        self.order
+            .retain(|(bound_mode, bound_chord, _)| (*bound_mode, *bound_chord) != (mode, chord));
+        self.lookup.remove(&(mode, chord))
+    }
+
+    /// Bind a chord, replacing whatever held it.
+    ///
+    /// This is what a configuration file does: the reader asking for a key to
+    /// mean something is not a conflict to report, it is an instruction.
+    pub fn rebind(&mut self, mode: Mode, chord: Chord, action: Action) {
+        self.unbind(mode, chord);
+        // Cannot fail: the chord was just removed.
+        let _ = self.bind(mode, chord, action);
+    }
+
     /// The action a key event triggers in `mode`.
     #[must_use]
     pub fn action(&self, mode: Mode, event: KeyEvent) -> Option<Action> {
@@ -577,6 +600,44 @@ mod tests {
             map.action(Mode::Document, key(KeyCode::Char('d'))),
             Some(Action::HalfPageDown)
         );
+    }
+
+    #[test]
+    fn rebinding_replaces_rather_than_conflicting() {
+        // A reader asking for a key to mean something is an instruction, not a
+        // conflict to report.
+        let mut map = Keymap::defaults();
+        map.rebind(Mode::Document, "j".parse().unwrap(), Action::Quit);
+        assert_eq!(
+            map.action(Mode::Document, key(KeyCode::Char('j'))),
+            Some(Action::Quit)
+        );
+        // And the replaced binding is gone from the help overlay too.
+        let rows = map.help_rows(Mode::Document);
+        let down = rows
+            .iter()
+            .find(|(_, action)| *action == Action::LineDown)
+            .expect("line-down is still bound to the arrow key");
+        assert_eq!(down.0, "down");
+    }
+
+    #[test]
+    fn unbinding_leaves_the_key_doing_nothing() {
+        let mut map = Keymap::defaults();
+        assert_eq!(
+            map.unbind(Mode::Document, "q".parse().unwrap()),
+            Some(Action::Quit)
+        );
+        assert_eq!(map.action(Mode::Document, key(KeyCode::Char('q'))), None);
+        assert_eq!(map.unbind(Mode::Document, "q".parse().unwrap()), None);
+    }
+
+    #[test]
+    fn a_mode_can_be_named_in_a_configuration_file() {
+        for mode in Mode::ALL {
+            assert_eq!(Mode::from_name(mode.name()), Some(*mode));
+        }
+        assert_eq!(Mode::from_name("nonsense"), None);
     }
 
     #[test]

@@ -5,7 +5,7 @@ use std::ops::Range;
 use super::Context;
 use crate::render::block::Inline;
 use crate::render::doc::LineKind;
-use crate::render::frag::{self, LinkSink};
+use crate::render::frag::{self, Breaks, LinkSink};
 use crate::render::wrap::{self, WrapMode};
 
 pub(super) fn emit(ctx: &mut Context<'_>, content: &[Inline], span: &Range<usize>) {
@@ -28,7 +28,12 @@ pub(super) fn emit_styled(
     }
     let frags = {
         let mut links = Sink(ctx.sink);
-        frag::fragment(content, base, ctx.theme, &mut links)
+        let breaks = if ctx.options.preserve_new_lines {
+            Breaks::Preserve
+        } else {
+            Breaks::Collapse
+        };
+        frag::fragment(content, base, ctx.theme, &mut links, breaks)
     };
     let avail = ctx.available_width();
     for line in wrap::wrap(frags, avail, WrapMode::Word) {

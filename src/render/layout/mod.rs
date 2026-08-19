@@ -26,6 +26,9 @@ pub struct LayoutOptions {
     pub width: u16,
     /// Show line numbers inside code blocks.
     pub code_line_numbers: bool,
+    /// Keep the line breaks the author typed inside a paragraph, rather than
+    /// re-wrapping it. This is glow's `-n`.
+    pub preserve_new_lines: bool,
 }
 
 /// Lay out a parsed document at a fixed content width.

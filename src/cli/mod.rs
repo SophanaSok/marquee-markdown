@@ -39,8 +39,12 @@ pub struct Cli {
     pub preserve_new_lines: bool,
 
     /// Style name, or a path to a theme file.
-    #[arg(short, long, default_value = "auto")]
-    pub style: String,
+    ///
+    /// No clap default: an unset flag has to stay unset so it does not
+    /// override a configuration file. The default lives in the defaults layer,
+    /// with every other default.
+    #[arg(short, long)]
+    pub style: Option<String>,
 
     /// Display in the full-screen reader.
     #[arg(short, long)]
@@ -60,6 +64,10 @@ pub struct Cli {
 pub enum Command {
     /// List the available styles and where they came from.
     Themes,
+    /// Print the configuration in force, as a file that would produce it.
+    Config,
+    /// Print the key bindings as markdown.
+    Keys,
     /// Print a man page to standard output.
     Man,
     /// Print a shell completion script to standard output.
@@ -83,6 +91,24 @@ pub enum RunMode {
 }
 
 impl Cli {
+    /// The settings the command line asked for.
+    ///
+    /// A switch that was not given contributes nothing rather than `false`:
+    /// there is no way to say `--no-mouse` on the command line, so an absent
+    /// flag is silence, and silence must not override a configuration file.
+    #[must_use]
+    pub fn layer(&self) -> crate::config::Layer {
+        crate::config::Layer {
+            style: self.style.clone(),
+            width: self.width,
+            line_numbers: self.line_numbers.then_some(true),
+            mouse: self.mouse.then_some(true),
+            all: self.all.then_some(true),
+            preserve_new_lines: self.preserve_new_lines.then_some(true),
+            contents: None,
+        }
+    }
+
     /// Validate flag combinations.
     ///
     /// # Errors
@@ -140,13 +166,35 @@ mod tests {
         let cli = cli_of(&["-a", "-l", "-m", "-n", "-w", "72", "-s", "paper", "x.md"]);
         assert!(cli.all && cli.line_numbers && cli.mouse && cli.preserve_new_lines);
         assert_eq!(cli.width, Some(72));
-        assert_eq!(cli.style, "paper");
+        assert_eq!(cli.style.as_deref(), Some("paper"));
         assert_eq!(cli.source.as_deref(), Some("x.md"));
     }
 
     #[test]
-    fn style_defaults_to_auto() {
-        assert_eq!(cli_of(&[]).style, "auto");
+    fn an_unset_style_stays_unset_so_a_config_file_can_decide() {
+        assert_eq!(cli_of(&[]).style, None);
+        assert_eq!(cli_of(&[]).layer().style, None);
+        assert_eq!(
+            cli_of(&["-s", "paper"]).layer().style.as_deref(),
+            Some("paper")
+        );
+    }
+
+    #[test]
+    fn a_switch_that_was_not_given_says_nothing() {
+        // Otherwise `mouse = true` in a config file would be undone by every
+        // invocation that did not pass `-m`.
+        let layer = cli_of(&["x.md"]).layer();
+        assert_eq!(layer.mouse, None);
+        assert_eq!(layer.line_numbers, None);
+        assert_eq!(layer.all, None);
+        assert_eq!(layer.preserve_new_lines, None);
+
+        let layer = cli_of(&["-m", "-l", "-a", "-n", "x.md"]).layer();
+        assert_eq!(layer.mouse, Some(true));
+        assert_eq!(layer.line_numbers, Some(true));
+        assert_eq!(layer.all, Some(true));
+        assert_eq!(layer.preserve_new_lines, Some(true));
     }
 
     #[test]

@@ -13,7 +13,11 @@
 //! let doc = render::render(
 //!     "# Title\n\nSome prose.",
 //!     &Theme::new(ThemeVariant::Slate),
-//!     LayoutOptions { width: 40, code_line_numbers: false },
+//!     LayoutOptions {
+//!         width: 40,
+//!         code_line_numbers: false,
+//!         preserve_new_lines: false,
+//!     },
 //! );
 //! assert_eq!(doc.outline[0].text, "Title");
 //! assert!(doc.lines.iter().all(|l| l.width() == 40));

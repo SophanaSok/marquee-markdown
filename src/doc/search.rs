@@ -269,6 +269,7 @@ mod tests {
             LayoutOptions {
                 width: 40,
                 code_line_numbers: false,
+                preserve_new_lines: false,
             },
         )
     }
@@ -418,6 +419,7 @@ mod tests {
             LayoutOptions {
                 width: 20,
                 code_line_numbers: false,
+                preserve_new_lines: false,
             },
         );
         search.refresh(&narrow, 2, 0);

@@ -39,8 +39,10 @@ pub use state::{App, Options, Overlay, Screen};
 ///
 /// # Errors
 /// Returns an error when the terminal cannot be taken over or drawing fails.
-pub fn run(source: Source, theme: Theme, options: Options) -> Result<()> {
-    take_over(App::new(source, theme, options), options, |_| {})
+pub fn run(source: Source, theme: Theme, options: Options, keymap: keymap::Keymap) -> Result<()> {
+    let mut app = App::new(source, theme, options);
+    app.keymap = keymap;
+    take_over(app, options, |_| {})
 }
 
 /// Open the file browser over `root`.
@@ -50,17 +52,15 @@ pub fn run(source: Source, theme: Theme, options: Options) -> Result<()> {
 ///
 /// # Errors
 /// Returns an error when the terminal cannot be taken over or drawing fails.
-pub fn browse(root: PathBuf, theme: Theme, options: Options) -> Result<()> {
+pub fn browse(root: PathBuf, theme: Theme, options: Options, keymap: keymap::Keymap) -> Result<()> {
     let all = options.all;
-    take_over(
-        App::browsing(root.clone(), theme, options),
-        options,
-        move |sender| {
-            browser::walk::spawn(root, all, move |scan| {
-                sender.send(event::Event::Scan(scan)).is_ok()
-            });
-        },
-    )
+    let mut app = App::browsing(root.clone(), theme, options);
+    app.keymap = keymap;
+    take_over(app, options, move |sender| {
+        browser::walk::spawn(root, all, move |scan| {
+            sender.send(event::Event::Scan(scan)).is_ok()
+        });
+    })
 }
 
 /// Take over the terminal and run `app` until it quits.
@@ -165,6 +165,7 @@ pub fn reconcile(app: &mut App, area: Rect) {
         width: app.panes.content_width,
         // Source files always get line numbers, matching glow.
         code_line_numbers: app.options.line_numbers || app.doc.source.is_code,
+        preserve_new_lines: app.options.preserve_new_lines,
     };
     let theme = app.theme.clone();
     app.view.top = app.doc.ensure_rendered(options, &theme, app.view.top);

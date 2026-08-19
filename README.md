@@ -5,8 +5,8 @@ A terminal markdown reader with the functionality of
 Claude artifacts do — a centered reading column on a painted page, typographic
 headings, sealed code cards — with a table-of-contents panel for navigation.
 
-> **Status: pre-release.** Everything below works today. Still to come: a
-> configuration file with rebindable keys, and packaging — see
+> **Status: pre-release.** Everything below works today. What remains before
+> 1.0 is packaging and a release workflow — see
 > [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## What it looks different from
@@ -56,6 +56,8 @@ marquee-markdown -l doc.md          # line numbers
 
 marquee-markdown -p doc.md          # through your pager
 marquee-markdown themes             # list available themes
+marquee-markdown config             # the settings in force
+marquee-markdown keys               # every key binding
 marquee-markdown man                # man page to stdout
 marquee-markdown completion fish    # shell completions
 ```
@@ -198,6 +200,56 @@ noise.
 
 Fetched documents are capped at 8 MiB and time out after 20 seconds, so a
 mistyped URL cannot leave you with an unresponsive terminal.
+
+## Configuration
+
+Nothing needs configuring, but everything can be. The file lives at
+`~/.config/marquee-markdown/config.toml`; `--config` or `MARQUEE_CONFIG` names
+a different one.
+
+```toml
+[general]
+style = "paper"            # theme name or path to a theme file
+width = 80                 # 0 disables wrapping
+line-numbers = false
+mouse = false
+all = false                # list hidden and ignored files when browsing
+preserve-new-lines = false
+
+[ui]
+contents = true            # start with the contents pane showing
+
+[keys.document]
+"ctrl+n" = "line-down"     # rebind
+"q" = "none"               # or take a key away
+```
+
+Settings resolve in one order, everywhere: **command line, then environment,
+then file, then defaults**. A flag that was not given contributes nothing, so
+`mouse = true` in your config is not undone by every invocation that omits
+`-m`.
+
+Environment variables are the setting name in `MARQUEE_` form, with
+`[general]` left out: `MARQUEE_STYLE`, `MARQUEE_WIDTH`, `MARQUEE_LINE_NUMBERS`,
+`MARQUEE_MOUSE`, `MARQUEE_ALL`, `MARQUEE_PRESERVE_NEW_LINES`, and
+`MARQUEE_UI_CONTENTS`.
+
+A setting this version does not recognize is reported and ignored rather than
+refused, so a file written for a newer version still works with an older
+binary. The same goes for a key or an action it does not know: one typo costs
+one key, not the keymap.
+
+Two commands make all of this inspectable:
+
+```sh
+marquee-markdown config    # the settings in force, as a file that would produce them
+marquee-markdown keys      # every binding, as markdown
+```
+
+`config` output round-trips: save it as your configuration file and you get the
+same settings back. Every action name it prints is listed in
+[docs/KEYBINDINGS.md](docs/KEYBINDINGS.md), which is generated from the
+keymap rather than written by hand.
 
 ## Themes
 
