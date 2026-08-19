@@ -389,6 +389,66 @@ impl Theme {
             .add_modifier(Modifier::BOLD)
     }
 
+    /// The status bar along the bottom of the reader.
+    #[must_use]
+    pub fn status_bar(&self) -> Style {
+        Style::new()
+            .bg(self.palette.surface.color())
+            .fg(self.palette.muted.color())
+    }
+
+    /// The part of the status bar that says where the reader is: the document
+    /// name and the section being read.
+    #[must_use]
+    pub fn status_active(&self) -> Style {
+        Style::new()
+            .bg(self.palette.surface.color())
+            .fg(self.palette.fg.color())
+            .add_modifier(Modifier::BOLD)
+    }
+
+    /// A transient message in the status bar.
+    #[must_use]
+    pub fn status_message(&self) -> Style {
+        Style::new()
+            .bg(self.palette.surface.color())
+            .fg(self.palette.accent.color())
+    }
+
+    /// The frame around an overlay panel such as the key reference.
+    #[must_use]
+    pub fn overlay_border(&self) -> Style {
+        Style::new()
+            .bg(self.palette.surface.color())
+            .fg(self.palette.border.color())
+    }
+
+    /// The interior of an overlay panel.
+    #[must_use]
+    pub fn overlay_body(&self) -> Style {
+        Style::new()
+            .bg(self.palette.surface.color())
+            .fg(self.palette.fg.color())
+    }
+
+    /// A key name inside the key reference.
+    #[must_use]
+    pub fn overlay_key(&self) -> Style {
+        Style::new()
+            .bg(self.palette.surface.color())
+            .fg(self.palette.accent.color())
+            .add_modifier(Modifier::BOLD)
+    }
+
+    /// The title of an overlay panel.
+    #[must_use]
+    pub fn overlay_title(&self) -> Style {
+        Style::new()
+            .bg(self.palette.surface.color())
+            .fg(self.palette.accent.color())
+            .add_modifier(Modifier::BOLD)
+    }
+
     /// Name of the bundled syntect theme paired with this palette.
     #[must_use]
     pub fn syntax_theme_name(&self) -> &str {
@@ -501,6 +561,13 @@ mod tests {
             theme.quote_text(),
             theme.link(),
             theme.table_border(),
+            theme.status_bar(),
+            theme.status_active(),
+            theme.status_message(),
+            theme.overlay_border(),
+            theme.overlay_body(),
+            theme.overlay_key(),
+            theme.overlay_title(),
             theme.table_header(),
             theme.list_marker(),
             theme.search_match(),

@@ -49,6 +49,17 @@ pub fn split_at_col(text: &str, cols: usize) -> (&str, usize, &str) {
     (text, used, "")
 }
 
+/// Split off the first grapheme cluster, returning `(cluster, rest)`.
+///
+/// `None` for an empty string. Used where a single cluster has to be dropped
+/// or replaced wholesale — clipping a line that starts inside a double-width
+/// character, for instance.
+#[must_use]
+pub fn split_first(text: &str) -> Option<(&str, &str)> {
+    let cluster = text.graphemes(true).next()?;
+    Some((cluster, &text[cluster.len()..]))
+}
+
 /// Truncate `text` to at most `cols` cells, appending `ellipsis` when anything
 /// was cut. The result never exceeds `cols` even after the ellipsis is added.
 #[must_use]
@@ -57,6 +68,12 @@ pub fn truncate(text: &str, cols: usize, ellipsis: &str) -> String {
         return text.to_owned();
     }
     let ell_w = width(ellipsis);
+    if ell_w > cols {
+        // No room to say that anything was cut; cutting silently still beats
+        // returning something wider than the caller asked for.
+        let (head, _, _) = split_at_col(text, cols);
+        return head.to_owned();
+    }
     let budget = cols.saturating_sub(ell_w);
     let (head, _, _) = split_at_col(text, budget);
     let mut out = head.to_owned();
@@ -133,5 +150,20 @@ mod tests {
     fn truncate_wide_text_stays_within_budget() {
         let out = truncate("日本語のラベル", 7, "…");
         assert!(width(&out) <= 7, "{out:?} is {} cells", width(&out));
+    }
+
+    #[test]
+    fn split_first_takes_whole_clusters() {
+        assert_eq!(split_first("日本"), Some(("日", "本")));
+        assert_eq!(split_first("e\u{301}x"), Some(("e\u{301}", "x")));
+        assert_eq!(split_first(""), None);
+    }
+
+    #[test]
+    fn truncating_below_the_width_of_the_ellipsis_still_fits() {
+        for cols in 0..3 {
+            let out = truncate("hello", cols, "…");
+            assert!(width(&out) <= cols, "{out:?} exceeds {cols}");
+        }
     }
 }

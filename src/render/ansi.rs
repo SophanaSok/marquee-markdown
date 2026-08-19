@@ -2,7 +2,7 @@
 //!
 //! This is the second consumer of the same layout — the TUI renders into a
 //! ratatui buffer, this writes escape codes. Because layout never saw an
-//! escape byte, column positions recorded in [`LineMeta::links`] are exact,
+//! escape byte, column positions recorded in [`LineMeta::links`](super::doc::LineMeta::links) are exact,
 //! which is what lets us emit real OSC 8 hyperlinks without disturbing the
 //! painted column. (glow counts those escape bytes as display width, which is
 //! why its link-bearing lines come out ragged.)

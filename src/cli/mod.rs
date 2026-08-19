@@ -103,6 +103,11 @@ impl Cli {
 #[must_use]
 pub fn run_mode(cli: &Cli, spec: &crate::source::SourceSpec, stdout_is_tty: bool) -> RunMode {
     use crate::source::SourceSpec;
+    // Nothing full-screen survives a redirect, so `-t` into a file renders
+    // once rather than filling it with cursor movements.
+    if !stdout_is_tty {
+        return RunMode::OneShot;
+    }
     if cli.pager {
         return RunMode::Pager;
     }
@@ -110,7 +115,7 @@ pub fn run_mode(cli: &Cli, spec: &crate::source::SourceSpec, stdout_is_tty: bool
         return RunMode::Tui;
     }
     match spec {
-        SourceSpec::BrowseCwd | SourceSpec::Dir(_) if stdout_is_tty => RunMode::Browser,
+        SourceSpec::BrowseCwd | SourceSpec::Dir(_) => RunMode::Browser,
         _ => RunMode::OneShot,
     }
 }
@@ -179,6 +184,18 @@ mod tests {
         let cli = cli_of(&[]);
         assert_eq!(
             run_mode(&cli, &SourceSpec::BrowseCwd, false),
+            RunMode::OneShot
+        );
+    }
+
+    #[test]
+    fn a_redirect_beats_an_explicit_full_screen_flag() {
+        assert_eq!(
+            run_mode(
+                &cli_of(&["-t", "x.md"]),
+                &SourceSpec::File("x.md".into()),
+                false
+            ),
             RunMode::OneShot
         );
     }

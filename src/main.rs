@@ -3,6 +3,7 @@
 use anyhow::Result;
 use clap::{CommandFactory, Parser};
 
+use marquee_markdown::app;
 use marquee_markdown::cli::{self, Cli, Command, RunMode};
 use marquee_markdown::source::{self, RealFs};
 use marquee_markdown::theme::registry;
@@ -57,8 +58,21 @@ fn run() -> Result<()> {
             oneshot::render_to(&mut out, &source, &theme, settings)?;
             Ok(())
         }
-        RunMode::Pager | RunMode::Tui | RunMode::Browser => {
-            anyhow::bail!("the interactive reader is not built yet; run without -t/-p for now")
+        RunMode::Tui => {
+            let source = source::resolve(&spec)?;
+            app::run(
+                source,
+                theme,
+                app::Options {
+                    width: cli.width,
+                    line_numbers: cli.line_numbers,
+                    mouse: cli.mouse,
+                },
+            )
+        }
+        RunMode::Pager => anyhow::bail!("--pager is not built yet; run without -p for now"),
+        RunMode::Browser => {
+            anyhow::bail!("the file browser is not built yet; name a file to read for now")
         }
     }
 }

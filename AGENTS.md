@@ -56,7 +56,7 @@ Two halves, with a hard boundary between them.
 ### `src/render/` — the engine
 
 Reusable, and **must not reference `app`, `ui`, `browser`, or `doc`**;
-`tests/render_isolation.rs` fails the build if it does. This keeps the renderer
+`tests/layering.rs` fails the build if it does. This keeps the renderer
 extractable into its own crate later.
 
 ```
@@ -84,7 +84,43 @@ source/      classify (pure, behind FsProbe) + resolve (I/O); frontmatter; kind.
 theme/       Palettes, the TOML theme format, and the theme registry.
 util/        Terminal detection, width rules.
 oneshot.rs   Non-interactive render to stdout.
+
+app/         The reader: state, input, and the loop.
+  action.rs    Every action the reader can perform. Input resolves to one of
+               these before reaching any logic.
+  keymap.rs    Chords, modes, and the one table of default bindings.
+  state.rs     App. Mode is DERIVED from what is open, never stored.
+  event.rs     The loop's own Event enum, plus a scripted source for tests.
+  update.rs    The only mutation site.
+  layout.rs    Pure: terminal size + state -> Panes.
+  derived.rs   Recomputed once per iteration: clamping, active section.
+  terminal.rs  RAII alternate-screen guard and the panic hook.
+doc/         Document state, independent of any terminal.
+  cache.rs     The ONLY caller of the layout engine.
+  view.rs      Scroll arithmetic, pure.
+ui/          Draw-only widgets, each taking &App.
 ```
+
+### The reader's loop
+
+```
+RECONCILE  pane geometry -> layout cache -> derived state   (pure, no input)
+DRAW       ui::draw(&App)                                   (no mutation)
+RECEIVE    one event
+UPDATE     update::handle(&mut App, event)                  (the only mutation)
+```
+
+Reconciling *before* drawing rather than during it is what lets the draw path
+take `&App`. Two consequences to preserve:
+
+- **`doc::cache::ensure_rendered` is the only path to a layout.** Scroll
+  position, outline anchors, and (later) search matches are all indices into
+  `RenderedDoc.lines`, and every one is invalidated together by a resize or a
+  theme switch. Remapping them in one place is why resizing keeps the reader's
+  position instead of teleporting them. Do not call `render::layout` elsewhere.
+- **Do not reach for `ListState`/`StatefulWidget`.** They mutate their offset
+  during render, which would require `&mut App` in the draw path and destroy
+  headless testability. Slice rows manually.
 
 ## The two invariants
 
@@ -128,6 +164,23 @@ whose text contains escapes.
 - Assert on the real contract, not a re-implementation of the code under test.
   An early outline test counted `#` characters in the source and disagreed with
   the parser over an edge case that the parser had right.
+- `tests/keyseq.rs` types whole key sequences at a headless reader and asserts
+  on `App::summary()`. Adding a mode without adding a case there is how the
+  "typing `q` in a prompt quits" class of bug gets in.
+- `tests/frame.rs` asserts every cell of a drawn frame carries an explicit
+  background, at sizes down to 1x1. The one exception it skips is the cell a
+  double-width glyph covers — ratatui's frame diff never writes there, because
+  the glyph to its left already does.
 - Some bugs are only reachable by running the binary: piped-stdin detection and
   broken-pipe handling were both invisible to the test suite. Run the binary
   after changing anything at the OS boundary.
+
+  For the full-screen reader that means a pty, which `script` provides:
+
+  ```sh
+  printf 'jjq' | script -qec "stty rows 24 cols 80; \
+      ./target/debug/marquee-markdown -t README.md" /dev/null
+  ```
+
+  Remember that `q` closes an open overlay rather than quitting, so a script
+  ending in `?q` will hang waiting for input rather than exiting.

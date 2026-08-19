@@ -1,7 +1,7 @@
 //! The layout driver: block tree + theme + width → rendered lines.
 //!
 //! Each block type has its own emitter module; all of them go through the
-//! shared [`Context`], which carries the sink, the theme, and the accumulated
+//! shared `Context`, which carries the sink, the theme, and the accumulated
 //! indent from enclosing containers (quotes, list items).
 
 mod code;
@@ -20,7 +20,7 @@ use super::sink::LineSink;
 use crate::theme::Theme;
 
 /// Options for one layout run.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct LayoutOptions {
     /// Content column width in cells.
     pub width: u16,

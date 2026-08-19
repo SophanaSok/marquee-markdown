@@ -2,7 +2,7 @@
 //!
 //! This module tree is the reusable core of the crate and stays free of any
 //! dependency on the application shell (`app`, `ui`, `browser`, `doc`) — the
-//! test in `tests/render_isolation.rs` enforces that.
+//! test in `tests/layering.rs` enforces that.
 //!
 //! # Example
 //!
@@ -28,6 +28,7 @@ pub mod layout;
 pub mod measure;
 pub mod parse;
 pub mod sink;
+pub mod tui;
 pub mod wrap;
 
 pub use doc::{Anchor, LineKind, LineMeta, RenderedDoc};

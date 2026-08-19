@@ -8,9 +8,12 @@
 
 #![forbid(unsafe_code)]
 
+pub mod app;
 pub mod cli;
+pub mod doc;
 pub mod oneshot;
 pub mod render;
 pub mod source;
 pub mod theme;
+pub mod ui;
 pub mod util;

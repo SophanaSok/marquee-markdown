@@ -13,10 +13,10 @@ scroll-tracking table-of-contents sidebar and in-document search.
 
 | Phase | Contents | Effort | State |
 | --- | --- | --- | --- |
-| **P0** Skeleton | Manifest with crates.io + deb/rpm metadata, lib/bin split, clippy config, pure-Rust syntect backend, render-isolation test | 2 | **Done** (CI and contributor docs still open) |
+| **P0** Skeleton | Manifest with crates.io + deb/rpm metadata, lib/bin split, clippy config, pure-Rust syntect backend, layering test | 2 | **Done** (CI and contributor docs still open) |
 | **P1** One-shot render + theming | Source classification, frontmatter, code-file wrapping, ANSI output, `-l -n -w -s`, theme loader, `themes`/`man`/`completion` | 3 | **Done** except `-n` |
-| **P2** Document reader | Terminal guard + panic hook, event loop, view/anchor/render cache, pager keys via `Action`, status bar, keymap-rendered help, `-t` | 3 | Next |
-| **P3** TOC + search | Outline tree, active-section derivation, focus model, filter/collapse/auto-hide, `/` `n` `N` | 3 | |
+| **P2** Document reader | Terminal guard + panic hook, event loop, view/anchor/render cache, pager keys via `Action`, status bar, keymap-rendered help, `-t` | 3 | **Done** (resize debounce open) |
+| **P3** TOC + search | Outline tree, active-section derivation, focus model, filter/collapse/auto-hide, `/` `n` `N` | 3 | Next |
 | **P4** Browser | Streaming gitignore-aware walk, paging, fuzzy filter with Unicode normalization, humanized modtimes, `-a` | 3 | |
 | **P5** Remote sources | `Fetcher` trait, http(s), `github://`/`gitlab://`, bare-host README API | 2 | |
 | **P6** Parity polish | Live reload, `e` at scroll line, `c` copy, `-p` pager, `-m` mouse, `ctrl+z`, link following, `y`, theme cycling | 2 | |
@@ -29,32 +29,88 @@ scroll-tracking table-of-contents sidebar and in-document search.
 sources: files, directory READMEs, stdin, and syntax-highlighted source files.
 Themes load from TOML. Output degrades correctly when redirected.
 
-176 tests; `cargo clippy --all-targets -- -D warnings` clean.
+`marquee-markdown -t file.md` is a working pager: every glow pager key, a
+status bar, a key reference rendered from the live keymap, light/dark switching,
+and a resize that keeps your place instead of teleporting you.
 
-## Immediate next steps (P2)
+269 tests; `cargo clippy --all-targets -- -D warnings` and `cargo doc --no-deps`
+clean.
 
-1. `app/terminal.rs` — RAII alternate-screen/raw-mode guard with a panic hook
-   that restores the terminal, so a panic never leaves a wedged shell.
-2. `app/action.rs` — the `Action` enum first. **Route input through it from the
-   very first commit**, even while the keymap is a hardcoded table; pattern
-   matching raw `KeyCode` in `update` makes P7 a rewrite instead of a data swap.
-3. `app/state.rs` — `App`, `Screen`, `Focus`, with `InputMode` *derived* rather
-   than stored, so focus and keymap cannot disagree.
-4. `app/event.rs` + `app/update.rs` — one mpsc of events; `update` is the only
-   mutation site.
-5. `doc/cache.rs` — the single re-render funnel (see the risk note below).
-6. `ui/` — draw-only widgets taking `&App`.
-7. Help overlay rendered **from the live keymap**, never a string literal.
+## Immediate next steps (P3)
+
+The sidebar is the reason the project exists, and it is where the risks below
+stop being theoretical.
+
+1. `doc/outline.rs` — the flat `Vec<Anchor>` the renderer already produces,
+   folded into a tree with skipped levels handled (`#` straight to `###` is
+   common and must not produce an orphan).
+2. `app/state.rs` — add `Focus`, and keep `Mode` **derived** from it the way it
+   is derived from the overlay today. Adding a stored mode alongside is how the
+   two start disagreeing.
+3. `keymap.rs` — a `Mode::Toc` block. Per the collision table: `h`/`l` collapse
+   and expand there, `/` filters, and neither steals what those keys do in the
+   document.
+4. `app/layout.rs` — the sidebar pane, with auto-hide below a width threshold.
+   `Panes` already exists to be extended; a hidden sidebar must be `None`, not
+   a zero-width rectangle, so widgets cannot draw into nothing.
+5. `ui/toc.rs` — **slice rows manually.** `ListState` mutates its offset during
+   render and would take `&mut App` into the draw path, which is the one thing
+   the architecture does not allow.
+6. `doc/search.rs` — scan `RenderedDoc::plain` once, convert byte matches to
+   `(line, column range)`, and highlight at draw time through an overlay
+   primitive. Do not re-lay out to search.
+7. `/` `n` `N` through `Action`, and a prompt mode that **captures all
+   printable input** — a `q` typed into a filter must not quit.
+
+Two things to watch, both recorded here because they are cheap now and
+expensive later: the TOC cursor (user-moved) and the active section
+(scroll-derived) are separate pieces of state and must stay that way, and
+search matches are line indices, so they belong in the `ensure_rendered`
+remapping alongside the scroll anchor.
+
+## What P2 built, and why it is shaped that way
+
+- `app/terminal.rs` — an RAII alternate-screen/raw-mode guard, plus a panic
+  hook that restores the terminal *before* the message is printed. Without the
+  hook the message lands on the alternate screen and disappears with it.
+- `app/action.rs` — `Action` came first, and input is routed through it. No
+  code anywhere matches on a `KeyCode` except the keymap, which is what makes
+  P7 a data swap. A test forces a new variant to be added to `Action::ALL`, so
+  it cannot be unbindable and invisible in the help overlay.
+- `app/keymap.rs` — the single table of default bindings. Duplicate chords in a
+  mode are an error rather than a silent overwrite, because the loser would
+  still appear in the help overlay.
+- `app/state.rs` — `Mode` is *derived* from what is open, never stored. The
+  "closed prompt still swallows keys" bug is unreachable rather than fixed.
+- `app/event.rs` — the loop consumes its own `Event` enum, so a headless test
+  feeds exactly what a terminal would, and later producers (file watcher,
+  directory walk) plug in without touching the update logic.
+- `app/update.rs` — the only mutation site.
+- `app/mod.rs` — `reconcile` before `draw`: pane geometry, then the layout
+  cache, then derived state.
+- `doc/cache.rs` — the single re-render funnel.
+- `render/tui.rs` — the buffer serializer, paired with `render/ansi.rs`. One
+  layout engine, two destinations.
+- `ui/` — draw-only widgets taking `&App`.
+
+Tests worth knowing about before changing any of it:
+
+- `tests/keyseq.rs` drives whole key sequences headlessly and asserts on a
+  one-line state summary. This is the cheapest coverage in the project for
+  modal bugs, and the place to add a case when a mode is added.
+- `tests/frame.rs` draws at seven terminal sizes down to 1×1 and asserts every
+  cell carries an explicit background — the painted page has no other
+  mechanical guard.
+- `tests/docs.rs` fails if a bound key is missing from the README table.
 
 ## Sequencing constraints
 
 These exist to avoid rewrites, and each one has already been paid for once in
 the design:
 
-- **P2 must use the `Action` enum from day one.** Otherwise P7 rewrites the
-  event loop.
-- **The help overlay must be a keymap renderer**, not a literal, for the same
-  reason.
+- **Input goes through the `Action` enum** and the help overlay is a keymap
+  renderer, both since P2. Undoing either turns P7 into a rewrite of the event
+  loop.
 - **`classify` already takes `FsProbe`** so P5 does not have to retrofit a seam
   under tests that already exist. Add `Fetcher` the same way.
 - **The theme loader is the only path to a `Theme`**, including built-ins, so
@@ -74,19 +130,23 @@ the design:
    every one is invalidated by a resize, theme switch, reload, or `-w` change.
    Uncoordinated invalidation is what makes a table of contents feel broken —
    the highlight drifts a section off, `n` jumps to the wrong line, the view
-   leaps on resize. **Mitigation for P2/P3:** a single `doc::cache::ensure_rendered()`
-   funnel that snapshots a scroll anchor (from `LineMeta.source` byte offsets,
-   already recorded), re-renders, remaps everything, and bumps a revision
-   counter. Nothing else may assign to `lines`. Add a resize debounce (~80 ms)
-   or dragging a window edge will re-render a large document on every event.
+   leaps on resize. **In place since P2:** `doc::cache::ensure_rendered()` is the
+   only caller of the layout engine. It snapshots a scroll anchor from the
+   `LineMeta.source` byte offsets, re-lays out, remaps the position, and bumps
+   a revision counter. Nothing else may assign to `lines`, and P3's search
+   matches must join the remapping rather than being remapped separately.
+   **Still open:** a resize debounce (~80 ms), or dragging a window edge
+   re-renders a large document on every event.
 
 3. **Purity vs. layout-dependent state.** Half-page scroll, TOC auto-scroll,
    clamping, and TOC auto-hide all need pane dimensions that naturally only
    exist inside `draw`, and ratatui's `StatefulWidget`/`ListState` is *designed*
    to mutate offsets during render. Taking `&mut App` in draw destroys headless
-   testability. **Mitigation:** a pure `layout::compute(term_size, &App) -> Panes`
-   called in a reconcile step before draw; `ui::draw(&mut Frame, &App)` with no
-   `&mut` available; slice rows manually instead of using `ListState`.
+   testability. **In place since P2:** `app::reconcile` computes
+   `layout::compute(area, &App) -> Panes` and the derived state before drawing,
+   and `ui::draw(&mut Frame, &App)` has no `&mut` to abuse. The remaining half
+   of the mitigation is P3's: slice TOC rows manually instead of reaching for
+   `ListState`.
 
 4. **Syntax theme clash.** Syntect themes carry their own background and
    foreground, which fight the palette. `highlight.rs` already forces the

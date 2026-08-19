@@ -5,9 +5,10 @@ A terminal markdown reader with the functionality of
 Claude artifacts do — a centered reading column on a painted page, typographic
 headings, sealed code cards — with a table-of-contents panel for navigation.
 
-> **Status: pre-release.** The rendering engine and the non-interactive reader
-> work today. The full-screen reader and its table-of-contents sidebar are not
-> built yet; see [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status: pre-release.** The rendering engine, the non-interactive reader, and
+> the full-screen reader (`-t`) work today. The table-of-contents sidebar,
+> in-document search, and the file browser are not built yet; see
+> [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## What it looks different from
 
@@ -23,7 +24,8 @@ Rendering the same document through glow 3.0.0 shows what this fixes:
 | Long code lines wrap *out* of the block | they stay sealed inside the card |
 | OSC 8 escapes counted as width, leaving ragged lines | escapes cannot reach width math |
 | 2-space margin | a centered reading column, page painted edge to edge |
-| No outline, no in-document search | both (once the reader lands) |
+| No outline, no in-document search | both (sidebar and search still to land) |
+| Keys hardcoded, cannot be rebound | every key resolves through a rebindable action table |
 
 ## Install
 
@@ -43,6 +45,7 @@ marquee-markdown -                  # read standard input
 cat notes.md | marquee-markdown     # same
 marquee-markdown src/main.rs        # source files render as highlighted code
 
+marquee-markdown -t doc.md          # full-screen reader
 marquee-markdown -w 80 doc.md       # fixed width (0 disables wrapping)
 marquee-markdown -s paper doc.md    # light theme
 marquee-markdown -l doc.md          # line numbers
@@ -55,6 +58,30 @@ marquee-markdown completion fish    # shell completions
 Output degrades on its own: piping or redirecting drops color, gutters, and
 hyperlinks, so `marquee-markdown doc.md > out.txt` contains just the text.
 `NO_COLOR` is honored.
+
+## Reading
+
+`-t` opens the full-screen reader. Keys follow glow, so muscle memory carries
+over; `?` shows the list, rendered from the keymap that is actually in force
+rather than from a fixed page, so it stays honest once keys become rebindable.
+
+Keys are written here the way a configuration file will spell them.
+
+| Key | |
+| --- | --- |
+| `j` `k` · `down` `up` | line down, line up |
+| `d` `u` · `ctrl+d` `ctrl+u` | half page down, half page up |
+| `f` `b` · `space` `pgdn` `pgup` | page down, page up |
+| `g` `G` · `home` `end` | top, bottom |
+| `h` `l` · `left` `right` | scroll sideways (only with `-w 0`) |
+| `T` | switch light / dark |
+| `?` | key reference |
+| `esc` | close what is open |
+| `q` · `ctrl+c` | quit |
+
+Resizing the terminal or switching theme re-lays out the document and keeps
+your place: the position is carried by source offset, not by line number, so a
+narrower column does not teleport you.
 
 ## Themes
 

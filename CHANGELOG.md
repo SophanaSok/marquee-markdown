@@ -8,8 +8,9 @@ Until 1.0 the `render` module's public API may change within minor versions.
 
 ## [Unreleased]
 
-Pre-release. The rendering engine and the non-interactive reader are complete;
-the full-screen reader is not built yet.
+Pre-release. The rendering engine, the non-interactive reader, and the
+full-screen reader are complete; the table-of-contents sidebar, in-document
+search, and the file browser are not built yet.
 
 ### Added
 
@@ -50,6 +51,21 @@ the full-screen reader is not built yet.
 - ANSI output with real OSC 8 hyperlinks; color and gutters degrade
   automatically when the destination is not a terminal.
 
+#### Full-screen reader (`-t`)
+
+- Alternate-screen reader with a scroll-tracking status bar showing the
+  document, the section being read, and progress.
+- Every glow pager key, kept pointing at what it points at in glow: `j`/`k`,
+  `d`/`u`, `f`/`b`, `g`/`G`, `space`, the arrow and page keys, `q`.
+- `T` switches between the light and dark palette; `?` opens a key reference;
+  `esc` closes what is open rather than quitting.
+- Horizontal scrolling with `h`/`l`, which is what makes `-w 0` usable.
+- Resizing or switching theme re-lays out and keeps the reading position,
+  carried by source byte offset rather than by line number.
+- Mouse wheel scrolling under `-m`.
+- `-t` into a pipe or a file renders once instead of writing cursor movements
+  into it.
+
 #### Theming
 
 - Two Claude palettes, `paper` (light) and `slate` (dark), compiled in as
@@ -75,10 +91,14 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
 
 ### Known gaps
 
-- The full-screen reader is not built: `-t`, `-p`, and bare invocation exit
-  with a clear message rather than doing something unexpected.
+- The table-of-contents sidebar and in-document search are not built yet, so
+  the reader currently has no navigation beyond scrolling.
+- `-p` and bare invocation (the file browser) exit with a clear message rather
+  than doing something unexpected.
 - URL and forge (`github.com/owner/repo`) sources report that they are not
   implemented yet.
 - `--config` is parsed but no configuration file is read yet.
 - `-n` (`--preserve-new-lines`) is parsed but not yet honored.
-- `-a` and `-m` only affect the browser and reader, which do not exist yet.
+- `-a` affects the browser, which does not exist yet.
+- Resizing re-lays out on every event; a large document dragged by a window
+  edge will work harder than it needs to until a debounce lands.
