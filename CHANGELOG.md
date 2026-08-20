@@ -27,10 +27,13 @@ Until 1.0 both halves may change.
 
 ### Changed
 
-- The configuration structs (`config::{Config, Layer, File}` and the sections
-  inside them) gained a field, which is a breaking change for anything that
-  built one with an exhaustive struct literal — `cargo semver-checks` is what
-  says so, and the reason this release is a minor bump rather than a patch.
+- The configuration structs — `config::{Config, Layer, File}` and the sections
+  inside them — are `#[non_exhaustive]`, and gained a field in the same
+  release. Both are breaking for anything that built one with an exhaustive
+  struct literal, which is why this is a minor bump rather than a patch, and
+  it is the last time: outside this crate they are now built from `Default`
+  and assigned to, so the next setting costs nobody a release. Reading and
+  writing their fields is unchanged.
 - Releases publish to crates.io from the release workflow itself, through
   crates.io trusted publishing, so the GitHub tag and the published crate —
   including the README — always come from the same commit. The workflow now

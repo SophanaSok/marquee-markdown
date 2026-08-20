@@ -11,8 +11,15 @@ use std::collections::BTreeMap;
 
 /// A parsed configuration file. Every field is optional: what is absent falls
 /// through to the layer below.
+///
+/// Adding a setting is routine here, and adding a public field to a struct
+/// anyone can write as a literal is a breaking change — which made every
+/// new setting cost a release. `non_exhaustive` buys that back: outside
+/// this crate these are built from [`Default`] and then assigned to, so a
+/// field arriving later is not an API break.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[serde(default)]
+#[non_exhaustive]
 pub struct File {
     /// Settings that also have a command-line flag.
     pub general: General,
@@ -25,6 +32,7 @@ pub struct File {
 /// `[general]`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[serde(default, rename_all = "kebab-case")]
+#[non_exhaustive]
 pub struct General {
     /// Theme name or path, as `--style` takes.
     pub style: Option<String>,
@@ -45,6 +53,7 @@ pub struct General {
 /// `[ui]`.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[serde(default, rename_all = "kebab-case")]
+#[non_exhaustive]
 pub struct Ui {
     /// Start with the contents pane showing.
     pub contents: Option<bool>,
