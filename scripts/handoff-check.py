@@ -100,9 +100,16 @@ def main() -> int:
         child = os.fork()
         if child == 0:
             os.setsid()
-            # Claim the pty as the controlling terminal, so that the editor
-            # this launches can open /dev/tty the way a real one does.
-            fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
+            # Claim the pty as the controlling terminal, so the editor this
+            # launches sees what a real one would and can open /dev/tty.
+            # Best-effort: not every platform exposes the call from Python,
+            # and the stub reads standard input, which is the descriptor
+            # actually being contested.
+            if hasattr(termios, "TIOCSCTTY"):
+                try:
+                    fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
+                except OSError:
+                    pass
             for fd in (0, 1, 2):
                 os.dup2(slave, fd)
             os.close(master)

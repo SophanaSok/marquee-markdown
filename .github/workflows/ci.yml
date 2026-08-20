@@ -142,6 +142,33 @@ jobs:
           # The effective configuration round-trips as a configuration file.
           "$BIN" --config "$OUT"/config.toml config > /dev/null
 
+  handoff:
+    # The smoke job above covers what can be checked without a terminal. This
+    # is the other half, and it exists because the bug it protects against was
+    # invisible to five hundred passing tests: the reader thread went on
+    # reading standard input while an editor owned the terminal, so the two
+    # processes split the keystrokes between them and the editor lost words.
+    # Reproducing it needs two processes and a real pty, which is what the
+    # script builds. Both Unixes, because terminal handling is where they
+    # differ; Windows has no pty to hand over and no `$EDITOR` convention.
+    name: Terminal handoff
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.os }}
+      - run: cargo build --locked
+      # Debug rather than release: the script drives the binary through a
+      # terminal, and the thing being timed is a handshake between threads,
+      # not throughput.
+      - run: python3 scripts/handoff-check.py target/debug/marquee-markdown
+
   msrv:
     name: MSRV
     runs-on: ubuntu-latest
