@@ -103,18 +103,7 @@ impl TreeBuilder {
     fn event(&mut self, event: Event<'_>, span: Range<usize>) {
         // Tight lists (and other tight containers) deliver inline content with
         // no wrapping Paragraph tag; open a synthetic one so text is never lost.
-        if self.inline_stack.is_empty()
-            && matches!(
-                event,
-                Event::Text(_)
-                    | Event::Code(_)
-                    | Event::SoftBreak
-                    | Event::HardBreak
-                    | Event::FootnoteReference(_)
-                    | Event::InlineMath(_)
-                    | Event::DisplayMath(_)
-            )
-        {
+        if self.inline_stack.is_empty() && opens_inline_content(&event) {
             self.open_leaf(LeafKind::Paragraph, span.clone());
         }
         match event {
@@ -482,6 +471,14 @@ impl TreeBuilder {
     }
 
     fn push_inline(&mut self, inline: Inline) {
+        // Content pushed with no frame open is content thrown away, and it
+        // goes silently: that is how `- **Bold.** Rest.` lost its lead-in for
+        // three releases. Assert it here rather than trusting every caller,
+        // the way `LineSink` asserts the width invariant.
+        debug_assert!(
+            !self.inline_stack.is_empty(),
+            "inline content with nowhere to go: {inline:?}"
+        );
         if let Some(frame) = self.inline_stack.last_mut() {
             frame.content.push(inline);
         }
@@ -549,6 +546,35 @@ impl TreeBuilder {
         }
         self.root
     }
+}
+
+/// Whether this event begins inline content, and so needs somewhere to put it.
+///
+/// A tight list item delivers its content with no wrapping `Paragraph` tag, so
+/// the first such event has to open one. The emphasis and link *starts* belong
+/// here as much as text does: `- **Bold.** Rest.` opens a `Strong` frame
+/// before any text arrives, and with no root frame beneath it the finished
+/// `Strong` had nowhere to be pushed and was dropped on the floor — silently,
+/// because `push_inline` does nothing when the stack is empty.
+fn opens_inline_content(event: &Event<'_>) -> bool {
+    matches!(
+        event,
+        Event::Text(_)
+            | Event::Code(_)
+            | Event::SoftBreak
+            | Event::HardBreak
+            | Event::FootnoteReference(_)
+            | Event::InlineMath(_)
+            | Event::DisplayMath(_)
+            | Event::InlineHtml(_)
+            | Event::Start(
+                Tag::Emphasis
+                    | Tag::Strong
+                    | Tag::Strikethrough
+                    | Tag::Link { .. }
+                    | Tag::Image { .. }
+            )
+    )
 }
 
 fn heading_level(level: HeadingLevel) -> u8 {
@@ -656,6 +682,54 @@ mod tests {
         };
         assert_eq!(items[0].task, Some(false));
         assert_eq!(items[1].task, Some(true));
+    }
+
+    #[test]
+    fn a_tight_list_item_keeps_content_that_starts_with_formatting() {
+        // `- **Bold.** Rest.` rendered as `• Rest.` — the lead-in vanished.
+        // A tight item has no wrapping paragraph, and the synthetic one was
+        // opened only for text-shaped events, so an emphasis *start* arriving
+        // first pushed a frame with no root under it. The finished `Strong`
+        // then had nowhere to go and was dropped without a word.
+        for (source, want) in [
+            ("- **Bold lead.** Rest.\n", "Bold lead. Rest."),
+            ("- *Em lead.* Rest.\n", "Em lead. Rest."),
+            ("- ~~Struck lead.~~ Rest.\n", "Struck lead. Rest."),
+            ("- [Link lead](http://x) rest.\n", "Link lead rest."),
+            ("- ![Image lead](i.png) rest.\n", "Image lead rest."),
+            // Inline HTML is literal text here; what it means is a separate
+            // question. Without this it opened a *block* mid-item instead.
+            ("- <b>HTML lead.</b> Rest.\n", "<b>HTML lead.</b> Rest."),
+            ("1. **Ordered bold.** Rest.\n", "Ordered bold. Rest."),
+            ("- **Only bold.**\n", "Only bold."),
+        ] {
+            let blocks = parse(source);
+            let BlockKind::List { items, .. } = &blocks[0].kind else {
+                panic!("a list, got {:?} from {source:?}", blocks[0].kind);
+            };
+            let BlockKind::Paragraph(content) = &items[0].children[0].kind else {
+                panic!(
+                    "a paragraph, got {:?} from {source:?}",
+                    items[0].children[0].kind
+                );
+            };
+            assert_eq!(Inline::plain_text(content), want, "from {source:?}");
+        }
+    }
+
+    #[test]
+    fn a_formatted_lead_in_keeps_its_styling_not_just_its_text() {
+        let blocks = parse("- **Bold lead.** Rest.\n");
+        let BlockKind::List { items, .. } = &blocks[0].kind else {
+            panic!("a list");
+        };
+        let BlockKind::Paragraph(content) = &items[0].children[0].kind else {
+            panic!("a paragraph");
+        };
+        assert!(
+            matches!(content.first(), Some(Inline::Strong(_))),
+            "the lead-in lost its weight: {content:#?}"
+        );
     }
 
     #[test]

@@ -28,6 +28,17 @@ Until 1.0 both halves may change.
 
 ### Fixed
 
+- **A list item no longer loses content that starts with formatting.**
+  `- **Bold.** Rest.` rendered as `• Rest.` — the lead-in was gone, and seven
+  bullets in this project's own README were missing theirs. A tight list item
+  arrives with no wrapping paragraph, so the parser opens a synthetic one on
+  the first inline event; the trigger listed the text-shaped events but not
+  the emphasis and link *starts*, so `**` opened a frame with no root beneath
+  it and the finished `Strong` was pushed into an empty stack and discarded.
+  Emphasis, links, images, inline code and inline HTML in the lead position
+  are all fixed, in list items, task items, and nested containers alike.
+  `push_inline` now asserts it has somewhere to put content, so the next
+  version of this loses loudly instead of silently.
 - **An overlong word inside an inline-code chip no longer overflows the
   column by one cell.** The chip's opening pad is glued to its content, so
   breaking before the content carried the pad onto the new line — and pad

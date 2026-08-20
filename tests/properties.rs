@@ -73,7 +73,7 @@ prop_compose! {
 
 /// One markdown block built around adversarial text, optionally nested.
 fn block() -> impl Strategy<Value = String> {
-    (0usize..10, nasty_text(6), 0usize..4).prop_map(|(kind, text, depth)| {
+    (0usize..12, nasty_text(6), 0usize..4).prop_map(|(kind, text, depth)| {
         let text = nest(&text, depth);
         match kind {
             0 => format!("# {text}"),
@@ -88,6 +88,11 @@ fn block() -> impl Strategy<Value = String> {
             // Inline code: the chip pads glue to their content, which is the
             // one construct that can carry an anchor across a line break.
             9 => format!("a `{text}` and `{text}`"),
+            // Container content that *starts* with formatting. A tight item
+            // has no wrapping paragraph, so the emphasis start is the first
+            // event to arrive and has to open one itself.
+            10 => format!("- **{text}** rest\n- *{text}* rest\n- [{text}](x) rest"),
+            11 => format!("- [ ] **{text}** rest\n\n> **{text}** rest"),
             _ => text,
         }
     })
@@ -118,6 +123,35 @@ fn render_at(text: &str, width: u16, numbers: bool, preserve: bool) -> RenderedD
 
 proptest! {
     #![proptest_config(ProptestConfig { cases: 96, ..ProptestConfig::default() })]
+
+    /// A list item never loses content that starts with formatting.
+    ///
+    /// `- **Bold.** Rest.` rendered as `• Rest.`: emphasis opened a frame with
+    /// no root beneath it, and the finished `Strong` was pushed into an empty
+    /// stack and dropped. Nothing failed — the words were simply gone.
+    #[test]
+    fn a_formatted_lead_in_survives_into_the_page(text in nasty_text(3)) {
+        let plain = text.replace(['*', '`', '~'], "");
+        let source = format!("- **{plain}** tail-word\n");
+        let doc = render_at(&source, 120, false, false);
+        let page = doc
+            .lines
+            .iter()
+            .map(|l| l.spans.iter().map(|s| s.content.as_ref()).collect::<String>())
+            .collect::<Vec<_>>()
+            .join(" ");
+        prop_assert!(
+            page.contains("tail-word"),
+            "the tail vanished from {source:?}: {page:?}"
+        );
+        // The lead-in is the half that used to disappear.
+        for word in plain.split_whitespace().filter(|w| w.len() > 3) {
+            prop_assert!(
+                page.contains(word),
+                "lead-in word {word:?} vanished from {source:?}: {page:?}"
+            );
+        }
+    }
 
     /// The invariant everything else is built on: every emitted line is
     /// exactly the content width. `LineSink` asserts this in debug builds, so
