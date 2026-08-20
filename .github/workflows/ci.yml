@@ -153,6 +153,9 @@ jobs:
     # differ; Windows has no pty to hand over and no `$EDITOR` convention.
     name: Terminal handoff
     runs-on: ${{ matrix.os }}
+    # The script has its own watchdog; this is the belt to that pair of braces.
+    # A job that hangs holds a runner until the six-hour default gives up.
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import fcntl
 import os
+import signal
 import pty
 import select
 import struct
@@ -37,7 +38,7 @@ READY = "EDITOR-READY"
 SENTINEL = "\x04"
 
 STUB_EDITOR = r"""#!/usr/bin/env python3
-import os, sys, termios, tty
+import os, select, sys, termios, time, tty
 log = os.environ["HANDOFF_LOG"]
 # Standard input, which is the descriptor the reader and this program are
 # being asked not to fight over.
@@ -47,7 +48,13 @@ tty.setraw(tty_fd)
 try:
     os.write(tty_fd, b"EDITOR-READY")
     seen = b""
-    while not seen.endswith(b"\x04"):
+    # Bounded, and not merely as a courtesy: nothing reaps this process, so a
+    # sentinel that never arrives would leave it holding the terminal for as
+    # long as the machine stays up.
+    deadline = time.time() + 30
+    while not seen.endswith(b"\x04") and time.time() < deadline:
+        if not select.select([tty_fd], [], [], 0.5)[0]:
+            continue
         chunk = os.read(tty_fd, 1)
         if not chunk:
             break
@@ -58,6 +65,26 @@ with open(log, "wb") as handle:
     handle.write(seen)
 sys.exit(0)
 """
+
+
+def run_reader(slave, master, binary, document, editor, log):
+    """Become the reader, in the child half of the fork. Never returns."""
+    os.setsid()
+    # Claim the pty as the controlling terminal, so the editor this launches
+    # sees what a real one would and can open /dev/tty. Best-effort: not
+    # every platform exposes the call from Python, and the stub reads standard
+    # input, which is the descriptor actually being contested.
+    if hasattr(termios, "TIOCSCTTY"):
+        try:
+            fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
+        except OSError:
+            pass
+    for fd in (0, 1, 2):
+        os.dup2(slave, fd)
+    os.close(master)
+    os.close(slave)
+    os.environ.update(TERM="xterm-256color", EDITOR=editor, HANDOFF_LOG=log, NO_COLOR="1")
+    os.execv(binary, [binary, "-t", document])
 
 
 def read_until(master: int, needle: bytes, timeout: float) -> bytes:
@@ -76,7 +103,31 @@ def read_until(master: int, needle: bytes, timeout: float) -> bytes:
     return seen
 
 
+# Nothing here should take more than a few seconds, and this runs unattended
+# in CI. A check that hangs is worse than one that fails: it holds a machine
+# until something else gives up on it.
+WATCHDOG = 120
+
+
+# Where the check had got to, for the watchdog to name. It runs unattended on
+# machines nobody is watching, so a timeout has to say more than that one
+# happened.
+STAGE = "starting up"
+
+
+def at(stage: str) -> None:
+    global STAGE
+    STAGE = stage
+
+
+def watchdog(_signum, _frame):
+    raise SystemExit(f"timed out after {WATCHDOG}s while {STAGE}")
+
+
 def main() -> int:
+    if hasattr(signal, "SIGALRM"):
+        signal.signal(signal.SIGALRM, watchdog)
+        signal.alarm(WATCHDOG)
     binary = sys.argv[1] if len(sys.argv) > 1 else "target/debug/marquee-markdown"
     if not os.path.exists(binary):
         print(f"no binary at {binary}; run `cargo build` first", file=sys.stderr)
@@ -99,31 +150,23 @@ def main() -> int:
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 80, 0, 0))
         child = os.fork()
         if child == 0:
-            os.setsid()
-            # Claim the pty as the controlling terminal, so the editor this
-            # launches sees what a real one would and can open /dev/tty.
-            # Best-effort: not every platform exposes the call from Python,
-            # and the stub reads standard input, which is the descriptor
-            # actually being contested.
-            if hasattr(termios, "TIOCSCTTY"):
-                try:
-                    fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
-                except OSError:
-                    pass
-            for fd in (0, 1, 2):
-                os.dup2(slave, fd)
-            os.close(master)
-            os.close(slave)
-            os.environ.update(
-                TERM="xterm-256color", EDITOR=editor, HANDOFF_LOG=log, NO_COLOR="1"
-            )
-            os.execv(binary, [binary, "-t", document])
+            # Everything from here to `execv` runs in the child, and nothing
+            # in it may return: a fork that falls back into the caller's code
+            # leaves two processes running this script, the second one holding
+            # a stdout that whoever ran us is still waiting on.
+            try:
+                run_reader(slave, master, binary, document, editor, log)
+            except BaseException:
+                os._exit(127)
+            os._exit(127)
         os.close(slave)
 
         try:
             # Let the reader draw its first frame, then ask it to edit.
+            at("waiting for the reader to draw its first frame")
             read_until(master, b"Title", 5.0)
             os.write(master, b"e")
+            at("waiting for the editor to start")
             seen = read_until(master, READY.encode(), 5.0)
             if READY.encode() not in seen:
                 print("FAIL: the editor never started", file=sys.stderr)
@@ -132,11 +175,13 @@ def main() -> int:
                 return 1
 
             # Type into the editor exactly as a person would.
+            at("typing into the editor")
             for char in TYPED:
                 os.write(master, char.encode())
                 time.sleep(0.012)
             os.write(master, SENTINEL.encode())
 
+            at("waiting for the editor to record what it was sent")
             deadline = time.time() + 5.0
             while time.time() < deadline and not os.path.exists(log):
                 time.sleep(0.02)
@@ -167,6 +212,7 @@ def main() -> int:
             print(f"ok: the editor received {got!r} and the reader stayed out of it")
             return 0
         finally:
+            at("cleaning up")
             try:
                 os.kill(child, 9)
                 os.waitpid(child, 0)
