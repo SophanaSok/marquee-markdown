@@ -33,10 +33,16 @@ cargo run --example preview -- tests/fixtures/kitchen-sink.md 80 slate
 ```sh
 cargo test
 cargo test --lib            # unit tests only, fast
+
+cargo build && python3 scripts/handoff-check.py   # needs a pty, not a tty
 ```
 
 Unit tests live inline in each module under `#[cfg(test)] mod tests`.
-Cross-cutting invariants live in `tests/`.
+Cross-cutting invariants live in `tests/`. What needs two processes and a real
+terminal lives in `scripts/`, because `cargo test` cannot express it: the
+handoff check runs the binary under a pty with a stub `$EDITOR` that records
+what it was sent. CI runs it on Linux; it is not part of `cargo test`, so run it
+by hand when touching the terminal, and expect to have to.
 
 **`cargo test` links a large dev-dependency tree and can take several minutes
 cold.** Run `cargo check --all-targets` first to surface compile errors in
