@@ -23,6 +23,8 @@ pub struct Layer {
     pub all: Option<bool>,
     /// Keep the line breaks the author typed.
     pub preserve_new_lines: Option<bool>,
+    /// Check crates.io for a newer release, and say so on the way out.
+    pub update_check: Option<bool>,
     /// Start with the contents pane showing.
     pub contents: Option<bool>,
 }
@@ -42,6 +44,7 @@ impl Layer {
             mouse: self.mouse.or(lower.mouse),
             all: self.all.or(lower.all),
             preserve_new_lines: self.preserve_new_lines.or(lower.preserve_new_lines),
+            update_check: self.update_check.or(lower.update_check),
             contents: self.contents.or(lower.contents),
         }
     }
@@ -56,6 +59,7 @@ impl Layer {
             mouse: Some(false),
             all: Some(false),
             preserve_new_lines: Some(false),
+            update_check: Some(true),
             // The contents pane is the reason the program exists; it still
             // hides itself on a narrow terminal or a document with nothing to
             // list.
@@ -73,6 +77,7 @@ impl Layer {
             mouse: file.general.mouse,
             all: file.general.all,
             preserve_new_lines: file.general.preserve_new_lines,
+            update_check: file.general.update_check,
             contents: file.ui.contents,
         }
     }
@@ -94,6 +99,7 @@ impl Layer {
             mouse: flag(get, "MARQUEE_MOUSE", &mut warnings),
             all: flag(get, "MARQUEE_ALL", &mut warnings),
             preserve_new_lines: flag(get, "MARQUEE_PRESERVE_NEW_LINES", &mut warnings),
+            update_check: flag(get, "MARQUEE_UPDATE_CHECK", &mut warnings),
             contents: flag(get, "MARQUEE_UI_CONTENTS", &mut warnings),
         };
         (layer, warnings)
@@ -221,6 +227,7 @@ mod tests {
         assert!(defaults.mouse.is_some());
         assert!(defaults.all.is_some());
         assert!(defaults.preserve_new_lines.is_some());
+        assert!(defaults.update_check.is_some());
         assert!(defaults.contents.is_some());
         // Width is deliberately undecided: it comes from the terminal.
         assert!(defaults.width.is_none());

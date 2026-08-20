@@ -107,6 +107,7 @@ impl Cli {
             mouse: self.mouse.then_some(true),
             all: self.all.then_some(true),
             preserve_new_lines: self.preserve_new_lines.then_some(true),
+            update_check: None,
             contents: None,
         }
     }

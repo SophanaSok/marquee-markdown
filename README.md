@@ -103,6 +103,14 @@ sudo dpkg -i marquee-markdown_*_amd64.deb
 sudo rpm -i marquee-markdown-*.x86_64.rpm
 ```
 
+With [`cargo-binstall`](https://github.com/cargo-bins/cargo-binstall), one
+command fetches the right archive and puts both binaries on your path — and
+the same command upgrades them later:
+
+```sh
+cargo binstall marquee-markdown
+```
+
 Homebrew and Scoop manifests live in [`packaging/`](packaging/); there is no
 tap or bucket yet.
 
@@ -120,6 +128,16 @@ Any monospace font works — the callout and image icons default to standard
 Unicode glyphs (ⓘ ✦ ‼ ⚠ ✖ ▣). If you use a [Nerd
 Font](https://www.nerdfonts.com/), an `[icons]` block in a theme file swaps in
 its glyphs; see [Themes](#themes).
+
+### Staying up to date
+
+The reader checks crates.io for a newer release at most once a day, from a
+detached background thread that never delays startup, rendering, or exit.
+When one exists, the last line on the way out says so and names the upgrade
+command. It stays quiet in scripts and builds: the notice only appears when
+standard error is a terminal, and never when `CI` is set. Turn it off for
+good with `update-check = false` in the configuration file, or
+`MARQUEE_UPDATE_CHECK=0` in the environment.
 
 ## Contents
 
@@ -350,6 +368,7 @@ line-numbers = false
 mouse = false
 all = false                # list hidden and ignored files when browsing
 preserve-new-lines = false
+update-check = true        # mention a newer release on the way out
 
 [ui]
 contents = true            # start with the contents pane showing
@@ -366,8 +385,8 @@ then file, then defaults**. A flag that was not given contributes nothing, so
 
 Environment variables are the setting name in `MARQUEE_` form, with
 `[general]` left out: `MARQUEE_STYLE`, `MARQUEE_WIDTH`, `MARQUEE_LINE_NUMBERS`,
-`MARQUEE_MOUSE`, `MARQUEE_ALL`, `MARQUEE_PRESERVE_NEW_LINES`, and
-`MARQUEE_UI_CONTENTS`.
+`MARQUEE_MOUSE`, `MARQUEE_ALL`, `MARQUEE_PRESERVE_NEW_LINES`,
+`MARQUEE_UPDATE_CHECK`, and `MARQUEE_UI_CONTENTS`.
 
 A setting this version does not recognize is reported and ignored rather than
 refused, so a file written for a newer version still works with an older

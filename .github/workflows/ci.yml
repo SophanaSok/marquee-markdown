@@ -142,6 +142,16 @@ jobs:
           # The effective configuration round-trips as a configuration file.
           "$BIN" --config "$OUT"/config.toml config > /dev/null
 
+          # The update check stays inert here: `CI` is set and standard error
+          # is no terminal, so nothing is fetched and nothing is cached. The
+          # cache directory not appearing is the proof that no thread ran.
+          XDG_CACHE_HOME="$OUT/cache" "$BIN" -w 60 README.md > /dev/null 2> "$OUT"/quiet.txt
+          ! grep -q 'is available' "$OUT"/quiet.txt
+          test ! -e "$OUT/cache/marquee-markdown"
+          # The explicit opt-out holds even where the other guards would not.
+          XDG_CACHE_HOME="$OUT/cache" MARQUEE_UPDATE_CHECK=0 "$BIN" -w 60 README.md > /dev/null
+          test ! -e "$OUT/cache/marquee-markdown"
+
   handoff:
     # The smoke job above covers what can be checked without a terminal. This
     # is the other half, and it exists because the bug it protects against was

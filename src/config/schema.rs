@@ -38,6 +38,8 @@ pub struct General {
     pub all: Option<bool>,
     /// Keep the line breaks the author typed.
     pub preserve_new_lines: Option<bool>,
+    /// Check crates.io for a newer release, and say so on the way out.
+    pub update_check: Option<bool>,
 }
 
 /// `[ui]`.
@@ -62,6 +64,7 @@ const KNOWN: &[(&str, &[&str])] = &[
             "mouse",
             "all",
             "preserve-new-lines",
+            "update-check",
         ],
     ),
     ("ui", &["contents"]),
@@ -147,6 +150,7 @@ mod tests {
             width = 72
             line-numbers = true
             preserve-new-lines = true
+            update-check = false
 
             [ui]
             contents = false
@@ -157,6 +161,7 @@ mod tests {
         assert_eq!(file.general.width, Some(72));
         assert_eq!(file.general.line_numbers, Some(true));
         assert_eq!(file.general.preserve_new_lines, Some(true));
+        assert_eq!(file.general.update_check, Some(false));
         assert_eq!(file.ui.contents, Some(false));
         assert!(warnings.is_empty(), "{warnings:?}");
     }
@@ -241,6 +246,7 @@ mod tests {
             mouse = true
             all = true
             preserve-new-lines = true
+            update-check = true
 
             [ui]
             contents = true

@@ -13,7 +13,7 @@ use super::{Cli, Command, RunMode};
 use crate::config::Config;
 use crate::source::{self, HttpFetcher, RealFs};
 use crate::theme::registry;
-use crate::{app, cli, oneshot, util};
+use crate::{app, cli, oneshot, update_check, util};
 
 /// The whole program. Returns the process exit code.
 ///
@@ -84,6 +84,13 @@ pub fn run() -> Result<()> {
         eprintln!("warning: {warning}");
     }
 
+    // Decided before the screen is taken, mentioned after it is given back,
+    // so the notice is the last thing left in the scrollback.
+    let notice = update_check::check(
+        config.update_check,
+        &program_name(std::env::args_os().next().as_deref()),
+    );
+
     let spec = source::classify(cli.source.as_deref(), util::tty::stdin_is_pipe(), &RealFs);
     let stdout_is_tty = util::tty::stdout_is_terminal();
     let mode = cli::run_mode(&cli, &spec, stdout_is_tty);
@@ -95,7 +102,7 @@ pub fn run() -> Result<()> {
         crate::theme::Theme::plain()
     };
 
-    match mode {
+    let result = match mode {
         RunMode::OneShot => {
             let source = source::resolve(&spec, &HttpFetcher::new())?;
             let settings = settings(&config);
@@ -119,7 +126,14 @@ pub fn run() -> Result<()> {
             let source = source::resolve(&spec, &HttpFetcher::new())?;
             oneshot::page(&source, &theme, settings(&config))
         }
+    };
+
+    if result.is_ok()
+        && let Some(notice) = notice
+    {
+        eprintln!("{notice}");
     }
+    result
 }
 
 /// Resolve the configuration: the command line over the environment over a

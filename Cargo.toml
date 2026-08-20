@@ -1,6 +1,6 @@
 [package]
 name = "marquee-markdown"
-version = "0.2.1"
+version = "0.3.0"
 # Two binaries ship (`mmd` is the short alias), so `cargo run` needs telling
 # which one is meant — without this, the documented
 # `cargo run -- keys > docs/KEYBINDINGS.md` truncates the file and then fails.
@@ -111,3 +111,27 @@ assets = [
     { source = "README.md", dest = "/usr/share/doc/marquee-markdown/README.md", mode = "644" },
     { source = "LICENSE", dest = "/usr/share/licenses/marquee-markdown/LICENSE", mode = "644" },
 ]
+
+# `cargo binstall marquee-markdown` fetches the prebuilt release archive
+# instead of compiling. The archives are named with short platform names
+# rather than target triples, so each supported triple is spelled out here;
+# any other target falls back to building from source.
+[package.metadata.binstall.overrides.x86_64-unknown-linux-gnu]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-v{ version }-x86_64-linux.tar.gz"
+bin-dir = "{ name }-v{ version }-x86_64-linux/{ bin }{ binary-ext }"
+pkg-fmt = "tgz"
+
+[package.metadata.binstall.overrides.aarch64-apple-darwin]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-v{ version }-aarch64-macos.tar.gz"
+bin-dir = "{ name }-v{ version }-aarch64-macos/{ bin }{ binary-ext }"
+pkg-fmt = "tgz"
+
+[package.metadata.binstall.overrides.x86_64-apple-darwin]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-v{ version }-x86_64-macos.tar.gz"
+bin-dir = "{ name }-v{ version }-x86_64-macos/{ bin }{ binary-ext }"
+pkg-fmt = "tgz"
+
+[package.metadata.binstall.overrides.x86_64-pc-windows-msvc]
+pkg-url = "{ repo }/releases/download/v{ version }/{ name }-v{ version }-x86_64-windows.zip"
+bin-dir = "{ name }-v{ version }-x86_64-windows/{ bin }{ binary-ext }"
+pkg-fmt = "zip"

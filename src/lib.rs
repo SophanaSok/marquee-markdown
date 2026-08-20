@@ -18,4 +18,5 @@ pub mod render;
 pub mod source;
 pub mod theme;
 pub mod ui;
+pub mod update_check;
 pub mod util;

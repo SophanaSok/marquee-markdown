@@ -14,6 +14,24 @@ Until 1.0 both halves may change.
 
 ## [Unreleased]
 
+### Added
+
+- The reader mentions a newer release on the way out: one line on standard
+  error, from an answer cached at most once a day and refreshed by a detached
+  background thread, so the check never delays startup, rendering, or exit.
+  It stays quiet in scripts and CI — standard error must be a terminal — and
+  `update-check = false` in the configuration (or `MARQUEE_UPDATE_CHECK=0`)
+  turns it off for good.
+- `cargo binstall marquee-markdown` finds the prebuilt release archives, so
+  upgrading no longer requires a compile.
+
+### Changed
+
+- The configuration structs (`config::{Config, Layer, File}` and the sections
+  inside them) gained a field, which is a breaking change for anything that
+  built one with an exhaustive struct literal — `cargo semver-checks` is what
+  says so, and the reason this release is a minor bump rather than a patch.
+
 ### Fixed
 
 - `e` no longer makes the editor sluggish. The terminal reader blocked in
