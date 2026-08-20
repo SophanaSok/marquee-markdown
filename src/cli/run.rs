@@ -147,6 +147,7 @@ fn load_config(cli: &Cli) -> Result<Config> {
 /// The one-shot renderer's settings.
 fn settings(config: &Config) -> oneshot::Settings {
     oneshot::Settings::detect(config.width, config.line_numbers, config.preserve_new_lines)
+        .with_html(config.html)
 }
 
 /// The settings the reader cares about.
@@ -158,6 +159,7 @@ fn options(config: &Config) -> app::Options {
         all: config.all,
         preserve_new_lines: config.preserve_new_lines,
         contents: config.contents,
+        html: config.html,
     }
 }
 

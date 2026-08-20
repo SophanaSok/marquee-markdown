@@ -11,6 +11,7 @@
 use super::block::{Block, BlockKind};
 use super::doc::RenderedDoc;
 use super::layout::LayoutOptions;
+use super::parse::ParseOptions;
 use super::{layout, parse};
 use crate::theme::Theme;
 
@@ -22,10 +23,21 @@ pub struct Document {
 }
 
 impl Document {
-    /// Parse markdown.
+    /// Parse markdown, with default options.
     #[must_use]
     pub fn parse(source: &str) -> Self {
-        let blocks = parse::parse(source);
+        Self::parse_with(source, ParseOptions::default())
+    }
+
+    /// Parse markdown.
+    ///
+    /// [`ParseOptions`] change the tree rather than its presentation, so they
+    /// belong here rather than on [`Self::layout`] — an HTML heading has to
+    /// reach [`Self::heading_count`], which is answered before anything is
+    /// laid out.
+    #[must_use]
+    pub fn parse_with(source: &str, options: ParseOptions) -> Self {
+        let blocks = parse::parse_with(source, options);
         let headings = count_headings(&blocks);
         Self { blocks, headings }
     }

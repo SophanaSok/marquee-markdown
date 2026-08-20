@@ -32,7 +32,8 @@ pub(super) fn emit(
     frag::fragment(content, style, ctx.theme, &mut IgnoreLinks, Breaks::Collapse);
     let avail = ctx.available_width();
     for line in wrap::wrap(frags, avail, WrapMode::Word) {
-        let lead = ctx.lead();
+        let mut lead = ctx.lead();
+        lead.extend(ctx.align_pad(&line));
         ctx.sink
             .push_frags(lead, &line, LineKind::Heading(level), Some(span.clone()));
     }

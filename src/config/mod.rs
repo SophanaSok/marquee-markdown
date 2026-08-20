@@ -23,6 +23,8 @@ use crate::app::keymap::{Keymap, Mode};
 pub use layer::Layer;
 pub use schema::File;
 
+use crate::render::HtmlMode;
+
 /// The environment variable naming a configuration file.
 pub const CONFIG_ENV: &str = "MARQUEE_CONFIG";
 
@@ -52,6 +54,8 @@ pub struct Config {
     pub update_check: bool,
     /// Start with the contents pane showing.
     pub contents: bool,
+    /// What to do with raw HTML.
+    pub html: HtmlMode,
     /// Key bindings, defaults with the file's changes laid over them.
     pub keymap: Keymap,
     /// Where the settings were read from, if a file was found.
@@ -126,6 +130,7 @@ impl Config {
             preserve_new_lines: layer.preserve_new_lines.unwrap_or(false),
             update_check: layer.update_check.unwrap_or(true),
             contents: layer.contents.unwrap_or(true),
+            html: layer.html.unwrap_or_default(),
             keymap,
             path,
             warnings,
@@ -158,6 +163,7 @@ impl Config {
         let _ = writeln!(out, "all = {}", self.all);
         let _ = writeln!(out, "preserve-new-lines = {}", self.preserve_new_lines);
         let _ = writeln!(out, "update-check = {}", self.update_check);
+        let _ = writeln!(out, "\n[render]\nhtml = {:?}", self.html.name());
         let _ = writeln!(out, "\n[ui]\ncontents = {}", self.contents);
 
         for mode in Mode::ALL {

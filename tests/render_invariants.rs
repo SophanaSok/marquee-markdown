@@ -5,7 +5,9 @@
 //! foundation the centered reading column and the sealed code cards rest on, so
 //! it is checked exhaustively rather than by example.
 
-use marquee_markdown::render::{self, LayoutOptions};
+use marquee_markdown::render::{
+    self, Document, HtmlMode, LayoutOptions, LineKind, ParseOptions, RenderedDoc,
+};
 use marquee_markdown::theme::{Theme, ThemeVariant};
 
 const FIXTURE: &str = include_str!("fixtures/kitchen-sink.md");
@@ -310,4 +312,169 @@ fn count_headings(blocks: &[marquee_markdown::render::block::Block]) -> usize {
             own + nested
         })
         .sum()
+}
+
+/// Lay the fixture out under one HTML mode.
+fn render_html(source: &str, theme: &Theme, width: u16, html: HtmlMode) -> RenderedDoc {
+    let mut parse = ParseOptions::default();
+    parse.html = html;
+    render::render_with(source, theme, parse, opts(width))
+}
+
+fn text_of(doc: &RenderedDoc) -> String {
+    doc.lines
+        .iter()
+        .map(|l| {
+            l.spans
+                .iter()
+                .map(|s| s.content.as_ref())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[test]
+fn every_html_mode_keeps_the_width_invariant() {
+    for variant in ThemeVariant::all() {
+        let theme = Theme::new(variant);
+        for html in HtmlMode::ALL {
+            for width in [10u16, 20, 32, 40, 55, 72, 80, 100, 120, 200] {
+                let doc = render_html(FIXTURE, &theme, width, html);
+                for (i, line) in doc.lines.iter().enumerate() {
+                    assert_eq!(
+                        line.width(),
+                        usize::from(width),
+                        "line {i} at width {width} under {html:?} in {variant:?}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn interpreted_html_puts_no_markup_on_the_page() {
+    // The reported bug, as an assertion. Code blocks legitimately contain
+    // angle brackets, and the literal fallback is markup on purpose, so both
+    // are exempt — everything else must read as prose.
+    let theme = Theme::new(ThemeVariant::Slate);
+    let doc = render_html(FIXTURE, &theme, 80, HtmlMode::Render);
+    for (i, line) in doc.lines.iter().enumerate() {
+        if matches!(
+            doc.meta[i].kind,
+            LineKind::Code { .. } | LineKind::CodeBorder { .. } | LineKind::Html
+        ) {
+            continue;
+        }
+        let text: String = line
+            .spans
+            .iter()
+            .map(|s| s.content.as_ref())
+            .collect::<String>();
+        for markup in [
+            "<p ",
+            "<p>",
+            "</p>",
+            "<div",
+            "</div>",
+            "align=\"center\"",
+            "<br>",
+        ] {
+            assert!(
+                !text.contains(markup),
+                "line {i} shows {markup:?}: {text:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn an_html_heading_reaches_the_outline_and_the_count() {
+    // Pane geometry is decided from `heading_count` at parse time, before any
+    // layout exists, so the two must agree or the contents pane decides wrong.
+    let theme = Theme::new(ThemeVariant::Slate);
+    let mut parse = ParseOptions::default();
+    parse.html = HtmlMode::Render;
+    let document = Document::parse_with(FIXTURE, parse);
+    let doc = document.layout(&theme, opts(80));
+    assert_eq!(
+        document.heading_count(),
+        doc.outline.len(),
+        "the parse-time count and the outline disagree"
+    );
+    assert!(
+        doc.outline.iter().any(|a| a.text == "An HTML heading"),
+        "the HTML heading is missing from the outline: {:?}",
+        doc.outline.iter().map(|a| &a.text).collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn a_centered_block_is_actually_centered() {
+    let theme = Theme::new(ThemeVariant::Slate);
+    let doc = render_html(FIXTURE, &theme, 80, HtmlMode::Render);
+    let line = doc
+        .lines
+        .iter()
+        .map(|l| {
+            l.spans
+                .iter()
+                .map(|s| s.content.as_ref())
+                .collect::<String>()
+        })
+        .find(|text| text.contains("An HTML heading"))
+        .expect("the centered heading is on the page");
+    let left = line.len() - line.trim_start().len();
+    let right = line.len() - line.trim_end().len();
+    assert!(
+        left.abs_diff(right) <= 1 && left > 0,
+        "not centered: {left} left, {right} right in {line:?}"
+    );
+}
+
+#[test]
+fn unrecognized_html_still_renders_as_literal_markup() {
+    // `<details>` and `<table>` have no emitter, and a table read as one
+    // run-on sentence is worse than one read as tags.
+    let theme = Theme::new(ThemeVariant::Slate);
+    let doc = render_html(FIXTURE, &theme, 80, HtmlMode::Render);
+    assert!(
+        text_of(&doc).contains("<details>"),
+        "the declined block lost its markup"
+    );
+}
+
+#[test]
+fn hiding_html_leaves_no_run_of_blank_lines() {
+    // Dropping a block must not leave the blank that separated it behind.
+    let theme = Theme::new(ThemeVariant::Slate);
+    let doc = render_html(FIXTURE, &theme, 80, HtmlMode::Hide);
+    let mut blanks = 0;
+    for (i, meta) in doc.meta.iter().enumerate() {
+        if meta.kind == LineKind::Blank {
+            blanks += 1;
+            assert!(blanks < 2, "two blank lines in a row at line {i}");
+        } else {
+            blanks = 0;
+        }
+    }
+    for (i, meta) in doc.meta.iter().enumerate() {
+        // Code blocks legitimately contain angle brackets.
+        if matches!(
+            meta.kind,
+            LineKind::Code { .. } | LineKind::CodeBorder { .. }
+        ) {
+            continue;
+        }
+        let text: String = doc.lines[i]
+            .spans
+            .iter()
+            .map(|s| s.content.as_ref())
+            .collect::<String>();
+        assert!(
+            !text.contains("<p") && !text.contains("<div") && !text.contains("</"),
+            "hide mode left markup on line {i}: {text:?}"
+        );
+    }
 }

@@ -6,6 +6,7 @@
 //! with a flag that beats the config in one place and loses in another.
 
 use super::schema::File;
+use crate::render::HtmlMode;
 
 /// Settings from one source. `None` means the source said nothing, which is
 /// different from saying "off".
@@ -34,6 +35,8 @@ pub struct Layer {
     pub update_check: Option<bool>,
     /// Start with the contents pane showing.
     pub contents: Option<bool>,
+    /// What to do with raw HTML.
+    pub html: Option<HtmlMode>,
 }
 
 impl Layer {
@@ -53,6 +56,7 @@ impl Layer {
             preserve_new_lines: self.preserve_new_lines.or(lower.preserve_new_lines),
             update_check: self.update_check.or(lower.update_check),
             contents: self.contents.or(lower.contents),
+            html: self.html.or(lower.html),
         }
     }
 
@@ -71,6 +75,9 @@ impl Layer {
             // hides itself on a narrow terminal or a document with nothing to
             // list.
             contents: Some(true),
+            // Documentation is written in markdown with HTML holes in it, and
+            // the tags are not what the author meant to say.
+            html: Some(HtmlMode::Render),
         }
     }
 
@@ -86,6 +93,11 @@ impl Layer {
             preserve_new_lines: file.general.preserve_new_lines,
             update_check: file.general.update_check,
             contents: file.ui.contents,
+            html: file
+                .render
+                .html
+                .as_deref()
+                .and_then(|value| value.parse().ok()),
         }
     }
 
@@ -108,8 +120,29 @@ impl Layer {
             preserve_new_lines: flag(get, "MARQUEE_PRESERVE_NEW_LINES", &mut warnings),
             update_check: flag(get, "MARQUEE_UPDATE_CHECK", &mut warnings),
             contents: flag(get, "MARQUEE_UI_CONTENTS", &mut warnings),
+            html: choice(get, "MARQUEE_RENDER_HTML", &mut warnings),
         };
         (layer, warnings)
+    }
+}
+
+/// Read an environment variable that names one of a fixed set of choices.
+///
+/// A value that is not one of them is reported and ignored, like every other
+/// setting this program does not understand: a typo costs one setting, not the
+/// whole environment.
+fn choice<T: std::str::FromStr<Err = String>>(
+    get: &dyn Fn(&str) -> Option<String>,
+    name: &str,
+    warnings: &mut Vec<String>,
+) -> Option<T> {
+    let raw = get(name).filter(|value| !value.trim().is_empty())?;
+    match raw.parse() {
+        Ok(value) => Some(value),
+        Err(why) => {
+            warnings.push(format!("{name}: {why}"));
+            None
+        }
     }
 }
 

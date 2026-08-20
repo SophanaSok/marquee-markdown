@@ -18,6 +18,30 @@ pub struct Block {
     pub kind: BlockKind,
     /// Byte range in the original markdown source.
     pub span: Range<usize>,
+    /// Which edge the content is set against.
+    ///
+    /// Only raw HTML's `align` attribute ever sets this — markdown has no
+    /// syntax that could ask for it — and only the heading and paragraph
+    /// emitters honour it. A field rather than a wrapping `BlockKind` variant
+    /// on purpose: the tree is walked by several hand-written recursive
+    /// helpers that end in `_ => 0`, and a new container variant any one of
+    /// them forgot would make `Document::heading_count` disagree with the
+    /// outline silently. That is the pane-geometry bug this project has
+    /// already paid for once. A field cannot be forgotten, because every
+    /// construction site is a compile error until it is filled in.
+    pub align: Alignment,
+}
+
+impl Block {
+    /// The ordinary case: set against the left edge, like all of markdown.
+    #[must_use]
+    pub fn at(kind: BlockKind, span: Range<usize>) -> Self {
+        Self {
+            kind,
+            span,
+            align: Alignment::Left,
+        }
+    }
 }
 
 /// Block-level structure. Container variants own their children so layout can
@@ -58,6 +82,8 @@ pub enum BlockKind {
     /// Thematic break (`---`, `***`).
     Rule,
     /// Raw HTML block, kept verbatim and rendered as muted literal text.
+    /// Only produced when the HTML could not be interpreted, or when the
+    /// reader asked for it with `html = "literal"`.
     Html(String),
     /// A footnote definition (`[^1]: …`); rendered at its source position.
     FootnoteDefinition {

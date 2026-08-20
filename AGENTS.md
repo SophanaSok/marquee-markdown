@@ -77,6 +77,9 @@ measure.rs   The single width chokepoint. Nothing else may call unicode_width.
 block.rs     Intermediate block tree: Block, BlockKind, Inline, ListItem.
 parse.rs     pulldown-cmark events -> block tree. Source byte ranges, heading
              slug dedup, GFM alerts. Cached; never re-run on resize.
+html.rs      Raw HTML -> blocks and inlines, or a decision to show it as
+             markup. A whitelist: an element with no emitter behind it sends
+             its whole block back to literal rather than being half-rendered.
 frag.rs      Inline content -> Frag (text + style + link + precomputed width).
 wrap.rs      Span-aware line breaking. WrapMode::{Word, HardAtColumn}.
 sink.rs      LineSink: the ONLY emitter of lines. Owns the width invariant.

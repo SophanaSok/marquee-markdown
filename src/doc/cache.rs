@@ -9,7 +9,7 @@
 //! Parsing is width- and theme-independent and stays cached across every
 //! re-layout, which is what makes resizing cheap.
 
-use crate::render::{Document, LayoutOptions, RenderedDoc};
+use crate::render::{Document, LayoutOptions, ParseOptions, RenderedDoc};
 use crate::source::Source;
 use crate::theme::Theme;
 
@@ -28,6 +28,8 @@ pub struct DocCache {
     built_from: Option<(LayoutOptions, Theme)>,
     /// Heading to land on after a reload, in preference to a byte offset.
     keep_heading: Option<String>,
+    /// How the document was parsed; a reload has to match it.
+    parse: ParseOptions,
     revision: u64,
 }
 
@@ -37,10 +39,17 @@ impl DocCache {
     /// layout path rather than one for startup and one for everything after.
     #[must_use]
     pub fn new(source: Source) -> Self {
-        let document = Document::parse(&source.text);
+        Self::with_options(source, ParseOptions::default())
+    }
+
+    /// Parse a document, saying how raw HTML should be treated.
+    #[must_use]
+    pub fn with_options(source: Source, parse: ParseOptions) -> Self {
+        let document = Document::parse_with(&source.text, parse);
         Self {
             source,
             document,
+            parse,
             doc: RenderedDoc::default(),
             outline: Outline::default(),
             built_from: None,
@@ -97,7 +106,7 @@ impl DocCache {
             .active_anchor(top)
             .and_then(|index| self.doc.outline.get(index))
             .map(|anchor| anchor.id.clone());
-        self.document = Document::parse(&source.text);
+        self.document = Document::parse_with(&source.text, self.parse);
         self.source = source;
         self.built_from = None;
     }

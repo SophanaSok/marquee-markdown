@@ -132,7 +132,37 @@ Another style of rule.
 
 <div align="center">Raw HTML block</div>
 
-Inline <b>HTML</b> too.
+Inline <b>HTML</b> too, and <em>emphasis</em>, <code>code</code>,
+<del>struck through</del>, <kbd>Ctrl</kbd> and a <my-widget>custom element</my-widget>.
+
+<h3 align="center">An HTML heading</h3>
+
+<p align="center">
+  Centered prose with a <a href="https://example.com">link</a>, an entity
+  &mdash; a numeric one &#8212; and a bare a &lt; b comparison,<br>
+  broken across lines.
+</p>
+
+<p align="center">
+  <a href="https://example.com/ci"><img alt="CI" src="https://img.example/ci.svg"></a>
+  <img alt="" src="https://img.example/decorative.svg">
+</p>
+
+<p><sub>A caption, in a size a terminal does not have.</sub></p>
+
+<!-- A comment, which renders as nothing at all. -->
+
+<div align="center">
+
+An unclosed container: a blank line ends the HTML block, so the closing tag
+arrives in a block of its own.
+
+</div>
+
+<details>
+<summary>Unrecognized, so this whole block stays literal markup</summary>
+<table><tr><td>including this</td></tr></table>
+</details>
 
 ## Footnotes
 

@@ -14,7 +14,9 @@
 use marquee_markdown::doc::View;
 use marquee_markdown::doc::search::{self, Search};
 use marquee_markdown::doc::view::Extent;
-use marquee_markdown::render::{self, Document, LayoutOptions, RenderedDoc, measure, tui};
+use marquee_markdown::render::{
+    self, Document, HtmlMode, LayoutOptions, ParseOptions, RenderedDoc, measure, tui,
+};
 use marquee_markdown::theme::{Theme, ThemeVariant};
 use proptest::prelude::*;
 use ratatui::buffer::Buffer;
@@ -73,7 +75,7 @@ prop_compose! {
 
 /// One markdown block built around adversarial text, optionally nested.
 fn block() -> impl Strategy<Value = String> {
-    (0usize..12, nasty_text(6), 0usize..4).prop_map(|(kind, text, depth)| {
+    (0usize..16, nasty_text(6), 0usize..4).prop_map(|(kind, text, depth)| {
         let text = nest(&text, depth);
         match kind {
             0 => format!("# {text}"),
@@ -93,6 +95,17 @@ fn block() -> impl Strategy<Value = String> {
             // event to arrive and has to open one itself.
             10 => format!("- **{text}** rest\n- *{text}* rest\n- [{text}](x) rest"),
             11 => format!("- [ ] **{text}** rest\n\n> **{text}** rest"),
+            // Raw HTML, which reaches the scanner and the alignment padding.
+            // The adversarial text lands in attribute values and in element
+            // content, which is where a scanner mis-slices a grapheme.
+            12 => format!(
+                "<p align=\"center\">{text}<br>\n  <a href=\"x\"><img alt=\"{text}\" src=\"y\"></a>\n  <code>{text}</code></p>"
+            ),
+            13 => format!("<div align=\"right\"><h2>{text}</h2><p>{text}</p></div>"),
+            // Markup that must be declined and shown literally, and markup
+            // that does not lex at all.
+            14 => format!("<details><summary>{text}</summary>{text}</details>"),
+            15 => format!("<p align=\"{text}\" {text}>{text}</p"),
             _ => text,
         }
     })
@@ -114,15 +127,60 @@ fn options(width: u16, numbers: bool, preserve: bool) -> LayoutOptions {
 }
 
 fn render_at(text: &str, width: u16, numbers: bool, preserve: bool) -> RenderedDoc {
-    render::render(
+    render_html(text, width, numbers, preserve, HtmlMode::default())
+}
+
+fn render_html(
+    text: &str,
+    width: u16,
+    numbers: bool,
+    preserve: bool,
+    html: HtmlMode,
+) -> RenderedDoc {
+    let mut parse = ParseOptions::default();
+    parse.html = html;
+    render::render_with(
         text,
         &Theme::new(ThemeVariant::Slate),
+        parse,
         options(width, numbers, preserve),
     )
 }
 
+/// Every HTML mode, for properties that must hold under all of them.
+fn html_mode() -> impl Strategy<Value = HtmlMode> {
+    prop::sample::select(&HtmlMode::ALL[..])
+}
+
 proptest! {
     #![proptest_config(ProptestConfig { cases: 96, ..ProptestConfig::default() })]
+
+    /// The width invariant holds however raw HTML is treated.
+    ///
+    /// `render` mode is the one with teeth: it runs a hand-written scanner
+    /// over adversarial text and pads lines to centre them, which are the two
+    /// ways this change could tear the painted column.
+    #[test]
+    fn every_html_mode_keeps_the_width_invariant(
+        text in document(),
+        width in 10u16..=120,
+        html in html_mode(),
+    ) {
+        let doc = render_html(&text, width, false, false, html);
+        prop_assert_eq!(doc.width, width);
+        for (index, line) in doc.lines.iter().enumerate() {
+            let rendered: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
+            prop_assert_eq!(
+                measure::width(&rendered),
+                usize::from(width),
+                "line {} at width {} under {:?}: {:?}",
+                index,
+                width,
+                html,
+                rendered
+            );
+        }
+    }
 
     /// A list item never loses content that starts with formatting.
     ///
@@ -149,6 +207,31 @@ proptest! {
             prop_assert!(
                 page.contains(word),
                 "lead-in word {word:?} vanished from {source:?}: {page:?}"
+            );
+        }
+    }
+
+    /// Interpreting HTML never loses the words inside it.
+    ///
+    /// The scanner may decline a block, and it may drop a tag it cannot show,
+    /// but text an author typed has to survive. Compared against the *plain*
+    /// mode rather than the literal one: literal renders the markup itself,
+    /// so a document made only of tags is legitimately empty once the tags
+    /// are interpreted away, and comparing to it would call that a loss.
+    #[test]
+    fn interpreting_html_never_swallows_a_document(
+        text in document(),
+        width in 40u16..=120,
+    ) {
+        let rendered = render_html(&text, width, false, false, HtmlMode::Render);
+        // `plain` is the mirror search runs over, so it is exactly what the
+        // reader can find. Wrapping may hard-split a very long token, so only
+        // the short distinctive word is checked for verbatim.
+        let page = rendered.plain.replace('\n', " ");
+        if text.contains("plain") {
+            prop_assert!(
+                page.contains("plain"),
+                "a word in the source is not on the page: {page:?}"
             );
         }
     }

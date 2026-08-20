@@ -12,19 +12,41 @@ use pulldown_cmark::{
 };
 
 use super::block::{AlertKind, Alignment, Block, BlockKind, Inline, ListItem};
+use super::html::{self, HtmlMode};
+
+/// Options for one parse.
+///
+/// Separate from `LayoutOptions` because these change the block tree, and the
+/// tree is built once and laid out many times. Anything here invalidates a
+/// cached parse; anything there does not.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
+pub struct ParseOptions {
+    /// What to do with raw HTML.
+    pub html: HtmlMode,
+}
+
+/// Parse a markdown document into the block tree, with default options.
+#[must_use]
+pub fn parse(source: &str) -> Vec<Block> {
+    parse_with(source, ParseOptions::default())
+}
 
 /// Parse a markdown document into the block tree.
 #[must_use]
-pub fn parse(source: &str) -> Vec<Block> {
-    let options = Options::ENABLE_TABLES
+pub fn parse_with(source: &str, options: ParseOptions) -> Vec<Block> {
+    let parser = Options::ENABLE_TABLES
         | Options::ENABLE_FOOTNOTES
         | Options::ENABLE_STRIKETHROUGH
         | Options::ENABLE_TASKLISTS
         | Options::ENABLE_GFM
         | Options::ENABLE_SMART_PUNCTUATION;
 
-    let mut builder = TreeBuilder::default();
-    for (event, span) in Parser::new_ext(source, options).into_offset_iter() {
+    let mut builder = TreeBuilder {
+        options,
+        ..TreeBuilder::default()
+    };
+    for (event, span) in Parser::new_ext(source, parser).into_offset_iter() {
         builder.event(event, span);
     }
     builder.finish()
@@ -48,6 +70,8 @@ struct TreeBuilder {
     slugs: HashMap<String, usize>,
     /// Table under construction.
     table: Option<TableBuilder>,
+    /// What the reader asked for.
+    options: ParseOptions,
 }
 
 struct Frame {
@@ -68,6 +92,13 @@ enum FrameKind {
     Footnote(String),
     /// A leaf block currently collecting inlines.
     Leaf(LeafKind),
+    /// A raw HTML block, accumulating its source.
+    ///
+    /// pulldown-cmark delivers one `Event::Html` per *line* of an HTML block,
+    /// so without somewhere to put them each line became its own block — and
+    /// the layout put a blank line between every one. The buffer is what makes
+    /// an HTML block a single thing that can be looked at as a whole.
+    Html(String),
 }
 
 enum LeafKind {
@@ -81,13 +112,19 @@ struct InlineFrame {
     content: Vec<Inline>,
 }
 
-enum InlineKind {
+pub(super) enum InlineKind {
     Root,
     Emphasis,
     Strong,
     Strikethrough,
     Link(String),
     Image(String),
+    /// `<code>` written as inline HTML. Flattened on close, because
+    /// [`Inline::Code`] holds text rather than children.
+    Code,
+    /// An inline tag whose closing tag has to pop something, but which
+    /// contributes no styling of its own (`<span>`, `<sub>`).
+    Transparent,
 }
 
 struct TableBuilder {
@@ -113,10 +150,7 @@ impl TreeBuilder {
             Event::Code(t) => self.push_inline(Inline::Code(t.into_string())),
             Event::SoftBreak => self.push_inline(Inline::SoftBreak),
             Event::HardBreak => self.push_inline(Inline::HardBreak),
-            Event::Rule => self.push_block(Block {
-                kind: BlockKind::Rule,
-                span,
-            }),
+            Event::Rule => self.push_block(Block::at(BlockKind::Rule, span)),
             Event::TaskListMarker(done) => {
                 if let Some(Frame {
                     kind: FrameKind::Item { task },
@@ -129,18 +163,20 @@ impl TreeBuilder {
             Event::FootnoteReference(label) => {
                 self.push_inline(Inline::FootnoteReference(label.into_string()));
             }
-            Event::Html(html) | Event::InlineHtml(html) => {
-                // Block-level HTML arrives outside any leaf; inline HTML is
-                // kept as literal text within the current inline run.
-                if self.in_leaf() {
-                    self.push_inline(Inline::Text(html.into_string()));
-                } else {
-                    self.push_block(Block {
-                        kind: BlockKind::Html(html.trim_end().to_owned()),
-                        span,
-                    });
-                }
-            }
+            Event::Html(html) => match self.stack.last_mut() {
+                // One `Event::Html` per *source line*, so the open frame is
+                // where the lines are joined back into the block the author
+                // actually wrote. Without it each line became its own block,
+                // and the layout put a blank line between every one.
+                Some(Frame {
+                    kind: FrameKind::Html(buffer),
+                    ..
+                }) => buffer.push_str(&html),
+                // Defensive: pulldown always frames these. A version that
+                // stopped must not silently swallow a document's HTML.
+                _ => self.finish_html(&html, span),
+            },
+            Event::InlineHtml(html) => self.inline_html(&html, span),
             Event::InlineMath(t) | Event::DisplayMath(t) => {
                 self.push_inline(Inline::Code(t.into_string()));
             }
@@ -243,6 +279,14 @@ impl TreeBuilder {
             Tag::Image { dest_url, .. } => {
                 self.open_inline(InlineKind::Image(dest_url.into_string()))
             }
+            Tag::HtmlBlock => {
+                self.close_dangling_leaf();
+                self.stack.push(Frame {
+                    kind: FrameKind::Html(String::new()),
+                    children: Vec::new(),
+                    span,
+                });
+            }
             // Definition lists, metadata, superscript etc. — treat contents as
             // ordinary inlines/blocks; no dedicated styling yet.
             _ => {}
@@ -258,13 +302,13 @@ impl TreeBuilder {
                     let FrameKind::Quote(alert) = frame.kind else {
                         return;
                     };
-                    self.push_block(Block {
-                        kind: BlockKind::BlockQuote {
+                    self.push_block(Block::at(
+                        BlockKind::BlockQuote {
                             alert,
                             children: frame.children,
                         },
-                        span: frame.span,
-                    });
+                        frame.span,
+                    ));
                 }
             }
             TagEnd::List(_) => {
@@ -272,10 +316,7 @@ impl TreeBuilder {
                     let FrameKind::List { start, items } = frame.kind else {
                         return;
                     };
-                    self.push_block(Block {
-                        kind: BlockKind::List { start, items },
-                        span: frame.span,
-                    });
+                    self.push_block(Block::at(BlockKind::List { start, items }, frame.span));
                 }
             }
             TagEnd::Item => {
@@ -303,25 +344,25 @@ impl TreeBuilder {
                     let FrameKind::Footnote(label) = frame.kind else {
                         return;
                     };
-                    self.push_block(Block {
-                        kind: BlockKind::FootnoteDefinition {
+                    self.push_block(Block::at(
+                        BlockKind::FootnoteDefinition {
                             label,
                             children: frame.children,
                         },
-                        span: frame.span,
-                    });
+                        frame.span,
+                    ));
                 }
             }
             TagEnd::Table => {
                 if let Some(t) = self.table.take() {
-                    self.push_block(Block {
-                        kind: BlockKind::Table {
+                    self.push_block(Block::at(
+                        BlockKind::Table {
                             alignments: t.alignments,
                             header: t.header,
                             rows: t.rows,
                         },
-                        span: t.span.start..span.end.max(t.span.end),
-                    });
+                        t.span.start..span.end.max(t.span.end),
+                    ));
                 }
             }
             TagEnd::TableHead => {
@@ -340,6 +381,16 @@ impl TreeBuilder {
                 let content = self.close_inline_root();
                 if let Some(t) = &mut self.table {
                     t.current_row.push(content);
+                }
+            }
+            TagEnd::HtmlBlock => {
+                if let Some(Frame {
+                    kind: FrameKind::Html(buffer),
+                    span,
+                    ..
+                }) = self.stack.pop()
+                {
+                    self.finish_html(&buffer, span);
                 }
             }
             TagEnd::Emphasis => self.close_inline(Inline::Emphasis),
@@ -368,6 +419,125 @@ impl TreeBuilder {
                 }
             }
             _ => {}
+        }
+    }
+
+    // --- raw HTML ---------------------------------------------------------
+
+    /// Dispose of one complete raw HTML block.
+    fn finish_html(&mut self, raw: &str, span: Range<usize>) {
+        match self.options.html {
+            HtmlMode::Hide => {}
+            HtmlMode::Literal => self.push_literal_html(raw, span),
+            HtmlMode::Render => {
+                // `slug` borrows all of `self`, and the interpreter needs it
+                // so an HTML heading joins the same document-wide dedup as a
+                // markdown one. Hand it just the counter.
+                let slugs = &mut self.slugs;
+                let interpreted = html::interpret(raw, &span, &mut |text| slug_in(slugs, text));
+                match interpreted {
+                    Some(blocks) => {
+                        for block in blocks {
+                            self.push_block(block);
+                        }
+                    }
+                    None => self.push_literal_html(raw, span),
+                }
+            }
+        }
+    }
+
+    fn push_literal_html(&mut self, raw: &str, span: Range<usize>) {
+        let text = raw.trim_end().to_owned();
+        if !text.is_empty() {
+            self.push_block(Block::at(BlockKind::Html(text), span));
+        }
+    }
+
+    /// Dispose of one inline HTML tag.
+    ///
+    /// These arrive one tag at a time with the text between them delivered as
+    /// ordinary `Event::Text`, so the state has to live across events. It
+    /// already does: `inline_stack` is exactly the mechanism `Tag::Emphasis`
+    /// uses, and an opening tag pushes onto it the same way.
+    fn inline_html(&mut self, raw: &str, span: Range<usize>) {
+        if !self.in_leaf() {
+            // A tag on its own outside any leaf is a block, not an inline.
+            self.finish_html(raw, span);
+            return;
+        }
+        match self.options.html {
+            HtmlMode::Hide => {}
+            HtmlMode::Literal => self.push_inline(Inline::Text(raw.to_owned())),
+            HtmlMode::Render => self.render_inline_html(raw),
+        }
+    }
+
+    fn render_inline_html(&mut self, raw: &str) {
+        let trimmed = raw.trim();
+        // A closing tag pops the frame its opening tag pushed. Anything that
+        // does not match is dropped rather than shown: in `render` mode the
+        // promise is that no markup reaches the page.
+        if let Some(name) = trimmed
+            .strip_prefix("</")
+            .and_then(|rest| rest.strip_suffix('>'))
+        {
+            self.close_inline_html(&name.trim().to_lowercase());
+            return;
+        }
+        match html::inline_open(raw) {
+            Some(html::InlineTag::Open(kind)) => self.open_inline(kind),
+            Some(html::InlineTag::Void(inlines)) => {
+                for inline in inlines {
+                    self.push_inline(inline);
+                }
+            }
+            // Unparseable, or something with no inline meaning: drop it.
+            None => {}
+        }
+    }
+
+    /// Close the innermost open inline frame belonging to `name`.
+    ///
+    /// Everything opened inside it closes with it, so mis-nested markup costs
+    /// styling rather than text — the same policy `close_inline_root` already
+    /// applies to input pulldown itself leaves open.
+    fn close_inline_html(&mut self, name: &str) {
+        let Some(target) = html::inline_kind(name) else {
+            return;
+        };
+        let Some(depth) = self.inline_stack.iter().rposition(|frame| {
+            std::mem::discriminant(&frame.kind) == std::mem::discriminant(&target)
+        }) else {
+            return;
+        };
+        if depth == 0 {
+            return; // never pop the root
+        }
+        while self.inline_stack.len() > depth {
+            let frame = self.inline_stack.pop().expect("len > depth");
+            let wrapped = match frame.kind {
+                InlineKind::Emphasis => Inline::Emphasis(frame.content),
+                InlineKind::Strong => Inline::Strong(frame.content),
+                InlineKind::Strikethrough => Inline::Strikethrough(frame.content),
+                InlineKind::Link(dest) => Inline::Link {
+                    dest,
+                    content: frame.content,
+                },
+                InlineKind::Image(dest) => Inline::Image {
+                    dest,
+                    alt: frame.content,
+                },
+                InlineKind::Code => Inline::Code(Inline::plain_text(&frame.content)),
+                InlineKind::Transparent | InlineKind::Root => {
+                    // Contributes no styling: splice the children up.
+                    for inline in frame.content {
+                        self.push_inline(inline);
+                    }
+                    continue;
+                }
+            };
+            self.push_inline(wrapped);
         }
     }
 
@@ -427,10 +597,7 @@ impl TreeBuilder {
                 }
             }
         };
-        self.push_block(Block {
-            kind,
-            span: frame.span,
-        });
+        self.push_block(Block::at(kind, frame.span));
     }
 
     fn open_inline_root(&mut self) {
@@ -503,6 +670,18 @@ impl TreeBuilder {
     }
 
     fn slug(&mut self, text: &str) -> String {
+        slug_in(&mut self.slugs, text)
+    }
+}
+
+/// Allocate a heading slug, deduplicated against everything seen so far.
+///
+/// A free function taking only the counter, because the HTML interpreter needs
+/// it while `TreeBuilder` is already borrowed elsewhere — and because an HTML
+/// heading must share one counter with the markdown ones or `#setup` would
+/// name two different places.
+fn slug_in(slugs: &mut HashMap<String, usize>, text: &str) -> String {
+    {
         let base: String = text
             .to_lowercase()
             .chars()
@@ -525,7 +704,7 @@ impl TreeBuilder {
         } else {
             base
         };
-        let count = self.slugs.entry(base.clone()).or_insert(0);
+        let count = slugs.entry(base.clone()).or_insert(0);
         let slug = if *count == 0 {
             base.clone()
         } else {
@@ -534,7 +713,9 @@ impl TreeBuilder {
         *count += 1;
         slug
     }
+}
 
+impl TreeBuilder {
     fn finish(mut self) -> Vec<Block> {
         // Drain anything malformed input left open.
         while let Some(frame) = self.stack.pop() {
@@ -697,9 +878,7 @@ mod tests {
             ("- ~~Struck lead.~~ Rest.\n", "Struck lead. Rest."),
             ("- [Link lead](http://x) rest.\n", "Link lead rest."),
             ("- ![Image lead](i.png) rest.\n", "Image lead rest."),
-            // Inline HTML is literal text here; what it means is a separate
-            // question. Without this it opened a *block* mid-item instead.
-            ("- <b>HTML lead.</b> Rest.\n", "<b>HTML lead.</b> Rest."),
+            ("- <b>HTML lead.</b> Rest.\n", "HTML lead. Rest."),
             ("1. **Ordered bold.** Rest.\n", "Ordered bold. Rest."),
             ("- **Only bold.**\n", "Only bold."),
         ] {
@@ -848,14 +1027,170 @@ mod tests {
         );
     }
 
+    fn parse_html(source: &str, html: HtmlMode) -> Vec<Block> {
+        parse_with(source, ParseOptions { html })
+    }
+
     #[test]
-    fn html_block_is_preserved() {
-        let blocks = parse("<div>\nhtml\n</div>\n");
+    fn literal_html_is_preserved() {
+        let blocks = parse_html("<div>\nhtml\n</div>\n", HtmlMode::Literal);
         assert!(
             blocks
                 .iter()
                 .any(|b| matches!(&b.kind, BlockKind::Html(h) if h.contains("div")))
         );
+    }
+
+    #[test]
+    fn an_html_block_is_one_block_not_one_per_line() {
+        // The reported bug: pulldown emits one `Event::Html` per source line,
+        // so without a frame to collect them every line became its own block
+        // and the layout put a blank line between each.
+        let source = "<div>\nline one\nline two\nline three\n</div>\n";
+        let blocks = parse_html(source, HtmlMode::Literal);
+        let html: Vec<_> = blocks
+            .iter()
+            .filter(|b| matches!(b.kind, BlockKind::Html(_)))
+            .collect();
+        assert_eq!(html.len(), 1, "one block per HTML block: {blocks:#?}");
+        let BlockKind::Html(text) = &html[0].kind else {
+            unreachable!()
+        };
+        assert_eq!(text.lines().count(), 5, "every source line is kept");
+    }
+
+    #[test]
+    fn an_html_heading_joins_the_block_tree() {
+        let blocks = parse("<h1 align=\"center\">Title</h1>\n");
+        let [block] = blocks.as_slice() else {
+            panic!("one block, got {blocks:#?}");
+        };
+        let BlockKind::Heading { level, id, content } = &block.kind else {
+            panic!("a heading, got {:?}", block.kind);
+        };
+        assert_eq!(*level, 1);
+        assert_eq!(id, "title");
+        assert_eq!(Inline::plain_text(content), "Title");
+        assert_eq!(block.align, Alignment::Center);
+    }
+
+    #[test]
+    fn html_headings_share_the_document_wide_slug_counter() {
+        // Two anchors named `setup` would send `#setup` to one of two places.
+        let blocks = parse("## Setup\n\n<h2>Setup</h2>\n");
+        let ids: Vec<_> = blocks
+            .iter()
+            .filter_map(|b| match &b.kind {
+                BlockKind::Heading { id, .. } => Some(id.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(ids, ["setup", "setup-1"]);
+    }
+
+    #[test]
+    fn a_centered_paragraph_keeps_its_words_and_loses_its_tags() {
+        let source = "<p align=\"center\">\n  A tagline<br>\n  on two lines.\n</p>\n";
+        let blocks = parse(source);
+        let [block] = blocks.as_slice() else {
+            panic!("one block, got {blocks:#?}");
+        };
+        let BlockKind::Paragraph(content) = &block.kind else {
+            panic!("a paragraph, got {:?}", block.kind);
+        };
+        assert_eq!(Inline::plain_text(content), "A tagline on two lines.");
+        assert!(content.contains(&Inline::HardBreak), "<br> becomes a break");
+        assert_eq!(block.align, Alignment::Center);
+    }
+
+    #[test]
+    fn a_badge_link_keeps_the_page_it_points_at() {
+        // `<a href=page><img src=picture>` — the image's destination must not
+        // win, or every badge opens the SVG it drew instead of the page.
+        let blocks =
+            parse("<p><a href=\"https://ci.example\"><img alt=\"CI\" src=\"b.svg\"></a></p>\n");
+        let BlockKind::Paragraph(content) = &blocks[0].kind else {
+            panic!("a paragraph, got {:?}", blocks[0].kind);
+        };
+        let [Inline::Link { dest, content }] = content.as_slice() else {
+            panic!("one link, got {content:#?}");
+        };
+        assert_eq!(dest, "https://ci.example");
+        assert_eq!(Inline::plain_text(content), "CI");
+    }
+
+    #[test]
+    fn unrecognized_html_falls_back_to_literal_markup() {
+        // A table read as one run-on sentence is worse than one read as tags.
+        let blocks = parse("<table>\n<tr><td>a</td></tr>\n</table>\n");
+        assert!(
+            blocks
+                .iter()
+                .any(|b| matches!(&b.kind, BlockKind::Html(h) if h.contains("table"))),
+            "{blocks:#?}"
+        );
+    }
+
+    #[test]
+    fn a_script_is_never_interpreted_as_prose() {
+        let blocks = parse("<script>alert('x')</script>\n");
+        assert!(
+            blocks.iter().all(|b| matches!(b.kind, BlockKind::Html(_))),
+            "{blocks:#?}"
+        );
+    }
+
+    #[test]
+    fn hiding_html_drops_the_block_entirely() {
+        let blocks = parse_html("before\n\n<div>gone</div>\n\nafter\n", HtmlMode::Hide);
+        assert_eq!(blocks.len(), 2, "{blocks:#?}");
+        assert!(
+            blocks
+                .iter()
+                .all(|b| matches!(b.kind, BlockKind::Paragraph(_)))
+        );
+    }
+
+    #[test]
+    fn inline_html_styles_the_text_between_the_tags() {
+        let blocks = parse("Inline <b>HTML</b> too.\n");
+        let BlockKind::Paragraph(content) = &blocks[0].kind else {
+            panic!("a paragraph, got {:?}", blocks[0].kind);
+        };
+        assert_eq!(Inline::plain_text(content), "Inline HTML too.");
+        assert!(
+            content.iter().any(|i| matches!(i, Inline::Strong(_))),
+            "{content:#?}"
+        );
+    }
+
+    #[test]
+    fn an_unclosed_inline_tag_never_loses_its_text() {
+        // The existing policy for malformed input: styling may be lost, text
+        // may not.
+        let blocks = parse("Text with <b>an unclosed tag.\n");
+        let BlockKind::Paragraph(content) = &blocks[0].kind else {
+            panic!("a paragraph, got {:?}", blocks[0].kind);
+        };
+        assert_eq!(Inline::plain_text(content), "Text with an unclosed tag.");
+    }
+
+    #[test]
+    fn hiding_inline_html_keeps_the_text_between_the_tags() {
+        let blocks = parse_html("Inline <b>HTML</b> too.\n", HtmlMode::Hide);
+        let BlockKind::Paragraph(content) = &blocks[0].kind else {
+            panic!("a paragraph, got {:?}", blocks[0].kind);
+        };
+        assert_eq!(Inline::plain_text(content), "Inline HTML too.");
+    }
+
+    #[test]
+    fn literal_inline_html_shows_the_markup() {
+        let blocks = parse_html("Inline <b>HTML</b> too.\n", HtmlMode::Literal);
+        let BlockKind::Paragraph(content) = &blocks[0].kind else {
+            panic!("a paragraph, got {:?}", blocks[0].kind);
+        };
+        assert_eq!(Inline::plain_text(content), "Inline <b>HTML</b> too.");
     }
 
     #[test]

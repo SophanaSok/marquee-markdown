@@ -14,7 +14,7 @@ mod table;
 
 use ratatui::text::Span;
 
-use super::block::{Block, BlockKind};
+use super::block::{Alignment, Block, BlockKind};
 use super::doc::{LineKind, RenderedDoc};
 use super::sink::LineSink;
 use crate::theme::Theme;
@@ -42,6 +42,7 @@ pub fn layout(blocks: &[Block], theme: &Theme, options: LayoutOptions) -> Render
         options,
         prefix: Vec::new(),
         code_blocks_emitted: 0,
+        align: Alignment::Left,
     };
     ctx.blocks(blocks);
     sink.finish(options.width.max(10))
@@ -57,6 +58,8 @@ pub(super) struct Context<'a> {
     pub prefix: Vec<PrefixPart>,
     /// Sequential index assigned to the next code block.
     pub code_blocks_emitted: u32,
+    /// Which edge the block being emitted is set against.
+    pub align: Alignment,
 }
 
 /// One accumulated lead element.
@@ -99,6 +102,31 @@ impl Context<'_> {
     }
 
     fn block(&mut self, block: &Block) {
+        let outer = std::mem::replace(&mut self.align, block.align);
+        self.emit(block);
+        self.align = outer;
+    }
+
+    /// Pad a wrapped line to sit against the current edge.
+    ///
+    /// Returned as part of the *lead* rather than the content, so `LineMeta`
+    /// counts it as decoration: a search for the first word of a centered
+    /// paragraph then matches the word, not the spaces in front of it.
+    pub fn align_pad(&self, line: &[super::frag::Frag]) -> Option<Span<'static>> {
+        if self.align == Alignment::Left {
+            return None;
+        }
+        let content: usize = line.iter().map(|frag| frag.width).sum();
+        let room = self.available_width().saturating_sub(content);
+        let pad = match self.align {
+            Alignment::Center => room / 2,
+            Alignment::Right => room,
+            Alignment::Left => 0,
+        };
+        (pad > 0).then(|| Span::styled(" ".repeat(pad), self.theme.page()))
+    }
+
+    fn emit(&mut self, block: &Block) {
         match &block.kind {
             BlockKind::Heading { level, id, content } => {
                 heading::emit(self, *level, id, content, &block.span);

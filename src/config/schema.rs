@@ -25,6 +25,8 @@ pub struct File {
     pub general: General,
     /// How the reader is laid out.
     pub ui: Ui,
+    /// How documents are rendered.
+    pub render: Render,
     /// Key bindings, per mode.
     pub keys: BTreeMap<String, BTreeMap<String, String>>,
 }
@@ -48,6 +50,25 @@ pub struct General {
     pub preserve_new_lines: Option<bool>,
     /// Check crates.io for a newer release, and say so on the way out.
     pub update_check: Option<bool>,
+}
+
+/// `[render]`.
+///
+/// Not `[general]`, whose doc comment promises every setting there also has a
+/// command-line flag. This one deliberately has none: `src/cli` keeps glow's
+/// flag surface, and glow has no equivalent to mirror.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default, rename_all = "kebab-case")]
+#[non_exhaustive]
+pub struct Render {
+    /// What to do with raw HTML: `render`, `hide` or `literal`.
+    ///
+    /// Held as written rather than as an [`HtmlMode`](crate::render::HtmlMode)
+    /// so a misspelling warns and falls through to the default, the way an
+    /// unknown *key* does. Deserializing straight into the enum would make one
+    /// typo refuse the whole file — which is the failure this module's opening
+    /// comment exists to prevent.
+    pub html: Option<String>,
 }
 
 /// `[ui]`.
@@ -76,6 +97,7 @@ const KNOWN: &[(&str, &[&str])] = &[
             "update-check",
         ],
     ),
+    ("render", &["html"]),
     ("ui", &["contents"]),
 ];
 
@@ -256,6 +278,9 @@ mod tests {
             all = true
             preserve-new-lines = true
             update-check = true
+
+            [render]
+            html = "render"
 
             [ui]
             contents = true

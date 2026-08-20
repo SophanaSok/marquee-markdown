@@ -33,7 +33,7 @@ Themes load from TOML. Output degrades correctly when redirected.
 status bar, a key reference rendered from the live keymap, light/dark switching,
 and a resize that keeps your place instead of teleporting you.
 
-531 tests, plus four `#[ignore]`d live checks against the real forges;
+662 tests, plus five `#[ignore]`d live checks against the real forges;
 `cargo clippy --all-targets -- -D warnings` and `cargo doc --no-deps`
 clean.
 
@@ -55,8 +55,8 @@ commit:
      cannot drift, and the generated man page and completions are named after
      whichever was invoked.
    - **The library API is in two halves.** A small stable surface —
-     `render::{render, Document, RenderedDoc, LayoutOptions, ansi, tui,
-     overlay, measure}` and `theme` — and the pipeline behind it, marked
+     `render::{render, render_with, Document, RenderedDoc, LayoutOptions,
+     ParseOptions, HtmlMode, ansi, tui, overlay, measure}` and `theme` — and the pipeline behind it, marked
      `#[doc(hidden)]` and free to change. `Document` was added to make that
      split possible: parse-once-lay-out-many is the thing a consumer actually
      needs, and having it opaque means the block tree never has to be frozen.
@@ -231,6 +231,12 @@ and cross-wrap search that narrows as you type). What remains is smaller:
 
 ## Deferred deliberately
 
+- **HTML with no emitter behind it.** `<table>`, `<ul>`/`<ol>`/`<li>`,
+  `<details>` folding, and `style="text-align:…"`. Each falls back to literal
+  markup, which is no worse than before HTML was interpreted at all. Tables
+  are the one worth doing, and the reason not to yet is that the column
+  solver is the most delicate code in the project — feeding it a second
+  source of cells wants its own change, not a rider on this one.
 - **Images.** The target terminal (foot) has sixel, but Alacritty has nothing
   and no terminal here supports the kitty protocol. `ratatui-image` would add a
   blocking resize on the draw thread. Revisit only if asked.

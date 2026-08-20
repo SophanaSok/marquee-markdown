@@ -37,6 +37,10 @@ extracting it into its own crate would be a move rather than an excavation.
  │               deduplicated heading slugs, and GFM alerts.
  │               Width-independent, so it is cached and never re-run on resize.
  │
+ ├─ html.rs      raw HTML → blocks and inlines, or a decision to show it as
+ │               markup. Runs inside parse, not layout: an HTML heading has to
+ │               reach heading_count, which pane geometry is decided from.
+ │
  ├─ frag.rs      inline content → Vec<Frag>. A Frag is display text, a style, an
  │               optional link index, and a precomputed width.
  │
@@ -52,6 +56,13 @@ extracting it into its own crate would be a move rather than an excavation.
  └─ RenderedDoc  lines, per-line metadata, the outline, interned links, the
                  plain mirror, and the width it was built at.
 ```
+
+Raw HTML is a parse-time decision, which is why `ParseOptions` exists
+alongside `LayoutOptions` rather than joining it. The two invalidate different
+things: a layout option changes only the lines, and a resize re-runs that many
+times a second; a parse option changes the tree. In practice the mode is fixed
+at startup, so nothing in the reader has to handle it changing — but wiring it
+to a key later would need a re-parse, not just `ensure_rendered`.
 
 `Document` is the parsed half held on its own, so a resize re-runs only the
 layout. It is opaque: the block tree behind it is the renderer's working

@@ -6,11 +6,11 @@
 //!
 //! # What is stable
 //!
-//! The API this module promises is deliberately small: [`render`],
-//! [`Document`], [`RenderedDoc`] and the metadata hanging off it,
-//! [`LayoutOptions`], the two serializers ([`ansi`] and [`tui`]), [`overlay`],
-//! [`measure`], and the whole of [`theme`](crate::theme). From 1.0 those
-//! follow semantic versioning.
+//! The API this module promises is deliberately small: [`render`] and
+//! [`render_with`], [`Document`], [`RenderedDoc`] and the metadata hanging off
+//! it, [`LayoutOptions`], [`ParseOptions`], [`HtmlMode`], the two serializers
+//! ([`ansi`] and [`tui`]), [`overlay`], [`measure`], and the whole of
+//! [`theme`](crate::theme). From 1.0 those follow semantic versioning.
 //!
 //! The pipeline behind them — parsing, fragmentation, wrapping, the block
 //! tree, the per-block emitters — is public so the binary and the tests can
@@ -35,6 +35,14 @@
 //! let doc = render::render("# Title\n\nSome prose.", &theme, options);
 //! assert_eq!(doc.outline[0].text, "Title");
 //! assert!(doc.lines.iter().all(|line| line.width() == 40));
+//!
+//! // Raw HTML is interpreted by default, so an HTML heading joins the
+//! // outline like a markdown one. `ParseOptions` says otherwise.
+//! use marquee_markdown::render::{HtmlMode, ParseOptions};
+//! let mut parse = ParseOptions::default();
+//! parse.html = HtmlMode::Literal;
+//! let doc = render::render_with("<h1>Title</h1>", &theme, parse, options);
+//! assert!(doc.outline.is_empty());
 //!
 //! // Parse once, lay out as often as the window changes size.
 //! let parsed = Document::parse("# Title\n\nSome prose.");
@@ -62,6 +70,8 @@ pub mod frag;
 #[doc(hidden)]
 pub mod highlight;
 #[doc(hidden)]
+pub mod html;
+#[doc(hidden)]
 pub mod layout;
 #[doc(hidden)]
 pub mod parse;
@@ -72,7 +82,9 @@ pub mod wrap;
 
 pub use doc::{Anchor, LineKind, LineMeta, RenderedDoc};
 pub use document::Document;
+pub use html::HtmlMode;
 pub use layout::LayoutOptions;
+pub use parse::ParseOptions;
 
 use crate::theme::Theme;
 
@@ -84,4 +96,19 @@ use crate::theme::Theme;
 #[must_use]
 pub fn render(source: &str, theme: &Theme, options: LayoutOptions) -> RenderedDoc {
     Document::parse(source).layout(theme, options)
+}
+
+/// Parse and lay out, saying how raw HTML should be treated.
+///
+/// The two option sets are separate because they invalidate different things:
+/// a [`ParseOptions`] change means re-parsing, a [`LayoutOptions`] change means
+/// only re-laying-out, which is what a resize does many times a second.
+#[must_use]
+pub fn render_with(
+    source: &str,
+    theme: &Theme,
+    parse: ParseOptions,
+    layout: LayoutOptions,
+) -> RenderedDoc {
+    Document::parse_with(source, parse).layout(theme, layout)
 }

@@ -9,7 +9,7 @@ use std::io::Write;
 use anyhow::{Context, Result};
 
 use crate::render::ansi::{self, AnsiOptions};
-use crate::render::{self, LayoutOptions};
+use crate::render::{self, HtmlMode, LayoutOptions, ParseOptions};
 use crate::source::Source;
 use crate::theme::Theme;
 use crate::util::{tty, width};
@@ -29,6 +29,8 @@ pub struct Settings {
     pub color: bool,
     /// Terminal width, when known.
     pub terminal_width: Option<u16>,
+    /// What to do with raw HTML.
+    pub html: HtmlMode,
 }
 
 impl Settings {
@@ -47,7 +49,18 @@ impl Settings {
             is_terminal,
             color: !tty::color_disabled(),
             terminal_width: tty::terminal_width(),
+            html: HtmlMode::default(),
         }
+    }
+
+    /// Say what to do with raw HTML.
+    ///
+    /// A builder rather than a fourth argument to [`Self::detect`], so adding
+    /// it costs no caller a signature change.
+    #[must_use]
+    pub fn with_html(mut self, html: HtmlMode) -> Self {
+        self.html = html;
+        self
     }
 }
 
@@ -68,9 +81,12 @@ pub fn render_to(
         _ => content_width,
     };
 
-    let doc = render::render(
+    let doc = render::render_with(
         &source.text,
         theme,
+        ParseOptions {
+            html: settings.html,
+        },
         LayoutOptions {
             width: content_width,
             // Source files always get line numbers, matching glow.
@@ -199,6 +215,7 @@ mod tests {
             is_terminal: false,
             color: false,
             terminal_width: None,
+            html: HtmlMode::default(),
         }
     }
 

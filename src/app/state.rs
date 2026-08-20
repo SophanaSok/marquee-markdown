@@ -11,6 +11,7 @@ use std::sync::mpsc::Sender;
 
 use crate::browser::Browser;
 use crate::doc::{DocCache, Links, Search, View};
+use crate::render::{HtmlMode, ParseOptions};
 use crate::source::Source;
 use crate::theme::{Appearance, Theme, ThemeVariant};
 
@@ -19,7 +20,13 @@ use super::keymap::{Keymap, Mode};
 use super::layout::Panes;
 
 /// Settings that come from the command line rather than from interaction.
+///
+/// Adding a setting is routine here, and adding a public field to a struct
+/// anyone can write as a literal is a breaking change. `non_exhaustive` moves
+/// that cost to now: outside this crate these are built from [`Default`] and
+/// then assigned to, so the next setting is not an API break.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Options {
     /// The `-w` flag: `Some(0)` disables wrapping.
     pub width: Option<u16>,
@@ -33,6 +40,8 @@ pub struct Options {
     pub preserve_new_lines: bool,
     /// Start with the contents pane showing.
     pub contents: bool,
+    /// What to do with raw HTML.
+    pub html: HtmlMode,
 }
 
 impl Default for Options {
@@ -43,6 +52,7 @@ impl Default for Options {
             mouse: false,
             all: false,
             preserve_new_lines: false,
+            html: HtmlMode::default(),
             contents: true,
         }
     }
@@ -210,7 +220,7 @@ impl App {
             Appearance::Dark => ThemeVariant::Paper,
         });
         Self {
-            doc: DocCache::new(source),
+            doc: DocCache::with_options(source, ParseOptions { html: options.html }),
             view: View::default(),
             theme,
             alternate,
@@ -252,7 +262,12 @@ impl App {
     /// Start reading `source`, leaving the browser as it was so `esc` comes
     /// back to it.
     pub fn read(&mut self, source: Source) {
-        self.doc = DocCache::new(source);
+        self.doc = DocCache::with_options(
+            source,
+            ParseOptions {
+                html: self.options.html,
+            },
+        );
         self.view = View::default();
         self.toc = Toc::default();
         self.search.clear();

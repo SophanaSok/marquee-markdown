@@ -34,6 +34,9 @@
 - **Reads markdown properly.** Headings become typography rather than hash
   marks, code blocks become sealed cards, tables get box drawing, and GFM
   callouts get an icon and a hue.
+- **Reads the HTML in a README too.** A centered `<h1>` becomes a heading in
+  the contents pane, badge images become the links they advertise, and `<br>`
+  breaks a line — instead of the tags themselves reaching the page.
 - **A contents pane that tracks where you are**, with folding — the thing
   `glow` has no equivalent of, and the reason this exists.
 - **Search inside a document** with `/`, `n` and `N`, highlighted in place.
@@ -57,6 +60,7 @@ over. But rendering the same document through glow 3.0.0 shows what this fixes:
 | Tables with no outer frame, columns stretched to the full width | box drawing with a shaded header band, columns sized to content |
 | Thematic breaks as `--------` | a hairline `─` across the column |
 | Long code lines wrap *out* of the block | they stay sealed inside the card |
+| Raw HTML in a README printed tag by tag | interpreted: the title joins the contents pane, badges read as links |
 | Link targets printed inline, interrupting the sentence | link text reads as text; `]` walks them, `enter` opens |
 | 2-space margin | a centered reading column, page painted edge to edge |
 | No outline, no in-document search | a scroll-tracking contents pane, and `/` `n` `N` |
@@ -370,6 +374,9 @@ all = false                # list hidden and ignored files when browsing
 preserve-new-lines = false
 update-check = true        # mention a newer release on the way out
 
+[render]
+html = "render"            # render | hide | literal
+
 [ui]
 contents = true            # start with the contents pane showing
 
@@ -386,7 +393,7 @@ then file, then defaults**. A flag that was not given contributes nothing, so
 Environment variables are the setting name in `MARQUEE_` form, with
 `[general]` left out: `MARQUEE_STYLE`, `MARQUEE_WIDTH`, `MARQUEE_LINE_NUMBERS`,
 `MARQUEE_MOUSE`, `MARQUEE_ALL`, `MARQUEE_PRESERVE_NEW_LINES`,
-`MARQUEE_UPDATE_CHECK`, and `MARQUEE_UI_CONTENTS`.
+`MARQUEE_UPDATE_CHECK`, `MARQUEE_RENDER_HTML`, and `MARQUEE_UI_CONTENTS`.
 
 A setting this version does not recognize is reported and ignored rather than
 refused, so a file written for a newer version still works with an older
@@ -511,7 +518,8 @@ bytes with real OSC 8 hyperlinks.
 The promised API is deliberately small, and from 1.0 it follows semantic
 versioning:
 
-- `render::{render, Document, RenderedDoc, LineMeta, LineKind, Anchor, LayoutOptions}`
+- `render::{render, render_with, Document, RenderedDoc, LineMeta, LineKind, Anchor}`
+- `render::{LayoutOptions, ParseOptions, HtmlMode}`
 - `render::{ansi, tui, overlay, measure}`
 - all of `theme`
 

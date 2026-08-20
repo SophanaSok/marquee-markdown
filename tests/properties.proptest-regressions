@@ -5,3 +5,5 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 47103004ef8fb0315d23d5cbb6c418a8d5f0a0583038cc10ef472f52ca63c749 # shrinks to text = "plain", depth = 6, width = 10
+cc ec8e2a9e3635f550270f084404d1fd18300cab01f06ea66e101701bf496aae39 # shrinks to text = "plain"
+cc eb7dfaa834ba77b7ad66f406ec41d1856550c0b1caf12eb3933f0b709927701f # shrinks to text = "<p align=\"center\">\t<br>\n  <a href=\"x\"><img alt=\"\t\" src=\"y\"></a>\n  <code>\t</code></p>", width = 40
