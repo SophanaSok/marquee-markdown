@@ -8,6 +8,13 @@ pub fn stdout_is_terminal() -> bool {
     std::io::stdout().is_terminal()
 }
 
+/// Whether standard error is a terminal — whether anyone is there to read
+/// a parting notice.
+#[must_use]
+pub fn stderr_is_terminal() -> bool {
+    std::io::stderr().is_terminal()
+}
+
 /// Whether standard input carries a document to read.
 ///
 /// This is deliberately narrower than "stdin is not a terminal". A

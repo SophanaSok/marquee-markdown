@@ -41,6 +41,8 @@ pub struct Config {
     pub all: bool,
     /// Keep the line breaks the author typed.
     pub preserve_new_lines: bool,
+    /// Check crates.io for a newer release, and say so on the way out.
+    pub update_check: bool,
     /// Start with the contents pane showing.
     pub contents: bool,
     /// Key bindings, defaults with the file's changes laid over them.
@@ -115,6 +117,7 @@ impl Config {
             mouse: layer.mouse.unwrap_or(false),
             all: layer.all.unwrap_or(false),
             preserve_new_lines: layer.preserve_new_lines.unwrap_or(false),
+            update_check: layer.update_check.unwrap_or(true),
             contents: layer.contents.unwrap_or(true),
             keymap,
             path,
@@ -147,6 +150,7 @@ impl Config {
         let _ = writeln!(out, "mouse = {}", self.mouse);
         let _ = writeln!(out, "all = {}", self.all);
         let _ = writeln!(out, "preserve-new-lines = {}", self.preserve_new_lines);
+        let _ = writeln!(out, "update-check = {}", self.update_check);
         let _ = writeln!(out, "\n[ui]\ncontents = {}", self.contents);
 
         for mode in Mode::ALL {
