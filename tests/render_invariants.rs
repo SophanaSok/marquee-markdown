@@ -212,6 +212,40 @@ fn tables_frame_when_words_fit_and_stack_as_cards_when_they_do_not() {
 }
 
 #[test]
+fn short_table_cells_never_wrap_whatever_they_contain() {
+    // The column solver and the row emitter have to agree about how wide a cell
+    // is. They measured it by different routes once, and an inline code span —
+    // drawn as a padded chip, two cells wider than its text — came out of the
+    // solver too narrow for its own content: the row grew to three lines, a
+    // blank, the text, another blank.
+    //
+    // Every kind here fits its column comfortably, so a row that is taller than
+    // one line means something measured the cell as narrower than it draws.
+    let theme = Theme::new(ThemeVariant::Slate);
+    for cell in [
+        "plain",
+        "`code`",
+        "*em*",
+        "**strong**",
+        "~~struck~~",
+        "[link](x)",
+    ] {
+        let source = format!("| Kind | Value |\n| --- | --- |\n| {cell} | yes |\n");
+        for width in [60u16, 80, 120] {
+            let out = render_text(&source, &theme, width);
+            let rows = out
+                .lines()
+                .filter(|l| l.contains('\u{2502}') && !l.contains('\u{253c}'))
+                .count();
+            assert_eq!(
+                rows, 2,
+                "cell {cell:?} at width {width} produced {rows} content lines, want 2:\n{out}"
+            );
+        }
+    }
+}
+
+#[test]
 fn a_table_that_fits_is_never_stretched_to_the_full_column() {
     // A narrow table centred in a wide column should keep its natural size,
     // not smear across the page.

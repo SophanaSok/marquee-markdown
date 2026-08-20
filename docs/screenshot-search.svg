@@ -1,6 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="840" height="540" viewBox="0 0 840.0 540.0" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="14.0">
 <rect width="100%" height="100%" fill="#262624" rx="6"/>
 <rect x="0.0" y="0.0" width="201.6" height="18.0" fill="#1f1e1d"/>
+<rect x="630.0" y="54.0" width="25.2" height="18.0" fill="#d97757"/>
+<rect x="596.4" y="144.0" width="25.2" height="18.0" fill="#d4a27f"/>
+<rect x="722.4" y="234.0" width="25.2" height="18.0" fill="#d4a27f"/>
+<rect x="226.8" y="252.0" width="25.2" height="18.0" fill="#d4a27f"/>
 <rect x="226.8" y="306.0" width="596.4" height="18.0" fill="#1f1e1d"/>
 <rect x="226.8" y="324.0" width="596.4" height="18.0" fill="#1f1e1d"/>
 <rect x="226.8" y="342.0" width="596.4" height="18.0" fill="#1f1e1d"/>
@@ -16,7 +20,9 @@
 <text x="201.6" y="49.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="0.0" y="67.5" fill="#87867f" textLength="126.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">     Navigation</text>
 <text x="201.6" y="67.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="210.0" y="67.5" fill="#f5f4ef" textLength="621.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">A terminal markdown reader that renders documents the way Claude artifacts</text>
+<text x="210.0" y="67.5" fill="#f5f4ef" textLength="411.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">A terminal markdown reader that renders documents</text>
+<text x="630.0" y="67.5" fill="#262624" font-weight="bold" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">the</text>
+<text x="655.2" y="67.5" fill="#f5f4ef" textLength="176.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> way Claude artifacts</text>
 <text x="201.6" y="85.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="210.0" y="85.5" fill="#f5f4ef" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">do.</text>
 <text x="201.6" y="103.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
@@ -26,7 +32,9 @@
 <text x="210.0" y="139.5" fill="#7ea3c4" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▎</text>
 <text x="201.6" y="157.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="210.0" y="157.5" fill="#7ea3c4" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▎</text>
-<text x="226.8" y="157.5" fill="#87867f" font-style="italic" textLength="453.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Callouts get an icon, a title, and a hue of their own.</text>
+<text x="226.8" y="157.5" fill="#87867f" font-style="italic" textLength="361.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Callouts get an icon, a title, and a hue of</text>
+<text x="596.4" y="157.5" fill="#262624" font-style="italic" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">the</text>
+<text x="621.6" y="157.5" fill="#87867f" font-style="italic" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ir own.</text>
 <text x="201.6" y="175.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="201.6" y="193.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="210.0" y="193.5" fill="#f5f4ef" font-weight="bold" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Rendering</text>
@@ -35,9 +43,12 @@
 <text x="201.6" y="247.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="210.0" y="247.5" fill="#f5f4ef" textLength="445.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Code blocks are sealed containers — a long line wraps</text>
 <text x="663.6" y="247.5" fill="#f5f4ef" font-style="italic" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">inside</text>
-<text x="714.0" y="247.5" fill="#f5f4ef" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> the card</text>
+<text x="722.4" y="247.5" fill="#262624" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">the</text>
+<text x="747.6" y="247.5" fill="#f5f4ef" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> card</text>
 <text x="201.6" y="265.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="210.0" y="265.5" fill="#f5f4ef" textLength="201.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">rather than escaping it:</text>
+<text x="210.0" y="265.5" fill="#f5f4ef" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">ra</text>
+<text x="226.8" y="265.5" fill="#262624" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">the</text>
+<text x="252.0" y="265.5" fill="#f5f4ef" textLength="159.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">r than escaping it:</text>
 <text x="201.6" y="283.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="201.6" y="301.5" fill="#3d3d3a" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│╭─</text>
 <text x="235.2" y="301.5" fill="#87867f" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">rust</text>
@@ -86,5 +97,6 @@
 <text x="319.2" y="517.5" fill="#f5f4ef" textLength="193.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> weight, colour, rhythm</text>
 <text x="571.2" y="517.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="0.0" y="535.5" fill="#f5f4ef" font-weight="bold" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> demo.md</text>
-<text x="75.6" y="535.5" fill="#87867f" textLength="756.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">› Marquee                                                                       0%  ? help</text>
+<text x="75.6" y="535.5" fill="#87867f" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">› Marquee</text>
+<text x="756.0" y="535.5" fill="#d97757" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> /the 1/7</text>
 </svg>

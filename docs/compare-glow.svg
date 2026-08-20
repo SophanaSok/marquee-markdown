@@ -1,0 +1,169 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1398" height="758" viewBox="0 0 1398.0 758.0" font-family="ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="14.0">
+<rect width="100%" height="100%" fill="#18181b" rx="8"/>
+<text x="18.0" y="32.0" fill="#e4e4e7" font-size="13" font-weight="bold">glow version 3.0.0 (add5e7a)</text>
+<text x="18.0" y="50.0" fill="#a1a1aa" font-size="11">glow --config /dev/null docs/compare.md</text>
+<rect x="18.0" y="62.0" width="672.0" height="648.0" fill="#1e1e1e" rx="4"/>
+<rect x="34.8" y="80.0" width="67.2" height="18.0" fill="#5f5fff"/>
+<rect x="43.2" y="476.0" width="67.2" height="18.0" fill="#303030"/>
+<rect x="43.2" y="494.0" width="67.2" height="18.0" fill="#303030"/>
+<rect x="51.6" y="584.0" width="126.0" height="18.0" fill="#303030"/>
+<text x="34.8" y="93.5" fill="#ffff87" font-weight="bold" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Ledger</text>
+<text x="34.8" y="129.5" fill="#d0d0d0" textLength="638.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">A small library for append-only logs. An entry is written once and read back</text>
+<text x="34.8" y="147.5" fill="#d0d0d0" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">by</text>
+<text x="34.8" y="165.5" fill="#d0d0d0" textLength="285.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">replaying the file from the start.</text>
+<text x="34.8" y="201.5" fill="#d0d0d0" textLength="504.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ Written for a talk. The API is illustrative, not shipping.</text>
+<text x="34.8" y="237.5" fill="#d0d0d0" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ [!NOTE]</text>
+<text x="34.8" y="255.5" fill="#d0d0d0" textLength="604.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ Entries are never rewritten in place. Compaction writes a new file and</text>
+<text x="34.8" y="273.5" fill="#d0d0d0" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ swaps</text>
+<text x="34.8" y="291.5" fill="#d0d0d0" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│ it in.</text>
+<text x="34.8" y="327.5" fill="#00afff" font-weight="bold" textLength="134.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">## Opening a log</text>
+<text x="51.6" y="363.5" fill="#00afff" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">pub</text>
+<text x="85.2" y="363.5" fill="#00afff" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">fn</text>
+<text x="110.4" y="363.5" fill="#00d787" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">open</text>
+<text x="144.0" y="363.5" fill="#d7d7af" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">(</text>
+<text x="152.4" y="363.5" fill="#c6c6c6" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">path:</text>
+<text x="202.8" y="363.5" fill="#00afff" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">&amp;</text>
+<text x="211.2" y="363.5" fill="#eeeeee" font-weight="bold" text-decoration="underline" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Path</text>
+<text x="244.8" y="363.5" fill="#d7d7af" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">,</text>
+<text x="253.2" y="363.5" fill="#c6c6c6" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> mode:</text>
+<text x="312.0" y="363.5" fill="#eeeeee" font-weight="bold" text-decoration="underline" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Mode</text>
+<text x="345.6" y="363.5" fill="#d7d7af" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">,</text>
+<text x="354.0" y="363.5" fill="#c6c6c6" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> cache:</text>
+<text x="421.2" y="363.5" fill="#eeeeee" font-weight="bold" text-decoration="underline" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Cache</text>
+<text x="463.2" y="363.5" fill="#d7d7af" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">)</text>
+<text x="471.6" y="363.5" fill="#c6c6c6" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> -&gt;</text>
+<text x="505.2" y="363.5" fill="#ff87d7" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Result</text>
+<text x="555.6" y="363.5" fill="#ff8787" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">&lt;</text>
+<text x="564.0" y="363.5" fill="#c6c6c6" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Ledger</text>
+<text x="614.4" y="363.5" fill="#d7d7af" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">,</text>
+<text x="34.8" y="381.5" fill="#c6c6c6" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">OpenError</text>
+<text x="110.4" y="381.5" fill="#ff8787" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">&gt;</text>
+<text x="127.2" y="381.5" fill="#d7d7af" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">{</text>
+<text x="51.6" y="399.5" fill="#c6c6c6" textLength="210.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    Ledger::with_capacity</text>
+<text x="261.6" y="399.5" fill="#d7d7af" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">(</text>
+<text x="270.0" y="399.5" fill="#c6c6c6" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">path</text>
+<text x="303.6" y="399.5" fill="#d7d7af" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">,</text>
+<text x="312.0" y="399.5" fill="#c6c6c6" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> mode</text>
+<text x="354.0" y="399.5" fill="#d7d7af" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">,</text>
+<text x="362.4" y="399.5" fill="#c6c6c6" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> cache</text>
+<text x="412.8" y="399.5" fill="#d7d7af" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">,</text>
+<text x="421.2" y="399.5" fill="#c6c6c6" textLength="142.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> DEFAULT_CAPACITY</text>
+<text x="564.0" y="399.5" fill="#d7d7af" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">)</text>
+<text x="51.6" y="417.5" fill="#d7d7af" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">}</text>
+<text x="43.2" y="453.5" fill="#d0d0d0" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Mode</text>
+<text x="76.8" y="453.5" fill="#d0d0d0" textLength="176.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">                    │</text>
+<text x="261.6" y="453.5" fill="#d0d0d0" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Reads</text>
+<text x="303.6" y="453.5" fill="#d0d0d0" textLength="168.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">                   │</text>
+<text x="480.0" y="453.5" fill="#d0d0d0" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Writes</text>
+<text x="18.0" y="471.5" fill="#d0d0d0" textLength="655.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  ─────────────────────────┼─────────────────────────┼────────────────────────</text>
+<text x="43.2" y="489.5" fill="#ff5f5f" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Replay </text>
+<text x="110.4" y="489.5" fill="#d0d0d0" textLength="142.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">                │</text>
+<text x="261.6" y="489.5" fill="#d0d0d0" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">yes</text>
+<text x="286.8" y="489.5" fill="#d0d0d0" textLength="184.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">                     │</text>
+<text x="480.0" y="489.5" fill="#d0d0d0" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">no</text>
+<text x="43.2" y="507.5" fill="#ff5f5f" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Append </text>
+<text x="110.4" y="507.5" fill="#d0d0d0" textLength="142.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">                │</text>
+<text x="261.6" y="507.5" fill="#d0d0d0" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">yes</text>
+<text x="286.8" y="507.5" fill="#d0d0d0" textLength="184.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">                     │</text>
+<text x="480.0" y="507.5" fill="#d0d0d0" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">yes</text>
+<text x="34.8" y="543.5" fill="#585858" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">--------</text>
+<text x="34.8" y="579.5" fill="#d0d0d0" textLength="462.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">• Entries are addressed by byte offset, never by index.</text>
+<text x="34.8" y="597.5" fill="#d0d0d0" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">•</text>
+<text x="51.6" y="597.5" fill="#ff5f5f" textLength="126.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Ledger::flush </text>
+<text x="177.6" y="597.5" fill="#d0d0d0" textLength="378.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> returns once the write has reached the disk.</text>
+<text x="34.8" y="615.5" fill="#d0d0d0" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">• The</text>
+<text x="85.2" y="615.5" fill="#00af5f" font-weight="bold" textLength="117.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">on-disk format</text>
+<text x="211.2" y="615.5" fill="#008787" text-decoration="underline" textLength="277.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">https://example.org/ledger/format</text>
+<text x="488.4" y="615.5" fill="#d0d0d0" textLength="117.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> is documented</text>
+<text x="34.8" y="633.5" fill="#d0d0d0" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">separately.</text>
+<text x="708.0" y="32.0" fill="#e4e4e7" font-size="13" font-weight="bold">marquee-markdown 0.2.1</text>
+<text x="708.0" y="50.0" fill="#a1a1aa" font-size="11">marquee-markdown --config /dev/null docs/compare.md</text>
+<rect x="708.0" y="62.0" width="672.0" height="648.0" fill="#262624" rx="4"/>
+<rect x="724.8" y="368.0" width="638.4" height="18.0" fill="#1f1e1d"/>
+<rect x="724.8" y="386.0" width="638.4" height="18.0" fill="#1f1e1d"/>
+<rect x="724.8" y="404.0" width="638.4" height="18.0" fill="#1f1e1d"/>
+<rect x="724.8" y="422.0" width="638.4" height="18.0" fill="#1f1e1d"/>
+<rect x="716.4" y="494.0" width="84.0" height="18.0" fill="#1f1e1d"/>
+<rect x="808.8" y="494.0" width="58.8" height="18.0" fill="#1f1e1d"/>
+<rect x="876.0" y="494.0" width="67.2" height="18.0" fill="#1f1e1d"/>
+<rect x="733.2" y="530.0" width="58.8" height="18.0" fill="#1f1e1d"/>
+<rect x="733.2" y="566.0" width="58.8" height="18.0" fill="#1f1e1d"/>
+<rect x="724.8" y="674.0" width="126.0" height="18.0" fill="#1f1e1d"/>
+<text x="708.0" y="75.5" fill="#d97757" font-weight="bold" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Ledger</text>
+<text x="708.0" y="93.5" fill="#3d3d3a" textLength="672.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">────────────────────────────────────────────────────────────────────────────────</text>
+<text x="708.0" y="129.5" fill="#f5f4ef" textLength="663.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">A small library for append-only logs. An entry is written once and read back by</text>
+<text x="708.0" y="147.5" fill="#f5f4ef" textLength="285.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">replaying the file from the start.</text>
+<text x="708.0" y="183.5" fill="#d4a27f" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▎</text>
+<text x="724.8" y="183.5" fill="#87867f" font-style="italic" textLength="487.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Written for a talk. The API is illustrative, not shipping.</text>
+<text x="708.0" y="219.5" fill="#7ea3c4" font-weight="bold" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▎ ⓘ Note</text>
+<text x="708.0" y="237.5" fill="#7ea3c4" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▎</text>
+<text x="708.0" y="255.5" fill="#7ea3c4" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▎</text>
+<text x="724.8" y="255.5" fill="#87867f" font-style="italic" textLength="638.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Entries are never rewritten in place. Compaction writes a new file and swaps</text>
+<text x="708.0" y="273.5" fill="#7ea3c4" font-weight="bold" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▎</text>
+<text x="724.8" y="273.5" fill="#87867f" font-style="italic" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">it in.</text>
+<text x="708.0" y="309.5" fill="#f5f4ef" font-weight="bold" textLength="109.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Opening a log</text>
+<text x="708.0" y="327.5" fill="#3d3d3a" textLength="672.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">────────────────────────────────────────────────────────────────────────────────</text>
+<text x="708.0" y="363.5" fill="#3d3d3a" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">╭─</text>
+<text x="733.2" y="363.5" fill="#87867f" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">rust</text>
+<text x="766.8" y="363.5" fill="#3d3d3a" textLength="613.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ───────────────────────────────────────────────────────────────────────╮</text>
+<text x="708.0" y="381.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="724.8" y="381.5" fill="#cc99cc" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">pub</text>
+<text x="758.4" y="381.5" fill="#cc99cc" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">fn</text>
+<text x="783.6" y="381.5" fill="#6699cc" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">open</text>
+<text x="817.2" y="381.5" fill="#d3d0c8" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">(</text>
+<text x="825.6" y="381.5" fill="#f2777a" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">path</text>
+<text x="859.2" y="381.5" fill="#d3d0c8" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">: &amp;Path,</text>
+<text x="934.8" y="381.5" fill="#f2777a" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">mode</text>
+<text x="968.4" y="381.5" fill="#d3d0c8" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">: Mode,</text>
+<text x="1035.6" y="381.5" fill="#f2777a" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">cache</text>
+<text x="1077.6" y="381.5" fill="#d3d0c8" textLength="285.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">: Cache) -&gt; Result&lt;Ledger, OpenErr</text>
+<text x="1363.2" y="381.5" fill="#3d3d3a" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<text x="708.0" y="399.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="724.8" y="399.5" fill="#d3d0c8" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">or&gt; {</text>
+<text x="1363.2" y="399.5" fill="#3d3d3a" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<text x="708.0" y="417.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="724.8" y="417.5" fill="#d3d0c8" textLength="369.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">    Ledger::with_capacity(path, mode, cache,</text>
+<text x="1102.8" y="417.5" fill="#f99157" textLength="134.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">DEFAULT_CAPACITY</text>
+<text x="1237.2" y="417.5" fill="#d3d0c8" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">)</text>
+<text x="1363.2" y="417.5" fill="#3d3d3a" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<text x="708.0" y="435.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="724.8" y="435.5" fill="#d3d0c8" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">}</text>
+<text x="1363.2" y="435.5" fill="#3d3d3a" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> │</text>
+<text x="708.0" y="453.5" fill="#3d3d3a" textLength="672.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">╰──────────────────────────────────────────────────────────────────────────────╯</text>
+<text x="708.0" y="489.5" fill="#3d3d3a" textLength="243.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">┌──────────┬───────┬────────┐</text>
+<text x="708.0" y="507.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="716.4" y="507.5" fill="#f5f4ef" font-weight="bold" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Mode</text>
+<text x="800.4" y="507.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="808.8" y="507.5" fill="#f5f4ef" font-weight="bold" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Reads</text>
+<text x="867.6" y="507.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="876.0" y="507.5" fill="#f5f4ef" font-weight="bold" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Writes</text>
+<text x="943.2" y="507.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="708.0" y="525.5" fill="#3d3d3a" textLength="243.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">├──────────┼───────┼────────┤</text>
+<text x="708.0" y="543.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="724.8" y="543.5" fill="#d97757" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Replay</text>
+<text x="800.4" y="543.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="808.8" y="543.5" fill="#f5f4ef" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> yes</text>
+<text x="867.6" y="543.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="876.0" y="543.5" fill="#f5f4ef" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> no</text>
+<text x="943.2" y="543.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="708.0" y="561.5" fill="#3d3d3a" textLength="243.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">├──────────┼───────┼────────┤</text>
+<text x="708.0" y="579.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="724.8" y="579.5" fill="#d97757" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Append</text>
+<text x="800.4" y="579.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="808.8" y="579.5" fill="#f5f4ef" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> yes</text>
+<text x="867.6" y="579.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="876.0" y="579.5" fill="#f5f4ef" textLength="33.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> yes</text>
+<text x="943.2" y="579.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="708.0" y="597.5" fill="#3d3d3a" textLength="243.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">└──────────┴───────┴────────┘</text>
+<text x="708.0" y="633.5" fill="#3d3d3a" textLength="672.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">────────────────────────────────────────────────────────────────────────────────</text>
+<text x="708.0" y="669.5" fill="#d4a27f" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">•</text>
+<text x="724.8" y="669.5" fill="#f5f4ef" textLength="445.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">Entries are addressed by byte offset, never by index.</text>
+<text x="708.0" y="687.5" fill="#d4a27f" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">•</text>
+<text x="724.8" y="687.5" fill="#d97757" textLength="117.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Ledger::flush</text>
+<text x="850.8" y="687.5" fill="#f5f4ef" textLength="378.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> returns once the write has reached the disk.</text>
+<text x="708.0" y="705.5" fill="#d4a27f" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">•</text>
+<text x="724.8" y="705.5" fill="#f5f4ef" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">The</text>
+<text x="758.4" y="705.5" fill="#d97757" text-decoration="underline" textLength="117.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">on-disk format</text>
+<text x="876.0" y="705.5" fill="#f5f4ef" textLength="218.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> is documented separately.</text>
+<text x="18.0" y="730.0" fill="#a1a1aa" font-size="11">Same document, same 80-column terminal, both at their defaults, no configuration on either side, nothing cropped. Regenerate: python3 scripts/screenshot.py --shot compare</text>
+</svg>

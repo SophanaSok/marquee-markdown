@@ -21,6 +21,31 @@ fn the_readme_documents_every_key_the_reader_binds() {
 }
 
 #[test]
+fn the_readme_pins_no_version_that_could_go_stale() {
+    // This drifted twice: prose announcing "0.1.0 is out" while the crate was
+    // at 0.2.1, and install examples naming a file only one release ever had.
+    // The crates.io badge already renders the current version live, so nothing
+    // in the prose needs to repeat it. The MSRV is exempt — it is a floor the
+    // release process does not move.
+    let readme = include_str!("../README.md");
+    let allowed = ["1.88", "3.0.0"]; // MSRV, and the glow release compared against
+    for (number, line) in readme.lines().enumerate() {
+        for word in line.split(|c: char| !(c.is_ascii_digit() || c == '.')) {
+            let digits: Vec<&str> = word.split('.').collect();
+            let is_version = digits.len() == 3
+                && digits
+                    .iter()
+                    .all(|d| !d.is_empty() && d.chars().all(|c| c.is_ascii_digit()));
+            assert!(
+                !is_version || allowed.contains(&word),
+                "README line {} pins version {word:?}, which will go stale:\n  {line}",
+                number + 1
+            );
+        }
+    }
+}
+
+#[test]
 fn the_readme_spells_keys_the_way_a_config_file_will() {
     // The tables double as a reference for `[keys.*]`, so every key they name
     // has to parse as a chord.

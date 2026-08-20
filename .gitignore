@@ -3,3 +3,6 @@
 
 # insta snapshot review artifacts
 *.snap.new
+
+# python bytecode from scripts/
+__pycache__/

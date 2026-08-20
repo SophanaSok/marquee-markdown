@@ -18,6 +18,7 @@ use crate::render::doc::LineKind;
 use crate::render::frag::{self, Breaks, Frag, FragKind, IgnoreLinks};
 use crate::render::measure;
 use crate::render::wrap::{self, WrapMode};
+use crate::theme::Theme;
 
 pub(super) fn emit(
     ctx: &mut Context<'_>,
@@ -39,7 +40,7 @@ pub(super) fn emit(
     // that, a framed table shreds prose into unreadable 2-character columns,
     // so stack the rows as `label: value` cards instead.
     let Some(widths) = (avail > chrome)
-        .then(|| solve_widths(columns, header, rows, avail - chrome))
+        .then(|| solve_widths(ctx, columns, header, rows, avail - chrome))
         .flatten()
     else {
         return emit_cards(ctx, header, rows, span);
@@ -83,11 +84,48 @@ pub(super) fn emit(
 /// pathological token should not force every table into card layout.
 const MAX_MIN_COLUMN: usize = 24;
 
+/// A cell's natural and minimum width, measured from the fragments that will
+/// actually be drawn.
+///
+/// Measuring the cell's plain text instead looks equivalent and is not: an
+/// inline code span is drawn as a padded chip, two columns wider than the text
+/// it contains. The solver would hand the emitter a column too narrow for its
+/// own content, and the cell would wrap into a three-line row — a blank line,
+/// the text, another blank — for no reason a reader could see.
+fn measure_cell(content: &[Inline], theme: &Theme) -> (usize, usize) {
+    let frags = frag::fragment(
+        content,
+        Style::new(),
+        theme,
+        &mut IgnoreLinks,
+        Breaks::Collapse,
+    );
+    let natural: usize = frags.iter().map(|f| f.width).sum();
+
+    // The widest run the wrapper cannot break: a word plus the glue stuck to it.
+    let (mut widest, mut run) = (0usize, 0usize);
+    for f in &frags {
+        match f.kind {
+            FragKind::Glue => run += f.width,
+            FragKind::Word => {
+                widest = widest.max(run);
+                run = f.width;
+            }
+            FragKind::Space | FragKind::Break => {
+                widest = widest.max(run);
+                run = 0;
+            }
+        }
+    }
+    (natural, widest.max(run))
+}
+
 /// Solve per-column widths against a content budget.
 ///
 /// Returns `None` when even the per-column minimums (each column's widest
 /// unbreakable word) do not fit — the caller then falls back to cards.
 fn solve_widths(
+    ctx: &Context<'_>,
     columns: usize,
     header: &[Vec<Inline>],
     rows: &[Vec<Vec<Inline>>],
@@ -96,14 +134,9 @@ fn solve_widths(
     let mut min = vec![1usize; columns];
     let mut nat = vec![1usize; columns];
     let mut measure_cell = |col: usize, content: &[Inline]| {
-        let text = Inline::plain_text(content);
-        nat[col] = nat[col].max(measure::width(&text));
-        let widest_word = text
-            .split_whitespace()
-            .map(measure::width)
-            .max()
-            .unwrap_or(0);
-        min[col] = min[col].max(widest_word.min(MAX_MIN_COLUMN));
+        let (cell_nat, cell_min) = measure_cell(content, ctx.theme);
+        nat[col] = nat[col].max(cell_nat);
+        min[col] = min[col].max(cell_min.min(MAX_MIN_COLUMN));
     };
     for (col, cell) in header.iter().enumerate() {
         measure_cell(col, cell);

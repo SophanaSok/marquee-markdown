@@ -25,8 +25,9 @@
   <code>python3 scripts/screenshot.py</code>.
 </sub></p>
 
-> **Status: 0.1.0 is out.** Everything documented here works today. See
-> [docs/ROADMAP.md](docs/ROADMAP.md) for what is planned before 1.0.
+> **Released and in use.** Everything documented here works today; the badge
+> above is the current version. See [docs/ROADMAP.md](docs/ROADMAP.md) for what
+> is planned before 1.0.
 
 ## What it does
 
@@ -52,18 +53,24 @@ over. But rendering the same document through glow 3.0.0 shows what this fixes:
 | glow | marquee-markdown |
 | --- | --- |
 | `## Heading` — hash marks reach the output | typography: weight, color, rhythm, a hairline rule |
-| Blockquotes prefixed with ASCII `\|` | an accent `▎` gutter bar |
 | `[!NOTE]` printed literally | an icon-and-title callout in its own hue |
-| Tables with no border, bare `---\|---` | box drawing with a shaded header band |
+| Tables with no outer frame, columns stretched to the full width | box drawing with a shaded header band, columns sized to content |
 | Thematic breaks as `--------` | a hairline `─` across the column |
 | Long code lines wrap *out* of the block | they stay sealed inside the card |
-| OSC 8 escapes counted as width, leaving ragged lines | escapes cannot reach width math |
+| Link targets printed inline, interrupting the sentence | link text reads as text; `]` walks them, `enter` opens |
 | 2-space margin | a centered reading column, page painted edge to edge |
 | No outline, no in-document search | a scroll-tracking contents pane, and `/` `n` `N` |
 | Keys hardcoded, cannot be rebound | every key resolves through a rebindable action table |
 
 The last two rows are the ones that made this worth building. The rest are
 rendering details that add up.
+
+<p align="center">
+  <img src="docs/compare-glow.svg" alt="The same document rendered by glow on the left and marquee-markdown on the right" width="100%">
+</p>
+
+<p align="center"><sub>The same document, the same 80-column terminal, both at their defaults and with no
+configuration on either side. glow left, marquee-markdown right.</sub></p>
 
 ## Install
 
@@ -90,10 +97,10 @@ archives and SHA-256 checksums alongside.
 
 ```sh
 # Debian and derivatives
-sudo dpkg -i marquee-markdown_0.1.0-1_amd64.deb
+sudo dpkg -i marquee-markdown_*_amd64.deb
 
 # Fedora and derivatives
-sudo rpm -i marquee-markdown-0.1.0-1.x86_64.rpm
+sudo rpm -i marquee-markdown-*.x86_64.rpm
 ```
 
 Homebrew and Scoop manifests live in [`packaging/`](packaging/); there is no
@@ -221,6 +228,12 @@ never drags the cursor away mid-keystroke. The pane hides itself on a narrow
 terminal, and on a document with fewer than two headings, where it would cost
 a quarter of the screen to say nothing.
 
+<p align="center">
+  <img src="docs/screenshot-search.svg" alt="Searching a document: matches highlighted in place, the current one accented, the count in the status bar" width="100%">
+</p>
+
+<p align="center"><sub><code>/</code> narrows as you type; <code>n</code> and <code>N</code> walk the matches.</sub></p>
+
 ## Browsing
 
 Run `marquee-markdown` with no argument, or point it at a directory, and it
@@ -266,6 +279,12 @@ back. A phrase broken across a soft wrap matches, with the highlight split
 across both lines; markers and gutter bars are decoration, not text, and never
 match. A lowercase query ignores case; a query with any capital in it does
 not. `esc` clears the highlight.
+
+<p align="center">
+  <img src="docs/screenshot-browser.svg" alt="The file browser listing markdown files found under the current directory, newest first" width="100%">
+</p>
+
+<p align="center"><sub>Run <code>mmd</code> with a directory, or with nothing at all, to browse.</sub></p>
 
 ## Editing, reloading, and copying
 
@@ -425,6 +444,12 @@ image = ""
 ```
 
 `marquee-markdown themes` lists what is available and where each came from.
+
+<p align="center">
+  <img src="docs/screenshot-paper.svg" alt="The same document in the paper theme, dark text on a light page" width="100%">
+</p>
+
+<p align="center"><sub>The same document in <code>paper</code>. Themes are data — a new palette needs no recompile.</sub></p>
 
 ## Using the renderer as a library
 
