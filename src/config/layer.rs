@@ -9,7 +9,14 @@ use super::schema::File;
 
 /// Settings from one source. `None` means the source said nothing, which is
 /// different from saying "off".
+///
+/// Adding a setting is routine here, and adding a public field to a struct
+/// anyone can write as a literal is a breaking change — which made every
+/// new setting cost a release. `non_exhaustive` buys that back: outside
+/// this crate these are built from [`Default`] and then assigned to, so a
+/// field arriving later is not an API break.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Layer {
     /// Theme name or path.
     pub style: Option<String>,

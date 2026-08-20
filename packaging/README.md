@@ -78,9 +78,7 @@ attribute cases both programs actually emit.
    notes from that section by matching the version, so the heading has to
    contain it — and refuses to release when it finds none.
 2. Bump `version` in `Cargo.toml`, and run `cargo check` so `Cargo.lock`
-   follows. Adding a public field to a configuration struct is a breaking
-   change before 1.0 — `cargo semver-checks` says so, and the bump has to
-   be a minor one.
+   follows.
 3. Commit, tag `vX.Y.Z`, and push the tag.
 4. Once the release exists, move the Scoop manifest to it: version, url,
    `extract_dir`, and the hash from the release's `checksums.txt`. Then

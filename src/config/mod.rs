@@ -27,7 +27,14 @@ pub use schema::File;
 pub const CONFIG_ENV: &str = "MARQUEE_CONFIG";
 
 /// The settings the program runs with.
+///
+/// Adding a setting is routine here, and adding a public field to a struct
+/// anyone can write as a literal is a breaking change — which made every
+/// new setting cost a release. `non_exhaustive` buys that back: outside
+/// this crate these are built from [`Default`] and then assigned to, so a
+/// field arriving later is not an API break.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub struct Config {
     /// Theme name or path.
     pub style: String,

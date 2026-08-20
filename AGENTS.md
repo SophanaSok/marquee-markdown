@@ -229,8 +229,7 @@ whose text contains escapes.
 workflow gates the rest and publishes to crates.io itself. The parts that
 are easy to forget: `docs/KEYBINDINGS.md` is generated, the changelog
 heading must contain the version (the release workflow refuses to release
-without it), adding a public field to a configuration struct is a breaking
-change that `cargo semver-checks` will require a minor bump for, the Scoop
+without it), the Scoop
 manifest is moved to the release *after* it exists and checked by
 `cargo test --test network -- --ignored`, and the man page and completions
 come from the binary rather than the repository.
