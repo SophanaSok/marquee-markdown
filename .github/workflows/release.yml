@@ -186,6 +186,36 @@ jobs:
           find artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name '*.deb' -o -name '*.rpm' \) \
             -exec cp {} release/ \;
           cd release && sha256sum * > checksums.txt
+      # Built here rather than kept in the repository, because the hash cannot
+      # exist before the archive does — which is exactly how the checked-in
+      # manifest came to sit two releases behind. Generated from the checksums
+      # this run just wrote, so it cannot describe a different build.
+      - name: Build the Scoop manifest from the checksums
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          archive="marquee-markdown-v$version-x86_64-windows.zip"
+          hash=$(awk -v a="$archive" '$2 == a { print $1 }' release/checksums.txt)
+          if [ "${#hash}" -ne 64 ]; then
+            echo "no sha256 for $archive in checksums.txt" >&2
+            exit 1
+          fi
+          sed -e "s/@VERSION@/$version/g" -e "s/@HASH@/$hash/g" \
+            packaging/scoop/marquee-markdown.template.json > release/marquee-markdown.json
+          python3 - "$version" "$hash" <<'CHECK'
+          import json, sys
+          version, hash_ = sys.argv[1], sys.argv[2]
+          text = open("release/marquee-markdown.json").read()
+          assert "@" not in text, "a placeholder was left unsubstituted"
+          m = json.loads(text)
+          arch = m["architecture"]["64bit"]
+          assert m["version"] == version, m["version"]
+          assert arch["hash"] == hash_, arch["hash"]
+          for field in ("url", "extract_dir"):
+              assert f"v{version}" in arch[field], arch[field]
+          assert "$version" in m["autoupdate"]["architecture"]["64bit"]["url"]
+          print(f"scoop manifest: {version} {hash_[:12]}...")
+          CHECK
+
       - name: Take the notes from the changelog
         id: notes
         run: |

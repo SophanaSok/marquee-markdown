@@ -5,23 +5,25 @@ What is here, and what fills in the blanks.
 | File | Filled in by |
 | --- | --- |
 | `homebrew/marquee-markdown.rb` | `brew bump-formula-pr`, from the release checksums |
-| `scoop/marquee-markdown.json` | the version and hash from `checksums.txt` |
+| `scoop/marquee-markdown.template.json` | the release workflow, from `checksums.txt` |
 
 Neither a Homebrew tap nor a Scoop bucket exists yet; these are the manifests
-to put in one. The Scoop manifest pins a released artifact, so it lags
-`Cargo.toml` between a bump and the release that carries it. Two checks hold
-it honest: `tests/docs.rs` fails offline if its version, url and
-`extract_dir` disagree with each other, and the live
-`the_scoop_manifest_names_the_latest_release` in `tests/network.rs` fails if
-it has fallen behind the newest release or pins a checksum that release did
-not publish. Run the live ones after a release:
+to put in one.
 
-```sh
-cargo test --test network -- --ignored
-```
+The Scoop manifest is **not** kept here — only the template is. A manifest
+pins a hash, and a hash cannot exist before the archive it describes, so a
+checked-in one is stale from the moment a release is tagged until somebody
+remembers to move it. It sat at 0.1.0 through two releases that way. The
+release workflow now fills the template from the `checksums.txt` it has just
+written and attaches `marquee-markdown.json` to the release, so the manifest
+for a version is built by the run that builds that version and cannot
+describe a different one. To start a bucket, take that asset.
 
-In a bucket, the `checkver` and `autoupdate` blocks keep it current on their
-own.
+`tests/docs.rs` guards the contract between the two: that the placeholders
+the workflow substitutes are there, that filling them yields valid JSON with
+the version in its url and `extract_dir`, and that Scoop's own `$version` in
+the `autoupdate` block — which keeps a bucket current on its own — is not
+one of them.
 
 Debian and RPM metadata live in `Cargo.toml` under `[package.metadata.deb]` and
 `[package.metadata.generate-rpm]`; the release workflow builds both with
@@ -80,16 +82,14 @@ attribute cases both programs actually emit.
 2. Bump `version` in `Cargo.toml`, and run `cargo check` so `Cargo.lock`
    follows.
 3. Commit, tag `vX.Y.Z`, and push the tag.
-4. Once the release exists, move the Scoop manifest to it: version, url,
-   `extract_dir`, and the hash from the release's `checksums.txt`. Then
-   `cargo test --test network -- --ignored` confirms it.
 
-The workflow does the rest, in an order that cannot leave the two sides
-disagreeing: it first refuses a tag that does not match `Cargo.toml` or a
-changelog with no notes for the version, then builds the archives, the Debian
-and RPM packages, and the checksums, then publishes the crate to crates.io,
-and only then drafts the GitHub release — so a release page never exists for
-a version crates.io does not have. A failed job is rerun with "re-run failed
+That is the whole of it — there is no step afterwards. The workflow does the
+rest, in an order that cannot leave the two sides disagreeing: it first
+refuses a tag that does not match `Cargo.toml` or a changelog with no notes
+for the version, then builds the archives, the Debian and RPM packages, and
+the checksums, then builds the Scoop manifest from those checksums, then
+publishes the crate to crates.io, and only then drafts the GitHub release —
+so a release page never exists for a version crates.io does not have. A failed job is rerun with "re-run failed
 jobs"; a publish that already succeeded is not run twice.
 
 Publishing authenticates over GitHub OIDC ([trusted

@@ -163,33 +163,52 @@ fn readme_images_are_absolute_and_point_at_real_files() {
 }
 
 #[test]
-fn the_scoop_manifest_is_internally_consistent() {
-    // The manifest pins a *released* artifact, so it lags `Cargo.toml` by
-    // design: between a version bump and the release that carries it, there is
-    // no archive to point at and no checksum to name. What can be checked
-    // without a network is that its three version-bearing fields agree — a
-    // manifest whose version was moved and whose url was not installs the old
-    // release under the new name. Whether it names the *latest* release is
-    // checked live, in `tests/network.rs`.
+fn the_scoop_template_fills_in_to_a_manifest_scoop_can_use() {
+    // The manifest is built by the release workflow from `checksums.txt`,
+    // because a hash cannot exist before the archive it describes. What lives
+    // in the repository is the template, so there is no pinned version here to
+    // fall behind — which is what happened when there was: it sat at 0.1.0
+    // through two releases.
+    //
+    // This guards the contract the workflow depends on: the placeholders it
+    // substitutes, and that substituting them yields the manifest Scoop wants.
     //
     // `packaging/` is excluded from the published crate, so inside the package
     // there is nothing to check.
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("packaging/scoop/marquee-markdown.json");
-    let Ok(text) = std::fs::read_to_string(&path) else {
+        .join("packaging/scoop/marquee-markdown.template.json");
+    let Ok(template) = std::fs::read_to_string(&path) else {
         return;
     };
-    let manifest: serde_json::Value = serde_json::from_str(&text).expect("valid JSON");
-    let version = manifest["version"].as_str().expect("a version field");
+
+    let filled = template
+        .replace("@VERSION@", "9.9.9")
+        .replace("@HASH@", &"a".repeat(64));
+    assert!(
+        !filled.contains('@'),
+        "a placeholder the release workflow does not substitute survived: {filled}"
+    );
+
+    let manifest: serde_json::Value =
+        serde_json::from_str(&filled).expect("valid JSON once filled");
+    assert_eq!(manifest["version"], "9.9.9");
     let arch = &manifest["architecture"]["64bit"];
     for field in ["url", "extract_dir"] {
         let value = arch[field].as_str().unwrap_or_else(|| panic!("a {field}"));
         assert!(
-            value.contains(&format!("v{version}")),
-            "the scoop manifest says version {version} but its {field} says {value} — \
-             move them together"
+            value.contains("v9.9.9"),
+            "{field} does not carry the version: {value}"
         );
     }
-    let hash = arch["hash"].as_str().expect("a hash field");
-    assert_eq!(hash.len(), 64, "the pinned hash is not a sha256: {hash}");
+    assert_eq!(arch["hash"].as_str().expect("a hash").len(), 64);
+
+    // Scoop's own `$version` in the autoupdate block is its syntax, not ours,
+    // and substituting it would break a bucket's ability to update itself.
+    let autoupdate = manifest["autoupdate"]["architecture"]["64bit"]["url"]
+        .as_str()
+        .expect("an autoupdate url");
+    assert!(
+        autoupdate.contains("$version"),
+        "the autoupdate block lost its own placeholder: {autoupdate}"
+    );
 }

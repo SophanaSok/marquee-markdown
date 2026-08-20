@@ -1,14 +1,14 @@
 {
   "$schema": "https://raw.githubusercontent.com/ScoopInstaller/Scoop/master/schema.json",
-  "version": "0.3.0",
+  "version": "@VERSION@",
   "description": "TUI markdown reader that renders documents like Claude artifacts",
   "homepage": "https://github.com/SophanaSok/marquee-markdown",
   "license": "MIT",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/SophanaSok/marquee-markdown/releases/download/v0.3.0/marquee-markdown-v0.3.0-x86_64-windows.zip",
-      "hash": "2977b3d2a31ac439069079ec9899fce7beabfbcb804eff8a895b459ec0796dc2",
-      "extract_dir": "marquee-markdown-v0.3.0-x86_64-windows"
+      "url": "https://github.com/SophanaSok/marquee-markdown/releases/download/v@VERSION@/marquee-markdown-v@VERSION@-x86_64-windows.zip",
+      "hash": "@HASH@",
+      "extract_dir": "marquee-markdown-v@VERSION@-x86_64-windows"
     }
   },
   "bin": [
