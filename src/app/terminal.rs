@@ -6,7 +6,7 @@
 //! runs the same restoration before the panic message is printed — otherwise
 //! the message lands on the alternate screen and vanishes with it.
 //!
-//! [`setup`] and [`teardown`] are mirrors, and a test holds them to it. Every
+//! `setup` and `teardown` are mirrors, and a test holds them to it. Every
 //! mode this program depends on has to be asked for here, because the state it
 //! inherits is whatever the last program to run happened to leave behind — and
 //! an editor opened with `e` leaves behind its own idea of the terminal, not
@@ -170,7 +170,12 @@ pub fn install_panic_hook() {
     }));
 }
 
-#[cfg(test)]
+// Unix only, and not because the invariant is: crossterm drives some of these
+// modes through the console API on Windows rather than as escape sequences, so
+// queueing them into a buffer would reach for the real console and write
+// nothing to inspect. The mirror still has to hold there; it just cannot be
+// read off the bytes.
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
     use std::collections::BTreeMap;
