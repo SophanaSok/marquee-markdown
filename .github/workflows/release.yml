@@ -11,8 +11,38 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  preflight:
+    # The gates that make a half-made release impossible. A tag that does not
+    # match the manifest, or a changelog with nothing to say for the version,
+    # stops everything before a single binary is built — both have produced
+    # quiet drift before: an empty release body, and a Scoop manifest two
+    # releases behind.
+    name: The tag matches the crate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The tag and Cargo.toml name the same version
+        run: |
+          version=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "the tag is $GITHUB_REF_NAME but Cargo.toml says $version" >&2
+            exit 1
+          fi
+      - name: The changelog has notes for this version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          awk -v ver="$version" '
+            /^## / { if (found) exit; if (index($0, ver)) found = 1; next }
+            found { print }
+          ' CHANGELOG.md > notes.md
+          if ! grep -q '[^[:space:]]' notes.md; then
+            echo "CHANGELOG.md has no notes under a heading containing $version" >&2
+            exit 1
+          fi
+
   build:
     name: Build ${{ matrix.name }}
+    needs: preflight
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -102,6 +132,7 @@ jobs:
 
   linux-packages:
     name: Debian and RPM packages
+    needs: preflight
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -118,9 +149,31 @@ jobs:
             target/debian/*.deb
             target/generate-rpm/*.rpm
 
+  publish-crate:
+    # crates.io gets the crate from the same commit as everything else, over
+    # OIDC (trusted publishing) rather than a stored token — publishing by
+    # hand is the step that used to be forgettable. Runs after the builds so
+    # a broken release never publishes, and before the GitHub release so a
+    # release page never exists for a version crates.io does not have.
+    name: Publish to crates.io
+    needs: [preflight, build, linux-packages]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write # OIDC, exchanged for a temporary crates.io token
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: rust-lang/crates-io-auth-action@v1
+        id: auth
+      - run: cargo publish --locked
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
   release:
     name: Publish the release
-    needs: [build, linux-packages]
+    needs: [build, linux-packages, publish-crate]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

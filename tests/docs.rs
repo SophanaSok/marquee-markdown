@@ -91,3 +91,105 @@ fn the_keybindings_reference_is_current() {
          `cargo run -- keys > docs/KEYBINDINGS.md`"
     );
 }
+
+#[test]
+fn every_relative_link_in_the_readme_resolves() {
+    // A renamed document or a deleted file breaks these silently otherwise —
+    // on GitHub, on crates.io, and in every packaged copy of this README.
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    for target in relative_targets() {
+        // `packaging/` is excluded from the published crate, so inside the
+        // package its absence is expected rather than a broken link.
+        if target.starts_with("packaging") && !root.join("packaging").exists() {
+            continue;
+        }
+        assert!(
+            root.join(&target).exists(),
+            "the README links to {target:?}, which does not exist"
+        );
+    }
+}
+
+/// Every link or image target in the README that is a path rather than a URL
+/// or an anchor.
+fn relative_targets() -> Vec<String> {
+    let readme = include_str!("../README.md");
+    let mut targets = Vec::new();
+    for (open, close) in [("](", ')'), ("href=\"", '"'), ("src=\"", '"')] {
+        for rest in readme.split(open).skip(1) {
+            let target = rest.split(close).next().expect("the target ends");
+            if target.starts_with("http") || target.starts_with('#') || target.is_empty() {
+                continue;
+            }
+            targets.push(target.to_owned());
+        }
+    }
+    assert!(
+        !targets.is_empty(),
+        "the README has no relative links at all"
+    );
+    targets
+}
+
+#[test]
+fn readme_images_are_absolute_and_point_at_real_files() {
+    // crates.io renders the README too, and rewrites relative image paths
+    // against the repository — a path that has worked on GitHub and broken on
+    // crates.io more than once. Absolute raw URLs render identically on both,
+    // and each must name a file that is actually in the tree, or a rename
+    // would only be noticed on the crates.io page after a release.
+    let readme = include_str!("../README.md");
+    let raw = "https://raw.githubusercontent.com/SophanaSok/marquee-markdown/main/";
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut repository_images = 0;
+    for rest in readme.split("src=\"").skip(1) {
+        let target = rest.split('"').next().expect("the target ends");
+        assert!(
+            target.starts_with("https://"),
+            "image {target:?} is not an absolute URL, so crates.io would rewrite it"
+        );
+        if let Some(path) = target.strip_prefix(raw) {
+            assert!(
+                root.join(path).exists(),
+                "image {target:?} points at nothing in the tree"
+            );
+            repository_images += 1;
+        }
+    }
+    assert!(
+        repository_images >= 5,
+        "only {repository_images} repository images found in the README"
+    );
+}
+
+#[test]
+fn the_scoop_manifest_is_internally_consistent() {
+    // The manifest pins a *released* artifact, so it lags `Cargo.toml` by
+    // design: between a version bump and the release that carries it, there is
+    // no archive to point at and no checksum to name. What can be checked
+    // without a network is that its three version-bearing fields agree — a
+    // manifest whose version was moved and whose url was not installs the old
+    // release under the new name. Whether it names the *latest* release is
+    // checked live, in `tests/network.rs`.
+    //
+    // `packaging/` is excluded from the published crate, so inside the package
+    // there is nothing to check.
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("packaging/scoop/marquee-markdown.json");
+    let Ok(text) = std::fs::read_to_string(&path) else {
+        return;
+    };
+    let manifest: serde_json::Value = serde_json::from_str(&text).expect("valid JSON");
+    let version = manifest["version"].as_str().expect("a version field");
+    let arch = &manifest["architecture"]["64bit"];
+    for field in ["url", "extract_dir"] {
+        let value = arch[field].as_str().unwrap_or_else(|| panic!("a {field}"));
+        assert!(
+            value.contains(&format!("v{version}")),
+            "the scoop manifest says version {version} but its {field} says {value} — \
+             move them together"
+        );
+    }
+    let hash = arch["hash"].as_str().expect("a hash field");
+    assert_eq!(hash.len(), 64, "the pinned hash is not a sha256: {hash}");
+}
