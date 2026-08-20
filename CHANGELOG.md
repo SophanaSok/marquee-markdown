@@ -12,7 +12,7 @@ LayoutOptions}`, `render::{ansi, tui, overlay, measure}`, and all of `theme`.
 pipeline — `parse`, `block`, `frag`, `wrap`, `sink`, `layout`, `highlight`.
 Until 1.0 both halves may change.
 
-## [Unreleased]
+## [0.3.0] - 2026-08-20
 
 ### Added
 
@@ -446,7 +446,8 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
 - Resizing re-lays out on every event; a large document dragged by a window
   edge will work harder than it needs to until a debounce lands.
 
-[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/SophanaSok/marquee-markdown/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/SophanaSok/marquee-markdown/releases/tag/v0.1.0
