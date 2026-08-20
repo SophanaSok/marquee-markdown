@@ -4,7 +4,6 @@
 //! the overlay cannot drift out of date the way a hand-written list would.
 
 use ratatui::Frame;
-use ratatui::layout::Rect;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Clear, Paragraph};
 
@@ -29,7 +28,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
         .unwrap_or(0);
     let widest = key_width + 2 + description_width;
 
-    let area = centered(
+    let area = super::centered(
         frame.area(),
         u16::try_from(widest + 4).unwrap_or(u16::MAX),
         u16::try_from(rows.len() + 2).unwrap_or(u16::MAX),
@@ -94,21 +93,8 @@ fn rows(app: &App) -> Vec<(String, String)> {
         .collect()
 }
 
-/// A rectangle of at most `width` by `height`, centered in `area`.
-fn centered(area: Rect, width: u16, height: u16) -> Rect {
-    let width = width.min(area.width);
-    let height = height.min(area.height);
-    Rect {
-        x: area.x + (area.width - width) / 2,
-        y: area.y + (area.height - height) / 2,
-        width,
-        height,
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::app::action::Action;
     use crate::app::keymap::{Keymap, Mode};
     use crate::app::state::{App, Options, Overlay};
@@ -116,6 +102,7 @@ mod tests {
     use crate::theme::{Theme, ThemeVariant};
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+    use ratatui::layout::Rect;
 
     fn app() -> App {
         let mut app = App::new(

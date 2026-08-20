@@ -13,6 +13,7 @@
 pub mod keys;
 pub mod layer;
 pub mod schema;
+pub mod write;
 
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};

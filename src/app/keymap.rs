@@ -20,7 +20,11 @@ use super::action::Action;
 ///
 /// The mode is always derived from application state, never stored, so the
 /// keymap and the visible focus cannot drift apart.
+///
+/// `non_exhaustive` because a new mode arrives with every new overlay, and
+/// each one would otherwise be a breaking change.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[non_exhaustive]
 pub enum Mode {
     /// Reading a document.
     Document,
@@ -32,6 +36,8 @@ pub enum Mode {
     Prompt,
     /// The key reference is open.
     Help,
+    /// The theme picker is open.
+    Themes,
 }
 
 impl Mode {
@@ -42,6 +48,7 @@ impl Mode {
         Self::Toc,
         Self::Prompt,
         Self::Help,
+        Self::Themes,
     ];
 
     /// The mode a configuration file's `[keys.<name>]` section refers to.
@@ -59,6 +66,7 @@ impl Mode {
             Self::Toc => "toc",
             Self::Prompt => "prompt",
             Self::Help => "help",
+            Self::Themes => "themes",
         }
     }
 }
@@ -276,6 +284,7 @@ const DEFAULTS: &[(Mode, &str, Action)] = &[
     (Mode::Document, "t", Action::ToggleToc),
     (Mode::Document, "tab", Action::FocusNext),
     (Mode::Document, "T", Action::ToggleTheme),
+    (Mode::Document, "s", Action::ThemePicker),
     (Mode::Document, "?", Action::ToggleHelp),
     (Mode::Document, "esc", Action::Escape),
     (Mode::Document, "q", Action::Quit),
@@ -310,6 +319,7 @@ const DEFAULTS: &[(Mode, &str, Action)] = &[
     (Mode::Browser, "r", Action::BrowserRescan),
     (Mode::Browser, ".", Action::BrowserToggleHidden),
     (Mode::Browser, "T", Action::ToggleTheme),
+    (Mode::Browser, "s", Action::ThemePicker),
     (Mode::Browser, "?", Action::ToggleHelp),
     (Mode::Browser, "esc", Action::Escape),
     (Mode::Browser, "q", Action::Quit),
@@ -334,6 +344,7 @@ const DEFAULTS: &[(Mode, &str, Action)] = &[
     (Mode::Toc, "t", Action::ToggleToc),
     (Mode::Toc, "/", Action::SearchStart),
     (Mode::Toc, "T", Action::ToggleTheme),
+    (Mode::Toc, "s", Action::ThemePicker),
     (Mode::Toc, "?", Action::ToggleHelp),
     (Mode::Toc, "esc", Action::Escape),
     (Mode::Toc, "q", Action::Quit),
@@ -367,6 +378,23 @@ const DEFAULTS: &[(Mode, &str, Action)] = &[
     (Mode::Help, "esc", Action::Escape),
     (Mode::Help, "q", Action::Escape),
     (Mode::Help, "ctrl+c", Action::Quit),
+    // The picker takes the movement keys the contents pane takes, because it
+    // is the same gesture: a list with a cursor on it. Every move previews the
+    // theme under the cursor, so `enter` only has to stop previewing — and
+    // `esc`, like `q`, puts back the theme that was on when it opened.
+    (Mode::Themes, "j", Action::ThemeDown),
+    (Mode::Themes, "down", Action::ThemeDown),
+    (Mode::Themes, "k", Action::ThemeUp),
+    (Mode::Themes, "up", Action::ThemeUp),
+    (Mode::Themes, "g", Action::ThemeTop),
+    (Mode::Themes, "home", Action::ThemeTop),
+    (Mode::Themes, "G", Action::ThemeBottom),
+    (Mode::Themes, "end", Action::ThemeBottom),
+    (Mode::Themes, "enter", Action::ThemeAccept),
+    (Mode::Themes, "s", Action::ThemePicker),
+    (Mode::Themes, "esc", Action::Escape),
+    (Mode::Themes, "q", Action::Escape),
+    (Mode::Themes, "ctrl+c", Action::Quit),
 ];
 
 /// Bindings that only make sense on some platforms. Absent rather than inert,

@@ -63,6 +63,12 @@ syntect = { version = "5.3.0", default-features = false, features = [
 ] }
 textwrap = "0.16.2"
 toml = "1.1.4"
+# Reading configuration is `toml`'s job; writing one setting back into a file
+# somebody hand-wrote is this one's. The theme picker edits `[general] style`
+# in place, and a reader who loses their comments to a theme change would be
+# right to be annoyed. It shares `winnow` and `indexmap` with what is already
+# here, so it costs one crate and no new transitive dependencies.
+toml_edit = "0.25.13"
 two-face = { version = "0.5.2", default-features = false, features = ["syntect-fancy"] }
 unicode-normalization = "0.1.25"
 unicode-segmentation = "1.13.3"

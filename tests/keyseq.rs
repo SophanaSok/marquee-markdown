@@ -67,10 +67,15 @@ fn nested() -> String {
 
 /// Type `script` at a reader over `text` and return the resulting state.
 fn run(text: &str, script: &str) -> App {
+    run_with(text, script, Options::default())
+}
+
+/// The same, with the reader's settings spelled out.
+fn run_with(text: &str, script: &str, options: Options) -> App {
     let mut app = App::new(
         Source::from_text(text, None, "doc.md".into(), Base::Cwd),
         Theme::new(ThemeVariant::Slate),
-        Options::default(),
+        options,
     );
     let mut terminal = Terminal::new(TestBackend::new(80, 24)).expect("test terminal");
     let mut events = ScriptedEvents::new(keys(script));
@@ -85,6 +90,58 @@ fn scrolling_down_and_back_returns_to_the_start() {
         app.summary(),
         "mode=document top=0 left=0 section=heading-1 toc=heading-1 search=- theme=slate quit=false"
     );
+}
+
+#[test]
+fn typing_q_in_the_theme_picker_closes_it_instead_of_quitting() {
+    // The same modal bug as the help overlay, and the reason a new mode has to
+    // arrive here: `q` is quit everywhere else.
+    let app = run(&document(), "sq");
+    assert!(!app.should_quit, "the picker swallowed the document");
+    assert_eq!(
+        app.summary(),
+        "mode=document top=0 left=0 section=heading-1 toc=heading-1 search=- theme=slate quit=false"
+    );
+}
+
+#[test]
+fn the_theme_picker_previews_as_it_moves_and_puts_it_back_on_escape() {
+    let text = document();
+    // `paper` sorts before `slate`, so `k` from the theme in force lands on it.
+    let previewing = run(&text, "sk");
+    assert_eq!(
+        previewing.summary(),
+        "mode=themes top=0 left=0 section=heading-1 toc=heading-1 search=- theme=paper quit=false"
+    );
+    assert_eq!(
+        run(&text, "sk<esc>").summary(),
+        "mode=document top=0 left=0 section=heading-1 toc=heading-1 search=- theme=slate quit=false"
+    );
+}
+
+#[test]
+fn scrolling_keys_move_the_picker_rather_than_the_document() {
+    // `j` and `k` mean something else in this mode; the document must not move
+    // underneath the panel while the cursor is being driven.
+    let app = run(&document(), "sjjkk");
+    assert_eq!(app.view.top, 0);
+}
+
+#[test]
+fn accepting_a_theme_keeps_it_and_writes_it_down() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("config.toml");
+    let mut options = Options::default();
+    options.config_path = Some(path.clone());
+
+    let app = run_with(&document(), "sk\r", options);
+    assert_eq!(
+        app.summary(),
+        "mode=document top=0 left=0 section=heading-1 toc=heading-1 search=- theme=paper quit=false"
+    );
+
+    let written = std::fs::read_to_string(&path).expect("the theme was written down");
+    assert!(written.contains("style = \"paper\""), "{written}");
 }
 
 #[test]

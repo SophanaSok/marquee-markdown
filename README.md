@@ -226,6 +226,7 @@ Keys are written here the way a configuration file will spell them.
 | `t` | show / hide the contents pane |
 | `tab` | move focus between the panes |
 | `T` | switch light / dark |
+| `s` | choose a theme |
 | `?` | key reference |
 | `ctrl+z` | suspend to the shell (unix) |
 | `esc` | close what is open |
@@ -273,6 +274,7 @@ first screenful is there immediately and a large tree fills in behind it.
 | `/` | filter the list |
 | `r` | rescan the directory |
 | `.` | show / hide hidden and ignored files |
+| `T` `s` | switch light / dark, choose a theme |
 | `esc` | clear the filter |
 | `q` · `ctrl+c` | quit |
 
@@ -470,6 +472,16 @@ image = ""
 ```
 
 `marquee-markdown themes` lists what is available and where each came from.
+
+In the reader, `s` opens the same list to pick from. The document behind it
+redraws as you move, so you are choosing by looking at your own text rather
+than at a swatch, and `enter` keeps what you are looking at — writing it to
+your configuration file so the next run starts there. `esc` puts back the
+theme you opened with. Only the `style` line is rewritten: comments, key
+order, and every other setting in the file survive.
+
+`T` still flips between light and dark, which is the faster gesture when you
+only ever use two.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/SophanaSok/marquee-markdown/main/docs/screenshot-paper.svg" alt="The same document in the paper theme, dark text on a light page" width="100%">

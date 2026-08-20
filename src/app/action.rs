@@ -108,6 +108,18 @@ pub enum Action {
     /// Stop, and let the shell have the terminal back.
     #[cfg(unix)]
     Suspend,
+    /// Show or hide the theme picker.
+    ThemePicker,
+    /// Move the theme picker's cursor down one theme, previewing it.
+    ThemeDown,
+    /// Move the theme picker's cursor up one theme, previewing it.
+    ThemeUp,
+    /// Move the theme picker's cursor to the first theme, previewing it.
+    ThemeTop,
+    /// Move the theme picker's cursor to the last theme, previewing it.
+    ThemeBottom,
+    /// Keep the previewed theme, and remember it for next time.
+    ThemeAccept,
 }
 
 impl Action {
@@ -158,6 +170,12 @@ impl Action {
         Self::Suspend,
         Self::Reload,
         Self::ToggleTheme,
+        Self::ThemePicker,
+        Self::ThemeDown,
+        Self::ThemeUp,
+        Self::ThemeTop,
+        Self::ThemeBottom,
+        Self::ThemeAccept,
         Self::ToggleHelp,
         Self::Escape,
         Self::Quit,
@@ -171,6 +189,12 @@ impl Action {
             Self::Escape => "escape",
             Self::ToggleHelp => "toggle-help",
             Self::ToggleTheme => "toggle-theme",
+            Self::ThemePicker => "theme-picker",
+            Self::ThemeDown => "theme-down",
+            Self::ThemeUp => "theme-up",
+            Self::ThemeTop => "theme-top",
+            Self::ThemeBottom => "theme-bottom",
+            Self::ThemeAccept => "theme-accept",
             Self::LineDown => "line-down",
             Self::LineUp => "line-up",
             Self::HalfPageDown => "half-page-down",
@@ -226,6 +250,12 @@ impl Action {
             Self::Escape => "close overlay",
             Self::ToggleHelp => "toggle this help",
             Self::ToggleTheme => "switch light / dark",
+            Self::ThemePicker => "choose a theme",
+            Self::ThemeDown => "next theme",
+            Self::ThemeUp => "previous theme",
+            Self::ThemeTop => "first theme",
+            Self::ThemeBottom => "last theme",
+            Self::ThemeAccept => "use this theme",
             Self::LineDown => "down a line",
             Self::LineUp => "up a line",
             Self::HalfPageDown => "down half a page",
@@ -359,7 +389,13 @@ mod tests {
             | Action::LinkOpen
             | Action::LinkCopy
             | Action::CopyDocument
-            | Action::Edit => {}
+            | Action::Edit
+            | Action::ThemePicker
+            | Action::ThemeDown
+            | Action::ThemeUp
+            | Action::ThemeTop
+            | Action::ThemeBottom
+            | Action::ThemeAccept => {}
             #[cfg(unix)]
             Action::Suspend => {}
         }
@@ -370,7 +406,7 @@ mod tests {
         // Suspending is a unix idea, and the action does not exist elsewhere
         // rather than existing and doing nothing — the key reference is
         // generated from what is bound, so an inert entry would be a lie.
-        let expected = if cfg!(unix) { 47 } else { 46 };
+        let expected = if cfg!(unix) { 53 } else { 52 };
         assert_eq!(Action::ALL.len(), expected, "Action::ALL is out of date");
     }
 

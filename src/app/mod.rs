@@ -42,7 +42,7 @@ pub use state::{App, Options, Overlay, Screen};
 pub fn run(source: Source, theme: Theme, options: Options, keymap: keymap::Keymap) -> Result<()> {
     let mut app = App::new(source, theme, options);
     app.keymap = keymap;
-    take_over(app, options)
+    take_over(app)
 }
 
 /// Open the file browser over `root`.
@@ -55,16 +55,16 @@ pub fn run(source: Source, theme: Theme, options: Options, keymap: keymap::Keyma
 pub fn browse(root: PathBuf, theme: Theme, options: Options, keymap: keymap::Keymap) -> Result<()> {
     let mut app = App::browsing(root, theme, options);
     app.keymap = keymap;
-    take_over(app, options)
+    take_over(app)
 }
 
 /// Take over the terminal and run `app` until it quits.
 ///
 /// `start` is handed the event sender so background work can be started with
 /// somewhere to report to.
-fn take_over(mut app: App, options: Options) -> Result<()> {
+fn take_over(mut app: App) -> Result<()> {
     terminal::install_panic_hook();
-    let mut screen = terminal::Screen::enter(options.mouse)?;
+    let mut screen = terminal::Screen::enter(app.options.mouse)?;
     let (mut events, sender) = event::Events::new();
     app.events = Some(sender);
     app.start_watching();

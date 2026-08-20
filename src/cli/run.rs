@@ -10,7 +10,7 @@ use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser};
 
 use super::{Cli, Command, RunMode};
-use crate::config::Config;
+use crate::config::{Config, Layer};
 use crate::source::{self, HttpFetcher, RealFs};
 use crate::theme::registry;
 use crate::{app, cli, oneshot, update_check, util};
@@ -113,14 +113,14 @@ pub fn run() -> Result<()> {
         }
         RunMode::Tui => {
             let source = source::resolve(&spec, &HttpFetcher::new())?;
-            app::run(source, theme, options(&config), config.keymap)
+            app::run(source, theme, options(&cli, &config), config.keymap)
         }
         RunMode::Browser => {
             let root = match &spec {
                 source::SourceSpec::Dir(path) => path.clone(),
                 _ => std::env::current_dir()?,
             };
-            app::browse(root, theme, options(&config), config.keymap)
+            app::browse(root, theme, options(&cli, &config), config.keymap)
         }
         RunMode::Pager => {
             let source = source::resolve(&spec, &HttpFetcher::new())?;
@@ -151,7 +151,16 @@ fn settings(config: &Config) -> oneshot::Settings {
 }
 
 /// The settings the reader cares about.
-fn options(config: &Config) -> app::Options {
+fn options(cli: &Cli, config: &Config) -> app::Options {
+    // Asked of the same two layers that would supply the theme, rather than by
+    // naming the environment variable again here: one definition of where a
+    // style can come from, so this cannot drift from what actually wins.
+    let style_overridden = cli.layer().style.is_some()
+        || Layer::from_env(&|name| std::env::var(name).ok())
+            .0
+            .style
+            .is_some();
+
     app::Options {
         width: config.width,
         line_numbers: config.line_numbers,
@@ -160,6 +169,8 @@ fn options(config: &Config) -> app::Options {
         preserve_new_lines: config.preserve_new_lines,
         contents: config.contents,
         html: config.html,
+        config_path: config.path.clone(),
+        style_overridden,
     }
 }
 

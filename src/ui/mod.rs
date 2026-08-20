@@ -10,9 +10,11 @@ pub mod browser;
 pub mod document;
 pub mod help;
 pub mod status;
+pub mod themes;
 pub mod toc;
 
 use ratatui::Frame;
+use ratatui::layout::Rect;
 
 use crate::app::state::{App, Overlay, Screen};
 
@@ -28,6 +30,22 @@ pub fn draw(frame: &mut Frame, app: &App) {
     status::draw(frame, app);
     match app.overlay {
         Some(Overlay::Help) => help::draw(frame, app),
+        Some(Overlay::Themes) => themes::draw(frame, app),
         None => {}
+    }
+}
+
+/// A rectangle of at most `width` by `height`, centered in `area`.
+///
+/// Shared by the overlay panels so they agree about where the middle is.
+#[must_use]
+pub(crate) fn centered(area: Rect, width: u16, height: u16) -> Rect {
+    let width = width.min(area.width);
+    let height = height.min(area.height);
+    Rect {
+        x: area.x + (area.width - width) / 2,
+        y: area.y + (area.height - height) / 2,
+        width,
+        height,
     }
 }

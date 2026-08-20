@@ -13,6 +13,44 @@ to change in any release: the pipeline — `parse`, `block`, `frag`, `wrap`,
 `sink`, `layout`, `highlight`, `html`.
 Until 1.0 both halves may change.
 
+## [Unreleased]
+
+### Added
+
+- **A theme picker in the reader.** `s` opens a list of every theme the
+  registry can find — the two built-ins and anything in
+  `~/.config/marquee-markdown/themes/` — and the document behind it redraws as
+  the cursor moves, so a theme is chosen by looking at your own text rather
+  than at a swatch. `enter` keeps what is on screen and `esc` puts back the
+  theme you opened with. Themes were already data; until now there was no way
+  to reach one from inside the reader, so a theme you had written could only be
+  selected by relaunching with `-s` or editing the configuration file.
+
+  A theme that will not load says so on its row and leaves the previous one up,
+  rather than the picker refusing to open because of one bad file.
+- **Accepting a theme records it**, so the next run starts there. Only the
+  `style` line is rewritten: comments, key order, and every other setting in
+  the file survive, which is what `toml_edit` was added for. When `-s` or
+  `MARQUEE_STYLE` is in force the save says so, because either would beat the
+  file on the next run and a setting that silently does nothing is worse than
+  one that says why.
+- `Mode::Themes` and the `theme-picker`, `theme-down`, `theme-up`,
+  `theme-top`, `theme-bottom` and `theme-accept` actions, all rebindable
+  through `[keys.themes]` like any other.
+- `Theme::overlay_meta`, for secondary text on an overlay panel. Composed from
+  the existing palette, so no theme file needs changing.
+
+### Changed
+
+- `app::Options` is no longer `Copy`: it now carries the path of the
+  configuration file the picker writes to. It stays `Clone` and
+  `#[non_exhaustive]`, and is built from `Default` outside this crate.
+- `T` is unchanged. It still flips light and dark, which is the faster gesture
+  for anyone who only uses two themes. Accepting a theme from the picker now
+  re-points what `T` swaps to when it would otherwise have become the theme
+  just chosen — picking the palette `T` was already going to reach used to
+  leave both sides of the swap identical and `T` doing nothing.
+
 ## [0.4.0] - 2026-08-20
 
 ### Added

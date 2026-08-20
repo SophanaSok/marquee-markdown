@@ -36,6 +36,7 @@ here can be pasted into `[keys.<mode>]`.
 | `t` | `toggle-toc` | show / hide contents |
 | `tab` | `focus-next` | focus contents / document |
 | `T` | `toggle-theme` | switch light / dark |
+| `s` | `theme-picker` | choose a theme |
 | `?` | `toggle-help` | toggle this help |
 | `esc` | `escape` | close overlay |
 | `q` `ctrl+c` | `quit` | quit |
@@ -56,6 +57,7 @@ here can be pasted into `[keys.<mode>]`.
 | `r` | `browser-rescan` | rescan the directory |
 | `.` | `browser-toggle-hidden` | show / hide hidden files |
 | `T` | `toggle-theme` | switch light / dark |
+| `s` | `theme-picker` | choose a theme |
 | `?` | `toggle-help` | toggle this help |
 | `esc` | `escape` | close overlay |
 | `q` `ctrl+c` | `quit` | quit |
@@ -75,6 +77,7 @@ here can be pasted into `[keys.<mode>]`.
 | `t` | `toggle-toc` | show / hide contents |
 | `/` | `search-start` | search |
 | `T` | `toggle-theme` | switch light / dark |
+| `s` | `theme-picker` | choose a theme |
 | `?` | `toggle-help` | toggle this help |
 | `esc` | `escape` | close overlay |
 | `q` `ctrl+c` | `quit` | quit |
@@ -102,5 +105,18 @@ here can be pasted into `[keys.<mode>]`.
 | `g` `home` | `top` | go to top |
 | `G` `end` | `bottom` | go to bottom |
 | `?` | `toggle-help` | toggle this help |
+| `esc` `q` | `escape` | close overlay |
+| `ctrl+c` | `quit` | quit |
+
+## `themes`
+
+| Key | Action | |
+| --- | --- | --- |
+| `j` `down` | `theme-down` | next theme |
+| `k` `up` | `theme-up` | previous theme |
+| `g` `home` | `theme-top` | first theme |
+| `G` `end` | `theme-bottom` | last theme |
+| `enter` | `theme-accept` | use this theme |
+| `s` | `theme-picker` | choose a theme |
 | `esc` `q` | `escape` | close overlay |
 | `ctrl+c` | `quit` | quit |

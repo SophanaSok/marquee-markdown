@@ -8,7 +8,8 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKi
 
 use super::action::Action;
 use super::event::Event;
-use super::state::{App, Focus, Overlay, Prompt, PromptKind, Screen};
+use super::state::{App, Focus, Overlay, Prompt, PromptKind, Screen, ThemePicker};
+use crate::theme::{Appearance, Theme, ThemeVariant};
 
 /// Apply one event.
 pub fn handle(app: &mut App, event: Event) {
@@ -50,9 +51,15 @@ pub fn apply(app: &mut App, action: Action) {
         Action::Quit => app.should_quit = true,
         Action::Escape => escape(app),
         Action::ToggleHelp => {
+            // Not bound in the picker by default, but it is rebindable, and
+            // burying the picker under the key reference would leave a preview
+            // applied that nobody accepted.
+            if app.overlay == Some(Overlay::Themes) {
+                cancel_picker(app);
+            }
             app.overlay = match app.overlay {
                 Some(Overlay::Help) => None,
-                None => {
+                _ => {
                     // A fresh open starts at the top; a reader who scrolled
                     // last time was looking for something else then.
                     app.help_scroll = 0;
@@ -65,6 +72,12 @@ pub fn apply(app: &mut App, action: Action) {
             // The layout cache notices the change on the next reconcile and
             // re-lays out the document, keeping the reading position.
         }
+        Action::ThemePicker => toggle_picker(app),
+        Action::ThemeDown => move_picker(app, 1),
+        Action::ThemeUp => move_picker(app, -1),
+        Action::ThemeTop => jump_picker(app, 0),
+        Action::ThemeBottom => jump_picker(app, usize::MAX),
+        Action::ThemeAccept => accept_theme(app),
         Action::LineDown => app.view.scroll(1, extent),
         Action::LineUp => app.view.scroll(-1, extent),
         Action::HalfPageDown => app.view.half_page(1, extent),
@@ -383,12 +396,165 @@ fn scroll_help(app: &mut App, action: Action) -> bool {
     true
 }
 
+/// Open the theme picker, or close it if it is already open.
+///
+/// The list is read once, here, rather than every frame: it comes off the
+/// filesystem, and the draw path may not touch the filesystem.
+fn toggle_picker(app: &mut App) {
+    if app.overlay == Some(Overlay::Themes) {
+        cancel_picker(app);
+        return;
+    }
+    let entries = crate::theme::registry::list();
+    if entries.is_empty() {
+        // Not reachable while the built-ins are compiled in, but an empty
+        // overlay would be a worse answer than saying so.
+        app.message = Some("no themes to choose from".to_owned());
+        return;
+    }
+    // Start on the theme in force, so the picker opens showing where you are
+    // rather than at the top of an alphabetical list.
+    let cursor = entries
+        .iter()
+        .position(|entry| entry.name == app.theme.name)
+        .unwrap_or(0);
+    app.picker = Some(ThemePicker {
+        entries,
+        cursor,
+        restore: app.theme.clone(),
+        failed: Vec::new(),
+    });
+    app.overlay = Some(Overlay::Themes);
+}
+
+/// Put back the theme the picker opened with, and close it.
+///
+/// Every move previews, so leaving without this would silently keep whatever
+/// the cursor last happened to touch.
+fn cancel_picker(app: &mut App) {
+    if let Some(picker) = app.picker.take() {
+        app.theme = picker.restore;
+    }
+    app.overlay = None;
+}
+
+/// Move the picker's cursor by `delta`, clamped at both ends, and preview.
+fn move_picker(app: &mut App, delta: isize) {
+    let Some(picker) = app.picker.as_ref() else {
+        return;
+    };
+    let last = picker.entries.len().saturating_sub(1);
+    // Clamped rather than wrapping, like the contents pane: a list you can fall
+    // off the end of makes it hard to tell where the end is.
+    let next = picker.cursor.saturating_add_signed(delta).min(last);
+    jump_picker(app, next);
+}
+
+/// Put the picker's cursor on `index`, clamped to the list, and preview.
+fn jump_picker(app: &mut App, index: usize) {
+    let Some(picker) = app.picker.as_mut() else {
+        return;
+    };
+    let index = index.min(picker.entries.len().saturating_sub(1));
+    picker.cursor = index;
+    preview_theme(app);
+}
+
+/// Show the theme under the cursor.
+///
+/// Assigning the theme is the whole of it: the layout cache notices on the next
+/// reconcile and re-lays out, keeping the reading position, exactly as it does
+/// for a resize.
+fn preview_theme(app: &mut App) {
+    let Some(picker) = app.picker.as_ref() else {
+        return;
+    };
+    let Some(entry) = picker.entries.get(picker.cursor) else {
+        return;
+    };
+    let name = entry.name.clone();
+    match crate::theme::registry::resolve(&name, None) {
+        Ok(theme) => app.theme = theme,
+        Err(error) => {
+            // A theme file somebody wrote can be malformed. Landing the cursor
+            // on it says so and leaves the previous theme up, rather than
+            // taking the reader down or leaving them wondering why nothing
+            // happened.
+            app.message = Some(format!("{name}: {error}"));
+            if let Some(picker) = app.picker.as_mut()
+                && !picker.failed.contains(&name)
+            {
+                picker.failed.push(name);
+            }
+        }
+    }
+}
+
+/// Keep the previewed theme, and write it to the configuration file.
+///
+/// The theme is already on screen — previewing did that — so accepting is about
+/// making it stick. A failed write is reported and nothing else: the reader
+/// asked for this theme, and they should get it for this session even if it
+/// cannot be recorded for the next one.
+fn accept_theme(app: &mut App) {
+    let Some(picker) = app.picker.take() else {
+        app.overlay = None;
+        return;
+    };
+    app.overlay = None;
+
+    // `T` swaps with the alternate, which was worked out from the theme the
+    // reader started with. Picking that same theme would leave both sides of
+    // the swap identical and `T` doing nothing at all.
+    if app.alternate.appearance == app.theme.appearance {
+        app.alternate = Theme::new(match app.theme.appearance {
+            Appearance::Light => ThemeVariant::Slate,
+            Appearance::Dark => ThemeVariant::Paper,
+        });
+    }
+
+    let name = match picker.entries.get(picker.cursor) {
+        Some(entry) => entry.name.clone(),
+        None => return,
+    };
+    // Nothing to save if the cursor never left a theme that would not load, or
+    // it is already what is in force.
+    if picker.failed.contains(&name) {
+        return;
+    }
+
+    app.message = Some(match save_style(app, &name) {
+        // The path is dropped here rather than the warning: a long one fills
+        // the status bar on its own, and of the two the reader already knows
+        // where their configuration lives.
+        Ok(_) if app.options.style_overridden => {
+            format!("{name} saved, but -s or MARQUEE_STYLE wins next run")
+        }
+        Ok(path) => format!("{name} saved to {}", path.display()),
+        Err(error) => format!("could not save {name}: {error}"),
+    });
+}
+
+/// Record `name` as the theme to start with, returning where it was written.
+fn save_style(app: &App, name: &str) -> anyhow::Result<std::path::PathBuf> {
+    let path = crate::config::write::target(app.options.config_path.as_deref())?;
+    crate::config::write::set_style(&path, name)?;
+    Ok(path)
+}
+
 /// Step back out of whatever is innermost.
 ///
 /// The ladder is explicit so that adding a layer later means adding a rung
 /// rather than reordering a condition, and so the last rung stays a hint
 /// rather than an exit: quitting on a stray escape loses the reader's place.
 fn escape(app: &mut App) {
+    // The picker previews as the cursor moves, so closing it has to put the
+    // theme back. Checked before the overlay is taken, or the state needed to
+    // do that is already gone.
+    if app.overlay == Some(Overlay::Themes) {
+        cancel_picker(app);
+        return;
+    }
     if app.overlay.take().is_some() {
         return;
     }
@@ -618,6 +784,7 @@ fn mouse_event(app: &mut App, mouse: MouseEvent) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::keymap::Mode;
     use crate::app::state::Options;
     use crate::source::{Base, Source};
     use crate::theme::{Theme, ThemeVariant};
@@ -694,6 +861,149 @@ mod tests {
         assert_eq!(app.theme.name, "paper");
         press(&mut app, KeyCode::Char('T'));
         assert_eq!(app.theme.name, "slate");
+    }
+
+    /// The picker lists whatever the registry finds, which on a developer's
+    /// machine includes any theme they have installed. These tests therefore
+    /// assert about the built-ins, which are always first and always there.
+    #[test]
+    fn the_picker_opens_on_the_theme_in_force() {
+        let mut app = app();
+        press(&mut app, KeyCode::Char('s'));
+        assert_eq!(app.mode(), Mode::Themes);
+        let picker = app.picker.as_ref().expect("the picker is open");
+        assert_eq!(picker.entries[picker.cursor].name, "slate");
+        // Still slate: opening the list is not a change.
+        assert_eq!(app.theme.name, "slate");
+    }
+
+    #[test]
+    fn moving_the_picker_previews_the_theme_under_the_cursor() {
+        let mut app = app();
+        press(&mut app, KeyCode::Char('s'));
+        press(&mut app, KeyCode::Char('k'));
+        assert_eq!(app.theme.name, "paper");
+    }
+
+    #[test]
+    fn the_cursor_stops_at_the_ends_rather_than_wrapping() {
+        let mut app = app();
+        press(&mut app, KeyCode::Char('s'));
+        for _ in 0..10 {
+            press(&mut app, KeyCode::Char('k'));
+        }
+        assert_eq!(app.theme.name, "paper");
+        let picker = app.picker.as_ref().expect("the picker is open");
+        assert_eq!(picker.cursor, 0);
+    }
+
+    #[test]
+    fn leaving_the_picker_puts_the_theme_back() {
+        let mut app = app();
+        press(&mut app, KeyCode::Char('s'));
+        press(&mut app, KeyCode::Char('k'));
+        assert_eq!(app.theme.name, "paper");
+        press(&mut app, KeyCode::Esc);
+        assert_eq!(app.theme.name, "slate", "escape did not restore the theme");
+        assert!(app.picker.is_none());
+        assert_eq!(app.mode(), Mode::Document);
+    }
+
+    #[test]
+    fn q_leaves_the_picker_rather_than_quitting() {
+        let mut app = app();
+        press(&mut app, KeyCode::Char('s'));
+        press(&mut app, KeyCode::Char('k'));
+        press(&mut app, KeyCode::Char('q'));
+        assert!(!app.should_quit);
+        assert_eq!(app.theme.name, "slate");
+    }
+
+    #[test]
+    fn pressing_the_picker_key_again_closes_it_without_keeping_the_preview() {
+        let mut app = app();
+        press(&mut app, KeyCode::Char('s'));
+        press(&mut app, KeyCode::Char('k'));
+        press(&mut app, KeyCode::Char('s'));
+        assert!(app.picker.is_none());
+        assert_eq!(app.theme.name, "slate");
+    }
+
+    #[test]
+    fn accepting_keeps_the_theme_and_records_it() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("config.toml");
+        std::fs::write(&path, "# mine\n[general]\nwidth = 72\n").expect("write");
+
+        let mut app = app();
+        app.options.config_path = Some(path.clone());
+        press(&mut app, KeyCode::Char('s'));
+        press(&mut app, KeyCode::Char('k'));
+        press(&mut app, KeyCode::Enter);
+
+        assert_eq!(app.theme.name, "paper");
+        assert!(app.picker.is_none());
+        assert_eq!(app.mode(), Mode::Document);
+
+        let written = std::fs::read_to_string(&path).expect("read back");
+        assert!(written.contains("style = \"paper\""), "{written}");
+        assert!(written.contains("# mine"), "{written}");
+        assert!(written.contains("width = 72"), "{written}");
+    }
+
+    #[test]
+    fn picking_the_theme_t_would_have_swapped_to_keeps_t_working() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut app = app();
+        app.options.config_path = Some(dir.path().join("config.toml"));
+        // The reader starts on slate, so `T` would go to paper. Pick paper.
+        press(&mut app, KeyCode::Char('s'));
+        press(&mut app, KeyCode::Char('k'));
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.theme.name, "paper");
+
+        // Without fixing up the alternate, both sides of the swap are paper
+        // and `T` silently does nothing.
+        press(&mut app, KeyCode::Char('T'));
+        assert_eq!(app.theme.name, "slate");
+        press(&mut app, KeyCode::Char('T'));
+        assert_eq!(app.theme.name, "paper");
+    }
+
+    #[test]
+    fn a_save_that_cannot_be_written_says_so_and_keeps_the_theme() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        // A directory where the file should be: it cannot be replaced.
+        let path = dir.path().join("config.toml");
+        std::fs::create_dir(&path).expect("mkdir");
+
+        let mut app = app();
+        app.options.config_path = Some(path);
+        press(&mut app, KeyCode::Char('s'));
+        press(&mut app, KeyCode::Char('k'));
+        press(&mut app, KeyCode::Enter);
+
+        // The reader asked for this theme; a failure to record it for next
+        // time is not a reason to take it away now.
+        assert_eq!(app.theme.name, "paper");
+        let message = app.message.as_deref().unwrap_or_default();
+        assert!(message.contains("could not save"), "{message}");
+    }
+
+    #[test]
+    fn a_shadowed_save_says_the_flag_will_still_win() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("config.toml");
+
+        let mut app = app();
+        app.options.config_path = Some(path);
+        app.options.style_overridden = true;
+        press(&mut app, KeyCode::Char('s'));
+        press(&mut app, KeyCode::Char('k'));
+        press(&mut app, KeyCode::Enter);
+
+        let message = app.message.as_deref().unwrap_or_default();
+        assert!(message.contains("MARQUEE_STYLE"), "{message}");
     }
 
     #[test]

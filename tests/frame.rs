@@ -158,6 +158,30 @@ fn a_scrolled_key_reference_stays_painted_on_a_short_terminal() {
 }
 
 #[test]
+fn the_theme_picker_paints_every_cell_at_every_size() {
+    for &(width, height) in SIZES {
+        for variant in [ThemeVariant::Paper, ThemeVariant::Slate] {
+            let mut app = fixture();
+            app.theme = Theme::new(variant);
+            // Through the update loop rather than by hand, so the panel is
+            // drawn from a picker the reader could actually have opened.
+            marquee_markdown::app::update::handle(
+                &mut app,
+                marquee_markdown::app::event::Event::Key(crossterm::event::KeyEvent::from(
+                    crossterm::event::KeyCode::Char('s'),
+                )),
+            );
+            assert_eq!(app.overlay, Some(marquee_markdown::app::Overlay::Themes));
+            let buf = frame(&mut app, width, height);
+            assert_fully_painted(
+                &buf,
+                &format!("theme picker at {width}x{height} in {}", variant.name()),
+            );
+        }
+    }
+}
+
+#[test]
 fn every_cell_is_painted_in_both_themes() {
     for variant in [ThemeVariant::Paper, ThemeVariant::Slate] {
         let mut app = fixture();

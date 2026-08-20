@@ -7,13 +7,14 @@
 //! reachable.
 
 use std::fmt;
+use std::path::PathBuf;
 use std::sync::mpsc::Sender;
 
 use crate::browser::Browser;
 use crate::doc::{DocCache, Links, Search, View};
 use crate::render::{HtmlMode, ParseOptions};
 use crate::source::Source;
-use crate::theme::{Appearance, Theme, ThemeVariant};
+use crate::theme::{Appearance, Theme, ThemeVariant, registry};
 
 use super::event::Event;
 use super::keymap::{Keymap, Mode};
@@ -25,7 +26,10 @@ use super::layout::Panes;
 /// anyone can write as a literal is a breaking change. `non_exhaustive` moves
 /// that cost to now: outside this crate these are built from [`Default`] and
 /// then assigned to, so the next setting is not an API break.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// Not `Copy`: the configuration file's path lives here, and it is what the
+/// theme picker writes a chosen theme back to.
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct Options {
     /// The `-w` flag: `Some(0)` disables wrapping.
@@ -42,6 +46,14 @@ pub struct Options {
     pub contents: bool,
     /// What to do with raw HTML.
     pub html: HtmlMode,
+    /// The configuration file in force, if one was found. Where the theme
+    /// picker records a chosen theme; when `None` it creates the file at the
+    /// default location instead.
+    pub config_path: Option<PathBuf>,
+    /// Whether `-s` or `MARQUEE_STYLE` set the theme. Both beat the file on the
+    /// next run, so a theme saved from the picker would appear not to take —
+    /// which is worth saying rather than letting the reader discover it.
+    pub style_overridden: bool,
 }
 
 impl Default for Options {
@@ -54,15 +66,43 @@ impl Default for Options {
             preserve_new_lines: false,
             html: HtmlMode::default(),
             contents: true,
+            config_path: None,
+            style_overridden: false,
         }
     }
 }
 
 /// A view layered over the document.
+///
+/// `non_exhaustive` for the same reason the configuration structs are: the
+/// reader grows overlays, and each one would otherwise be a breaking change.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Overlay {
     /// The key reference.
     Help,
+    /// The theme picker.
+    Themes,
+}
+
+/// What the theme picker is showing, while it is open.
+///
+/// The list is a snapshot rather than a live read: [`registry::list`] reads a
+/// directory, and the draw path may not do that once a frame.
+#[derive(Debug, Clone)]
+pub struct ThemePicker {
+    /// Every selectable theme, as of when the picker opened.
+    pub entries: Vec<registry::Entry>,
+    /// The row the cursor is on.
+    pub cursor: usize,
+    /// The theme that was in force when the picker opened, to put back if the
+    /// reader changes their mind. Every cursor move previews, so without this
+    /// there would be nothing to cancel back to.
+    pub restore: Theme,
+    /// Themes that would not load, by name. A hand-written theme file can be
+    /// malformed, and the picker says so on the row rather than by refusing to
+    /// open.
+    pub failed: Vec<String>,
 }
 
 /// A running file watch, or none.
@@ -168,6 +208,10 @@ pub struct App {
     pub keymap: Keymap,
     /// What is layered over the document, if anything.
     pub overlay: Option<Overlay>,
+    /// The theme picker's list and cursor, while `overlay` is
+    /// [`Overlay::Themes`]. Held beside the overlay rather than inside it so
+    /// `Overlay` stays `Copy`, the same way [`App::help_scroll`] is.
+    pub picker: Option<ThemePicker>,
     /// First visible row of the key reference, when it is open and taller
     /// than the terminal. Derived-clamped each frame; reset when it opens.
     pub help_scroll: u16,
@@ -226,6 +270,7 @@ impl App {
             alternate,
             keymap: Keymap::defaults(),
             overlay: None,
+            picker: None,
             help_scroll: 0,
             panes: Panes::default(),
             screen: Screen::Document,
@@ -329,6 +374,7 @@ impl App {
     pub fn mode(&self) -> Mode {
         match self.overlay {
             Some(Overlay::Help) => Mode::Help,
+            Some(Overlay::Themes) => Mode::Themes,
             None if self.prompt.is_some() => Mode::Prompt,
             None => self.pane_mode(),
         }

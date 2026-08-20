@@ -469,6 +469,18 @@ impl Theme {
             .fg(self.palette.fg.color())
     }
 
+    /// Secondary text inside an overlay panel, such as where a theme came from.
+    ///
+    /// [`Self::list_meta`] is the same idea against the page background; this
+    /// one sits on the panel, and using the wrong one puts a rectangle of page
+    /// background inside the frame.
+    #[must_use]
+    pub fn overlay_meta(&self) -> Style {
+        Style::new()
+            .bg(self.palette.surface.color())
+            .fg(self.palette.muted.color())
+    }
+
     /// A key name inside the key reference.
     #[must_use]
     pub fn overlay_key(&self) -> Style {
@@ -639,6 +651,7 @@ mod tests {
             theme.status_message(),
             theme.overlay_border(),
             theme.overlay_body(),
+            theme.overlay_meta(),
             theme.overlay_key(),
             theme.overlay_title(),
             theme.table_header(),
