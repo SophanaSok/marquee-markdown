@@ -149,23 +149,25 @@ jobs:
     # reading standard input while an editor owned the terminal, so the two
     # processes split the keystrokes between them and the editor lost words.
     # Reproducing it needs two processes and a real pty, which is what the
-    # script builds. Both Unixes, because terminal handling is where they
-    # differ; Windows has no pty to hand over and no `$EDITOR` convention.
+    # script builds.
+    #
+    # Linux only. Windows has no pty to hand over and no `$EDITOR` convention,
+    # and macOS hung on this script rather than running it — the build
+    # finished, the script started, and nothing happened until the job was
+    # cancelled twenty minutes later. The unbounded waits that could explain
+    # it have since been closed and the script now has a watchdog that names
+    # the stage it died in, so the way back in is to put `macos-latest` here
+    # and read what it says. Until somebody does that, this covers Linux
+    # honestly rather than covering macOS in name.
     name: Terminal handoff
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     # The script has its own watchdog; this is the belt to that pair of braces.
     # A job that hangs holds a runner until the six-hour default gives up.
     timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ matrix.os }}
       - run: cargo build --locked
       # Debug rather than release: the script drives the binary through a
       # terminal, and the thing being timed is a handshake between threads,
