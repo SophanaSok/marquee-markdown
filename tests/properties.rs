@@ -73,7 +73,7 @@ prop_compose! {
 
 /// One markdown block built around adversarial text, optionally nested.
 fn block() -> impl Strategy<Value = String> {
-    (0usize..9, nasty_text(6), 0usize..4).prop_map(|(kind, text, depth)| {
+    (0usize..10, nasty_text(6), 0usize..4).prop_map(|(kind, text, depth)| {
         let text = nest(&text, depth);
         match kind {
             0 => format!("# {text}"),
@@ -85,6 +85,9 @@ fn block() -> impl Strategy<Value = String> {
             6 => format!("```rust\nfn x() {{ // {text}\n}}\n```"),
             7 => format!("| a | b |\n| - | - |\n| {text} | {text} |"),
             8 => format!("[{text}](https://example.com/{text}) and ![{text}](img.png)"),
+            // Inline code: the chip pads glue to their content, which is the
+            // one construct that can carry an anchor across a line break.
+            9 => format!("a `{text}` and `{text}`"),
             _ => text,
         }
     })

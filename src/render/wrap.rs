@@ -73,8 +73,16 @@ fn wrap_words(frags: Vec<Frag>, width: usize) -> Vec<WrappedLine> {
             }
         }
 
-        if frag.width > width {
-            // Atom wider than a whole line: hard-split at grapheme boundaries.
+        if used + frag.width > width {
+            // Wider than the room left: hard-split at grapheme boundaries.
+            //
+            // `used` is normally 0 here, because the break above flushed —
+            // so for an ordinary atom this is still "wider than a whole
+            // line". It is not 0 when a glue fragment dragged its anchor onto
+            // a fresh line: `x <code>overlong</code>` carries the chip's
+            // opening pad across, and pad-plus-word can exceed the column
+            // even though neither does alone. Testing against `width` there
+            // let the pair through and tore the painted page by one cell.
             hard_split_into(&frag, width, &mut lines, &mut current, &mut used);
             continue;
         }
@@ -243,6 +251,50 @@ pub fn line_width(line: &WrappedLine) -> usize {
 mod tests {
     use super::*;
     use ratatui::style::Style;
+
+    #[test]
+    fn a_glued_run_that_drags_its_anchor_still_fits_the_column() {
+        // `x ` + an inline-code chip whose content is exactly the column
+        // wide. The chip's opening pad is glued to the text, so breaking
+        // before the text carries the pad onto the new line — and pad plus
+        // text is one cell wider than the column. This tore the page by one
+        // cell, which `LineSink` only catches in debug builds.
+        let style = Style::default();
+        let frags = vec![
+            Frag {
+                text: "x".to_owned(),
+                style,
+                link: None,
+                width: 1,
+                kind: FragKind::Word,
+            },
+            Frag {
+                text: " ".to_owned(),
+                style,
+                link: None,
+                width: 1,
+                kind: FragKind::Space,
+            },
+            Frag {
+                text: " ".to_owned(),
+                style,
+                link: None,
+                width: 1,
+                kind: FragKind::Word,
+            },
+            Frag {
+                text: "a".repeat(20),
+                style,
+                link: None,
+                width: 20,
+                kind: FragKind::Glue,
+            },
+        ];
+        for line in wrap(frags, 20, WrapMode::Word) {
+            let used: usize = line.iter().map(|f| f.width).sum();
+            assert!(used <= 20, "line of {used} cells in a 20-cell column");
+        }
+    }
 
     fn frag(text: &str, kind: FragKind) -> Frag {
         Frag {

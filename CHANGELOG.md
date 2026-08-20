@@ -24,6 +24,18 @@ Until 1.0 both halves may change.
   came to sit at 0.1.0 through two releases. What remains here is the
   template it is filled from.
 
+## [Unreleased]
+
+### Fixed
+
+- **An overlong word inside an inline-code chip no longer overflows the
+  column by one cell.** The chip's opening pad is glued to its content, so
+  breaking before the content carried the pad onto the new line — and pad
+  plus content could exceed the column even though neither did alone. The
+  width invariant is what the painted page rests on, and `LineSink` only
+  asserts it in debug builds, so in a release this tore the page silently.
+  Found by a property test, which now generates inline code.
+
 ## [0.3.0] - 2026-08-20
 
 ### Added
