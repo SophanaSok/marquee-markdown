@@ -8,8 +8,20 @@ What is here, and what fills in the blanks.
 | `scoop/marquee-markdown.json` | the version and hash from `checksums.txt` |
 
 Neither a Homebrew tap nor a Scoop bucket exists yet; these are the manifests
-to put in one. The Scoop manifest carries the real hash for 0.1.0 and can
-auto-update from the checksums file attached to each release.
+to put in one. The Scoop manifest pins a released artifact, so it lags
+`Cargo.toml` between a bump and the release that carries it. Two checks hold
+it honest: `tests/docs.rs` fails offline if its version, url and
+`extract_dir` disagree with each other, and the live
+`the_scoop_manifest_names_the_latest_release` in `tests/network.rs` fails if
+it has fallen behind the newest release or pins a checksum that release did
+not publish. Run the live ones after a release:
+
+```sh
+cargo test --test network -- --ignored
+```
+
+In a bucket, the `checkver` and `autoupdate` blocks keep it current on their
+own.
 
 Debian and RPM metadata live in `Cargo.toml` under `[package.metadata.deb]` and
 `[package.metadata.generate-rpm]`; the release workflow builds both with
@@ -61,17 +73,34 @@ attribute cases both programs actually emit.
 
 ## Cutting a release
 
-1. Update `CHANGELOG.md`: turn `[Unreleased]` into the version and the date.
-   The release workflow takes the notes from that section by matching the
-   version, so the heading has to contain it.
+1. Update `CHANGELOG.md`: turn `[Unreleased]` into the version and the date,
+   and add the compare link at the bottom. The release workflow takes the
+   notes from that section by matching the version, so the heading has to
+   contain it — and refuses to release when it finds none.
 2. Bump `version` in `Cargo.toml`, and run `cargo check` so `Cargo.lock`
-   follows.
-3. Commit, tag `vX.Y.Z`, and push the tag. The workflow builds the archives,
-   the Debian and RPM packages, and the checksums, and drafts the release.
-4. `cargo publish`.
-5. Update the Homebrew formula and the Scoop manifest with the new checksums.
-6. ~~Add the crates.io badge to the README, and `cargo semver-checks` to CI.~~
-   Done after 0.1.0.
+   follows. Adding a public field to a configuration struct is a breaking
+   change before 1.0 — `cargo semver-checks` says so, and the bump has to
+   be a minor one.
+3. Commit, tag `vX.Y.Z`, and push the tag.
+4. Once the release exists, move the Scoop manifest to it: version, url,
+   `extract_dir`, and the hash from the release's `checksums.txt`. Then
+   `cargo test --test network -- --ignored` confirms it.
+
+The workflow does the rest, in an order that cannot leave the two sides
+disagreeing: it first refuses a tag that does not match `Cargo.toml` or a
+changelog with no notes for the version, then builds the archives, the Debian
+and RPM packages, and the checksums, then publishes the crate to crates.io,
+and only then drafts the GitHub release — so a release page never exists for
+a version crates.io does not have. A failed job is rerun with "re-run failed
+jobs"; a publish that already succeeded is not run twice.
+
+Publishing authenticates over GitHub OIDC ([trusted
+publishing](https://crates.io/docs/trusted-publishing)) rather than a stored
+token. The one-time setup lives on crates.io under the crate's Settings →
+Trusted Publishing: add a GitHub publisher with repository owner
+`SophanaSok`, repository `marquee-markdown`, workflow file `release.yml`.
+Until that is configured, the publish job fails at authentication and can be
+rerun once it is.
 
 Both `marquee-markdown` and `mmd` are shipped, as two real binaries rather than
 a binary and a symlink. That costs about 12 MB, and buys the same result from

@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshot.svg" alt="marquee-markdown reading a document, with the contents pane on the left" width="100%">
+  <img src="https://raw.githubusercontent.com/SophanaSok/marquee-markdown/main/docs/screenshot.svg" alt="marquee-markdown reading a document, with the contents pane on the left" width="100%">
 </p>
 
 <p align="center"><sub>
@@ -66,7 +66,7 @@ The last two rows are the ones that made this worth building. The rest are
 rendering details that add up.
 
 <p align="center">
-  <img src="docs/compare-glow.svg" alt="The same document rendered by glow on the left and marquee-markdown on the right" width="100%">
+  <img src="https://raw.githubusercontent.com/SophanaSok/marquee-markdown/main/docs/compare-glow.svg" alt="The same document rendered by glow on the left and marquee-markdown on the right" width="100%">
 </p>
 
 <p align="center"><sub>The same document, the same 80-column terminal, both at their defaults and with no
@@ -247,7 +247,7 @@ terminal, and on a document with fewer than two headings, where it would cost
 a quarter of the screen to say nothing.
 
 <p align="center">
-  <img src="docs/screenshot-search.svg" alt="Searching a document: matches highlighted in place, the current one accented, the count in the status bar" width="100%">
+  <img src="https://raw.githubusercontent.com/SophanaSok/marquee-markdown/main/docs/screenshot-search.svg" alt="Searching a document: matches highlighted in place, the current one accented, the count in the status bar" width="100%">
 </p>
 
 <p align="center"><sub><code>/</code> narrows as you type; <code>n</code> and <code>N</code> walk the matches.</sub></p>
@@ -299,7 +299,7 @@ match. A lowercase query ignores case; a query with any capital in it does
 not. `esc` clears the highlight.
 
 <p align="center">
-  <img src="docs/screenshot-browser.svg" alt="The file browser listing markdown files found under the current directory, newest first" width="100%">
+  <img src="https://raw.githubusercontent.com/SophanaSok/marquee-markdown/main/docs/screenshot-browser.svg" alt="The file browser listing markdown files found under the current directory, newest first" width="100%">
 </p>
 
 <p align="center"><sub>Run <code>mmd</code> with a directory, or with nothing at all, to browse.</sub></p>
@@ -465,7 +465,7 @@ image = ""
 `marquee-markdown themes` lists what is available and where each came from.
 
 <p align="center">
-  <img src="docs/screenshot-paper.svg" alt="The same document in the paper theme, dark text on a light page" width="100%">
+  <img src="https://raw.githubusercontent.com/SophanaSok/marquee-markdown/main/docs/screenshot-paper.svg" alt="The same document in the paper theme, dark text on a light page" width="100%">
 </p>
 
 <p align="center"><sub>The same document in <code>paper</code>. Themes are data — a new palette needs no recompile.</sub></p>

@@ -31,6 +31,11 @@ Until 1.0 both halves may change.
   inside them) gained a field, which is a breaking change for anything that
   built one with an exhaustive struct literal — `cargo semver-checks` is what
   says so, and the reason this release is a minor bump rather than a patch.
+- Releases publish to crates.io from the release workflow itself, through
+  crates.io trusted publishing, so the GitHub tag and the published crate —
+  including the README — always come from the same commit. The workflow now
+  refuses a tag that does not match `Cargo.toml`, and a changelog with no
+  notes for the version.
 
 ### Fixed
 
