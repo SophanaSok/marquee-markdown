@@ -192,10 +192,31 @@ Live checks against the real forges exist in `tests/network.rs` behind
 Each of these cost a debugging session. They are here so the next one does not.
 
 - **A background thread owning standard input means nothing may ask the
-  terminal a question.** `Terminal::clear` snapshots the cursor position first
-  — a round trip the event thread swallows the reply to — so it times out and
-  fails. Forcing a redraw after an external program means resetting both
-  ratatui buffers instead.
+  terminal a question — except while that thread is standing down.**
+  `Terminal::clear` snapshots the cursor position first, a round trip the event
+  thread swallows the reply to, so it times out and fails. Forcing a redraw
+  after an external program means resetting both ratatui buffers instead. The
+  one window where a question is legal is inside `external::run`, which parks
+  the reader through `app::gate` before the terminal changes hands; that is
+  what lets the leftovers of the other program's session be read and thrown
+  away. Moving the buffer reset inside that window as an optimization would
+  put it back on the wrong side of the rule.
+- **Two processes reading one terminal split the keystrokes between them.**
+  The reader used to block in `event::read` for its whole life, including while
+  an editor had the terminal — so the editor lost characters, and stalled
+  waiting out timeouts on questions whose replies the reader had eaten. A
+  thread parked in a blocking read cannot be asked to stop, which is why the
+  reader waits with a timeout and parks at a gate instead. The handshake is the
+  load-bearing part: `gate::pause` does not return until the reader has
+  acknowledged from the top of its loop, the only point at which it is provably
+  not inside a read. `scripts/handoff-check.py` reproduces the original defect.
+- **Every terminal mode the reader depends on has to be asked for.** Bracketed
+  paste was not, so `Event::Paste` never fired and a pasted newline was an
+  ordinary Enter: it submitted the search prompt and left the rest of the paste
+  being dispatched as bindings, where `q` quits. What the terminal is set to on
+  the way in is whatever the last program left behind, and an editor launched
+  with `e` leaves its own settings, not ours. `terminal::setup` and
+  `terminal::teardown` are mirrors and a test holds them to it.
 - **Pane geometry may not depend on anything only a layout can produce.** The
   contents pane first decided whether to show itself from the outline, which
   does not exist until the first layout — so it appeared on frame two, changed

@@ -17,6 +17,7 @@ pub mod action;
 pub mod derived;
 pub mod event;
 pub mod external;
+pub mod gate;
 pub mod keymap;
 pub mod layout;
 pub mod state;
@@ -107,6 +108,7 @@ where
         batch.clear();
         batch.push(event);
         events.drain(&mut batch)?;
+        event::coalesce(&mut batch);
         for event in batch.drain(..) {
             update::handle(app, event);
         }
@@ -117,13 +119,21 @@ where
             && let Some(request) = app.pending.take()
         {
             perform(app, &request);
+            // The window may have been resized while the other program had
+            // the terminal. SIGWINCH goes to the foreground process group,
+            // which was not this one, so nothing reported it — and drawing at
+            // the old width leaves a mangled frame standing until the reader
+            // happens to press a key. Asking the backend costs an ioctl and
+            // no round-trip, unlike every other question a terminal can be
+            // asked. Before the swaps, which are what blank the buffers.
+            let _ = terminal.autoresize();
             // The other program has been all over the screen, so every cell
             // has to be written again.
             //
             // `Terminal::clear` is the obvious call and the wrong one: it
             // snapshots the cursor position first, and that query is a
-            // round-trip through the terminal that can never be answered —
-            // the event thread owns standard input and swallows the reply.
+            // round-trip through the terminal. By here the reader thread is
+            // reading standard input again and would swallow the reply.
             // Resetting both buffers instead makes the next diff write
             // everything, with nothing asked of the terminal.
             terminal.swap_buffers();
