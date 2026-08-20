@@ -100,6 +100,41 @@ fn drawing_is_never_handed_the_means_to_mutate() {
     );
 }
 
+/// Exactly one module may read the terminal.
+///
+/// Crossterm's reader is process-global, and it forbids being driven from more
+/// than one thread. The whole handoff to an editor rests on that: input can
+/// only be stood down for another program if there is a single, known place
+/// that reads it. A second `event::read` somewhere else would not fail a test
+/// or a build — it would quietly go back to splitting keystrokes with whatever
+/// the reader launched.
+#[test]
+fn only_one_module_reads_the_terminal() {
+    const READER: &str = "src/app/event.rs";
+    let mut offenders = Vec::new();
+    for path in rust_files(Path::new("src")) {
+        if path == Path::new(READER) {
+            continue;
+        }
+        let source = std::fs::read_to_string(&path).expect("source is readable");
+        for (lineno, line) in source.lines().enumerate() {
+            if line.contains("event::read(") || line.contains("event::poll(") {
+                offenders.push(format!(
+                    "{}:{}: {}",
+                    path.display(),
+                    lineno + 1,
+                    line.trim()
+                ));
+            }
+        }
+    }
+    assert!(
+        offenders.is_empty(),
+        "only {READER} may read the terminal; route it through there instead:\n{}",
+        offenders.join("\n")
+    );
+}
+
 fn rust_files(dir: &Path) -> Vec<PathBuf> {
     let mut files = Vec::new();
     let mut stack = vec![dir.to_path_buf()];

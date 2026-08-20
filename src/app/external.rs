@@ -11,6 +11,7 @@ use std::process::Command;
 
 use anyhow::{Context, Result};
 
+use super::gate;
 use super::terminal;
 
 /// Something that needs the terminal to itself.
@@ -35,6 +36,18 @@ pub enum Request {
 /// cannot be started. The caller should show it rather than exit: failing to
 /// open an editor is not a reason to lose the reader's place.
 pub fn run(request: &Request, mouse: bool) -> Result<()> {
+    // Stand the terminal reader down before the terminal changes hands, and
+    // not a moment after: from here until the guard drops, this thread is the
+    // only one in the process reading the terminal, so every byte the other
+    // program is sent reaches it whole. Without this both processes block on
+    // the same tty and each takes an arbitrary half of everything typed —
+    // which is why an editor opened this way used to lose keystrokes and spend
+    // its startup waiting out timeouts on questions whose answers had already
+    // been eaten.
+    //
+    // A guard rather than a pair of calls, so that a failed restore, a failed
+    // editor, or a panic still gives input back.
+    let paused = gate::pause();
     terminal::restore(mouse).context("cannot hand back the terminal")?;
     let outcome = match request {
         Request::Edit { path, line } => edit(path, *line),
@@ -44,6 +57,11 @@ pub fn run(request: &Request, mouse: bool) -> Result<()> {
     // Take the terminal back whatever happened, so a failed editor does not
     // also cost the reader their session.
     let retaken = terminal::enter(mouse).context("cannot take the terminal back");
+    // Still paused, and deliberately so: this is the one window in which it is
+    // safe for this thread to read the terminal at all. After `enter`, so that
+    // nothing queues up behind it and raw mode is back for the parse.
+    super::event::discard_pending_input(&paused);
+    drop(paused);
     outcome.and(retaken)
 }
 
@@ -66,6 +84,19 @@ fn edit(path: &Path, line: usize) -> Result<()> {
 /// Sent through `kill` rather than `libc::raise`, which is unsafe: the library
 /// forbids unsafe code, and one convenience key is not a reason to give up a
 /// guarantee that holds for the whole crate.
+///
+/// `Command::status` is the SIGCONT handler, structurally. `kill` targets this
+/// pid rather than the process group, so the child is not stopped with us; the
+/// signal is generated before it exits, so this process stops while blocked in
+/// `wait`. The shell then saves the tty modes, and on `fg` restores them,
+/// hands the terminal back, and sends SIGCONT — only then does `status` return
+/// and the caller take the screen again.
+///
+/// A stop signal stops every thread, so the terminal reader is frozen here
+/// too. The pause in [`run`] is still not redundant: it closes the window
+/// between handing the terminal back and the signal actually landing, and it
+/// leaves the reader parked on a condvar rather than frozen mid-read holding
+/// crossterm's own lock.
 #[cfg(unix)]
 fn suspend() -> Result<()> {
     let pid = std::process::id().to_string();

@@ -111,6 +111,7 @@ app/         The reader: state, input, and the loop.
   derived.rs   Recomputed once per iteration: clamping, active section.
   terminal.rs  RAII alternate-screen guard and the panic hook.
   external.rs  Editing and suspending: hand the terminal over, take it back.
+  gate.rs      Standing the reader down so another program owns the terminal.
 browser/     The file list, independent of any terminal.
   walk.rs      Streaming ignore-aware directory walk, on its own thread.
   filter.rs    Fuzzy matching, NFC-normalized on both sides.
@@ -263,4 +264,8 @@ come from the binary rather than the repository.
   Two P6 bugs were invisible to 470 passing tests and obvious on the first run:
   the file watch never fired for a relative path, and restoring the screen
   after an editor timed out on a terminal query. Neither is reachable from a
-  test.
+  unit test — but the second turned out to be reachable from a *process* test,
+  and `scripts/handoff-check.py` is it: it runs the binary under a pty with a
+  stub `$EDITOR` that records what it was sent. Its root cause was the reader
+  thread never standing down, so it read the editor's keystrokes; that is what
+  `src/app/gate.rs` now prevents, and the check fails without it.

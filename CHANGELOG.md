@@ -16,6 +16,35 @@ Until 1.0 both halves may change.
 
 ### Fixed
 
+- `e` no longer makes the editor sluggish. The terminal reader blocked in
+  `read` for the life of the process, including while the editor it had just
+  launched owned the terminal — so two processes sat on the same tty and each
+  took an arbitrary half of everything typed. Editors lost whole words, stalled
+  waiting for the tail of escape sequences that had been eaten, and waited out
+  timeouts on the questions they ask a terminal at startup; the stolen keys
+  were then replayed as commands the moment the editor exited. The reader now
+  stands down for as long as another program has the terminal, and does not
+  hand it over until it has acknowledged from a point where it holds no read.
+  Anything the other program left behind is discarded rather than parsed as
+  keystrokes. `scripts/handoff-check.py` reproduces the original defect.
+- Pasting into the search or filter prompt no longer runs as keystrokes.
+  Bracketed paste was never enabled, so a paste arrived as ordinary keys: the
+  newline in a multi-line paste submitted the prompt, and the rest was
+  dispatched as bindings, where `q` quits and `e` opens an editor. The handler
+  that strips control characters from a paste existed but could never run.
+  Editors turn bracketed paste off on the way out, so a single `e` used to
+  break pasting for the rest of the session.
+- A window resized while an editor had the terminal is no longer drawn at the
+  old width. The resize signal goes to the foreground process group, which by
+  then is the editor's, so nothing reported it and the mangled frame stood
+  until the next keypress.
+- Saving repeatedly during one editing session no longer costs a re-read and a
+  full re-layout per save when the editor exits. Only the first reload in a
+  batch is kept; the rest could only reproduce it.
+- Failing to take over the terminal no longer leaves it taken over. If building
+  the backend failed there was no guard yet to restore it, and a write that
+  failed part way through `restore` skipped leaving raw mode — the wedged shell
+  that module exists to prevent.
 - Table cells no longer wrap when they fit. The column solver measured a cell's
   plain text while the emitter drew its fragments, and an inline code span is
   drawn as a padded chip two cells wider than its text — so a cell like
