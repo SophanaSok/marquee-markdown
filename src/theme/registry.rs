@@ -2,8 +2,8 @@
 //!
 //! Selection order: a filesystem path wins, then a user theme in the config
 //! directory, then a compiled-in name, then the `auto`/`system`/`notty`
-//! specials. Only `system` looks at the terminal; `auto` is the dark palette,
-//! which is what it has always been and what glow answers too. Everything goes through the same constructor — a community
+//! specials. `auto` is an alias for the dark palette, spelled the way glow
+//! spells it; `system` is the one that looks at the terminal. Everything goes through the same constructor — a community
 //! theme, a shipped one, and the one built from the terminal's own colors are
 //! the same kind of thing.
 
@@ -45,8 +45,7 @@ pub enum Origin {
 /// Listing it conditionally would make `themes` say different things down a
 /// pipe than on a screen, and would make it appear and disappear from the
 /// picker for reasons the reader cannot see; a terminal that says nothing
-/// simply makes `system` the same palette `auto` would have picked, which is
-/// what it honestly is.
+/// simply makes `system` a shipped palette, which is what it honestly is.
 #[must_use]
 pub fn list() -> Vec<Entry> {
     let mut out: Vec<Entry> = ThemeVariant::all()
@@ -90,9 +89,9 @@ pub const SYSTEM: &str = "system";
 /// Resolve a `--style` value.
 ///
 /// `terminal` is what the terminal answered when asked about its own colors —
-/// [`TerminalColors::UNKNOWN`] when it was not asked or did not answer. It is
-/// what `system` means, and nothing else consults it: `auto` is the dark
-/// palette whatever the terminal says, matching glow.
+/// [`TerminalColors::UNKNOWN`] when it was not asked or did not answer. Only
+/// `system` consults it. `auto` does not, despite the name: it is an alias for
+/// the dark palette.
 ///
 /// # Errors
 /// Returns an error when the name matches no theme, listing what is available.
@@ -106,17 +105,18 @@ pub fn resolve(style: &str, terminal: &TerminalColors) -> Result<Theme> {
     }
 
     match style.to_ascii_lowercase().as_str() {
-        // Deliberately not the terminal's background, and deliberately not
-        // conditional on whether anything happened to ask: `auto` is the
-        // default, so anything it decides differently is decided differently
-        // for everyone who never chose a theme. It answers the dark palette,
-        // as glow does and as it always has. `system` is where looking at the
-        // terminal lives, because asking for it is how you say you want it.
+        // An alias for the dark palette, not an adaptive choice — the name is
+        // glow's, kept so its flags carry over, and the behavior is glow's
+        // too. It resolves the same whatever the terminal says, and stays that
+        // way deliberately: `auto` is the default, so anything it decided
+        // differently would be decided differently for every reader who never
+        // chose a theme. `--style system` is the adaptive one, and asking for
+        // it is how you say you want it.
         "auto" => Ok(Theme::new(ThemeVariant::Slate)),
         // A terminal that answered too little is not an error: falling back to
-        // what `auto` would have picked keeps a document on the screen, which
-        // is what the reader asked for. Refusing to start over a palette
-        // question would not be.
+        // a shipped palette keeps a document on the screen, which is what the
+        // reader asked for. Refusing to start over a palette question would
+        // not be.
         SYSTEM => Ok(system::theme(terminal).unwrap_or_else(|| Theme::new(nearest(terminal)))),
         "notty" | "plain" | "none" => Ok(Theme::plain()),
         name => {
@@ -142,8 +142,9 @@ pub fn resolve(style: &str, terminal: &TerminalColors) -> Result<Theme> {
 /// The shipped palette closest to the terminal's own background.
 ///
 /// Where `system` lands when the terminal described itself too poorly to build
-/// from. Still its own answer rather than `auto`'s: half an answer about the
-/// background is worth more than no answer at all.
+/// from. Half an answer about the background is still worth having, so this
+/// uses it — unlike `auto`, which is an alias for the dark palette and asks
+/// nothing.
 fn nearest(terminal: &TerminalColors) -> ThemeVariant {
     match terminal.is_dark() {
         Some(false) => ThemeVariant::Paper,
@@ -197,11 +198,10 @@ mod tests {
     }
 
     #[test]
-    fn auto_is_the_dark_palette_whatever_the_terminal_says() {
-        // `auto` is the default, so what it decides is what everyone who never
-        // chose a theme sees. It stays where it has always been, including
-        // when the answer is sitting right there: `-s system` is how you ask
-        // for the other thing, and asking is the point.
+    fn auto_is_an_alias_for_the_dark_palette() {
+        // `auto` is an alias, not an adaptive choice, and it is the default —
+        // so what it decides is what every reader who never chose a theme
+        // sees. It resolves the same with the answer sitting right there.
         for terminal in [silent(), dark_terminal(), light_terminal()] {
             assert_eq!(resolve("auto", &terminal).unwrap().name, "slate");
         }

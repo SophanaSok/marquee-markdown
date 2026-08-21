@@ -29,8 +29,8 @@ scroll-tracking table-of-contents sidebar and in-document search.
   through the console input API rather than as bytes on a device, which is a
   different mechanism from the `/dev/tty` exchange in `src/util/osc.rs` rather
   than a variation on it. Windows Terminal does answer these questions, so
-  this is worth writing; until it is, `system` falls back to what `auto` would
-  have picked, as it does for any terminal that stays quiet.
+  this is worth writing; until it is, `system` falls back to a shipped
+  palette, as it does for any terminal that stays quiet.
 
 ## What works today
 

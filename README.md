@@ -175,6 +175,7 @@ marquee-markdown https://example.com/doc.md      # any URL
 marquee-markdown -t doc.md          # full-screen reader
 marquee-markdown -w 80 doc.md       # fixed width (0 disables wrapping)
 marquee-markdown -s paper doc.md    # light theme
+marquee-markdown -s system doc.md   # your terminal's own colors
 marquee-markdown -l doc.md          # line numbers
 
 marquee-markdown -p doc.md          # through your pager
@@ -368,7 +369,7 @@ a different one.
 
 ```toml
 [general]
-style = "paper"            # theme name or path to a theme file
+style = "paper"            # paper | slate | system | a name | a path
 width = 80                 # 0 disables wrapping
 line-numbers = false
 mouse = false
@@ -418,12 +419,13 @@ keymap rather than written by hand.
 
 ## Themes
 
-Two palettes ship compiled in — `paper` (light) and `slate` (dark) — and
-`--style auto`, which picks the dark one, is the default.
+Two palettes ship compiled in — `paper` (light) and `slate` (dark). The
+default is `--style auto`, which despite the name is not adaptive: it is an
+alias for `slate`, spelled the way `glow` spells it so its flags carry over.
 
-`--style system` builds the whole palette out of the colors your terminal is
-already using, so a document reads in your own colorscheme rather than in
-Claude's:
+The adaptive one is `--style system`, which builds the whole palette out of
+the colors your terminal is already using, so a document reads in your own
+colorscheme rather than in Claude's:
 
 ```sh
 marquee-markdown -s system doc.md
@@ -437,9 +439,9 @@ floor so a light scheme's yellow does not become an unreadable heading. On
 Solarized Light that floor is what picks the red over the yellow; without it
 the heading would sit at a ratio of 2.0 on its own page.
 
-Only `system` asks — `auto` and the named palettes send the terminal nothing,
-so the default invocation is unchanged. Anything that will not answer falls
-back to a shipped palette, and costs nothing to try:
+Only `system` asks. `auto` and the named palettes send the terminal nothing at
+all, so the default invocation is unchanged. Anything that will not answer
+falls back to a shipped palette, and costs nothing to try:
 
 | where | `system` gets | asked for |
 | --- | --- | --- |

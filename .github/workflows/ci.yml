@@ -128,9 +128,10 @@ jobs:
 
           # Including the style that asks the terminal about its colors. The
           # question is a write of escape sequences, and a question asked down
-          # a pipe is a question written into somebody's file. `auto` is here
-          # because it is the default, and the day it starts asking is the day
-          # this needs to already have been true.
+          # a pipe is a question written into somebody's file. `auto` is an
+          # alias that asks nothing, and is checked anyway because it is the
+          # default: the day that stops being true is the day this has to
+          # already have been here.
           MARQUEE_STYLE=system "$BIN" README.md > "$OUT"/system.txt
           ! grep -q $'\x1b' "$OUT"/system.txt
           MARQUEE_STYLE=auto "$BIN" README.md > "$OUT"/auto.txt

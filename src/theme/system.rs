@@ -44,8 +44,8 @@ impl TerminalColors {
 
     /// Whether the background is a dark one, or `None` if it is not known.
     ///
-    /// This is what `--style auto` has always wanted: the parameter existed
-    /// from the start, and both callers passed `None`.
+    /// What `system` falls back on when the terminal named its background but
+    /// said too little else to build a palette from.
     #[must_use]
     pub fn is_dark(&self) -> Option<bool> {
         self.bg.map(|bg| luminance(bg) < 0.5)
@@ -76,7 +76,7 @@ const MIN_LEGIBLE: f64 = 2.0;
 /// Build the `system` theme, or `None` if the terminal said too little.
 ///
 /// `None` is the ordinary answer, not a failure: it means the caller should
-/// use whatever `--style auto` would have picked.
+/// use a shipped palette instead.
 #[must_use]
 pub fn theme(colors: &TerminalColors) -> Option<Theme> {
     Some(Theme::from(theme_file(colors)?))
