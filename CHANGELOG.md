@@ -13,6 +13,36 @@ to change in any release: the pipeline — `parse`, `block`, `frag`, `wrap`,
 `sink`, `layout`, `highlight`, `html`.
 Until 1.0 both halves may change.
 
+## [0.5.1] - 2026-08-21
+
+Packaging and test-suite fixes. Nothing a reader will notice: of the three
+changes here, two are to files excluded from the published crate, and the
+third is internal.
+
+### Fixed
+
+- **The Homebrew formula had no `url` and no `sha256`.** Not stale — absent,
+  since it was written, through four releases. `brew install` had nothing but
+  `--HEAD` to fetch, and the `version` its own test block asserts against did
+  not exist. It now points at the tag's source tarball, which is what the
+  formula builds from; the `checksums.txt` on a release describes the prebuilt
+  archives it never downloads.
+- **The configuration tests read whoever was running them.**
+  `Config::load(.., None, ..)` stubbed the environment but not the filesystem,
+  so `locate` reached for the real default path and "nothing configured" meant
+  "nothing configured, unless this machine has a file". Three tests asserting
+  the defaults were asserting the machine had no configuration. They passed for
+  as long as they did because hardly anyone had one — and then the theme picker
+  started writing it, so trying the headline feature of 0.5.0 turned the suite
+  red for reasons unconnected to anything the contributor touched. `locate` is
+  handed the location now, which is what the module header always claimed.
+
+### Changed
+
+- `tests/docs.rs` checks the Homebrew formula, and the smoke job checks that a
+  configuration file in the usual place is read — the one line no unit test can
+  see, since it reaches through `dirs`. Both were confirmed by breaking them.
+
 ## [0.5.0] - 2026-08-21
 
 ### Added
@@ -563,7 +593,8 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
 - Resizing re-lays out on every event; a large document dragged by a window
   edge will work harder than it needs to until a debounce lands.
 
-[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/SophanaSok/marquee-markdown/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.2.1...v0.3.0
