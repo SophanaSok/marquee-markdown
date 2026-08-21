@@ -7,9 +7,10 @@
 # `brew bump-formula-pr --version=X.Y.Z`, which rewrites both lines and
 # computes the hash itself.
 #
-# `tests/docs.rs` checks that the version here has a dated release in the
-# changelog, because a formula nothing checks is how this one came to sit with
-# no `url` at all through four releases.
+# `tests/docs.rs` allows this to be one release behind the newest dated release
+# in the changelog — the gap between the tag and the tap pull request — and
+# fails at two. A formula nothing checks is how this one came to sit with no
+# `url` at all through four releases.
 class MarqueeMarkdown < Formula
   desc "TUI markdown reader that renders documents like Claude artifacts"
   homepage "https://github.com/SophanaSok/marquee-markdown"

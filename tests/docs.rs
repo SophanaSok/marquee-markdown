@@ -223,9 +223,19 @@ fn the_homebrew_formula_points_at_a_real_release() {
     //
     // The check is against the changelog rather than `Cargo.toml`, because the
     // formula points at a *released* version and `Cargo.toml` is the *next*
-    // one. Between bumping the version and updating the tap they differ, and a
-    // test that demanded they match would go red on every release commit with
-    // no way to fix it — the hash cannot be computed before the tag exists.
+    // one. Demanding they match is unsatisfiable, not merely awkward: the
+    // `sha256` is of the tarball GitHub builds from the tag, the tag points at
+    // the release commit, so a correct hash inside that commit would be the
+    // hash of a tree containing itself. Every way out is worse — tagging first
+    // leaves the tag naming a commit that fails this test, and a placeholder
+    // hash passes it while breaking `brew install`.
+    //
+    // Hence two entries rather than one. The tap is updated after the tag, so
+    // the formula spends the gap exactly one release behind; allowing only the
+    // newest would red every release commit. Allowing any dated release, which
+    // is what this first did, permits the failure it was written to stop — a
+    // formula frozen while the versions march past, which is the Scoop-at-0.1.0
+    // story above. One release of lag is the process. Two is a forgotten tap.
     //
     // `packaging/` is excluded from the published crate, so inside the package
     // there is nothing to check.
@@ -253,12 +263,24 @@ fn the_homebrew_formula_points_at_a_real_release() {
         .and_then(|file| file.strip_suffix(".tar.gz"))
         .unwrap_or_else(|| panic!("not a source tarball: {url}"));
 
+    // Newest first, and `## [Unreleased]` carries no date, so it drops out here
+    // rather than needing a case of its own — which is precisely what lets the
+    // formula lag a release without the test having to know it is mid-release.
     let changelog = std::fs::read_to_string(root.join("CHANGELOG.md")).expect("CHANGELOG.md");
-    let released = format!("## [{}] - ", tag.trim_start_matches('v'));
-    assert!(
-        changelog.contains(&released),
-        "the formula is at {tag}, which the changelog has no dated release for"
-    );
+    let dated: Vec<&str> = changelog
+        .lines()
+        .filter_map(|line| Some(line.strip_prefix("## [")?.split_once("] - ")?.0))
+        .collect();
+
+    match dated.iter().position(|&v| v == tag.trim_start_matches('v')) {
+        Some(0 | 1) => {}
+        Some(behind) => panic!(
+            "the formula is at {tag}, {behind} releases behind {}: the tap was \
+             not updated after the last one",
+            dated[0]
+        ),
+        None => panic!("the formula is at {tag}, which the changelog has no dated release for"),
+    }
 
     let sha = field("sha256 ");
     assert!(

@@ -85,10 +85,10 @@ attribute cases both programs actually emit.
 4. Once the tag is up, bump `homebrew/marquee-markdown.rb` with
    `brew bump-formula-pr --version=X.Y.Z`. This one is last rather than part
    of the release commit because it pins the hash of the tag's source tarball,
-   which does not exist until the tag is pushed. `tests/docs.rs` checks the
-   version it names has a dated release in the changelog, so a formula left
-   behind shows up as a red test rather than as an install of the wrong
-   version.
+   which does not exist until the tag is pushed. `tests/docs.rs` allows the
+   formula to be one release behind the newest dated heading in the changelog
+   — that gap is this step — and fails at two, so skipping it shows up as a red
+   test on the *next* release rather than as an install of the wrong version.
 
 Steps 1 to 3 are the whole of the release itself. The workflow does the
 rest, in an order that cannot leave the two sides disagreeing: it first
