@@ -152,6 +152,34 @@ fn html_mode() -> impl Strategy<Value = HtmlMode> {
     prop::sample::select(&HtmlMode::ALL[..])
 }
 
+/// The counterexample proptest found on CI, pinned as itself.
+///
+/// A regression *seed* would not do: the seeds in
+/// `tests/properties.proptest-regressions` are written by proptest when it
+/// fails locally, and inventing one records a hash that replays some other
+/// case under a comment claiming it is this one. The input is short, so it
+/// can simply be the test.
+///
+/// What it holds is that the card wraps rather than the document losing
+/// anything: the long line is split at the column, which is the whole point
+/// of `HardAtColumn`, and every word is still findable on the page.
+#[test]
+fn a_code_card_splits_a_long_line_rather_than_dropping_any_of_it() {
+    let text = "```rust\nfn x() { // > \u{5de}\u{5d9}\u{5dc}\u{5d4}                 very-long-unbreakable-token-that-exceeds-any-sensible-column-width                 plain\n}\n```";
+    // 48 is where the boundary lands inside `plain`, which is what made this
+    // look like a loss.
+    let narrow = render_html(text, 48, false, false, HtmlMode::Render);
+    let page = narrow.plain.replace('\n', " ");
+    assert!(
+        page.contains("pl") && page.contains("ain"),
+        "the line was dropped rather than split: {page:?}"
+    );
+    for line in &narrow.lines {
+        let drawn: String = line.spans.iter().map(|s| s.content.as_ref()).collect();
+        assert_eq!(measure::width(&drawn), 48, "{page:?}");
+    }
+}
+
 proptest! {
     #![proptest_config(ProptestConfig { cases: 96, ..ProptestConfig::default() })]
 
@@ -223,10 +251,21 @@ proptest! {
         text in document(),
         width in 40u16..=120,
     ) {
+        // Wide enough that nothing has to wrap. Inside a code card the wrap
+        // is `HardAtColumn` -- which is exactly what keeps a long line sealed
+        // in the card instead of escaping it -- and a column boundary splits
+        // a word as readily as a space. So at a narrow width a short word can
+        // land across the break (`pl` on one line, `ain` on the next) with
+        // the renderer having done precisely the right thing. Asserting
+        // otherwise tests where the boundary fell, which is not a property of
+        // interpreting HTML. The width invariant is checked on its own terms
+        // by `every_html_mode_keeps_the_width_invariant`, at every width.
+        let longest = text.lines().map(measure::width).max().unwrap_or(0);
+        let width = width.max(u16::try_from(longest + 24).unwrap_or(u16::MAX));
+
         let rendered = render_html(&text, width, false, false, HtmlMode::Render);
         // `plain` is the mirror search runs over, so it is exactly what the
-        // reader can find. Wrapping may hard-split a very long token, so only
-        // the short distinctive word is checked for verbatim.
+        // reader can find.
         let page = rendered.plain.replace('\n', " ");
         if text.contains("plain") {
             prop_assert!(
