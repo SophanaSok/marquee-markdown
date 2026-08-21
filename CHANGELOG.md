@@ -16,16 +16,7 @@ Until 1.0 both halves may change.
 ## [0.6.0] - 2026-08-21
 
 `--style system`: a palette built from the colors your terminal is already
-using.
-
-### Changed
-
-- **`--style auto` now follows the terminal's background, which is what it has
-  always claimed to do.** The seam for it was there from the start and both
-  callers passed "unknown", so `auto` — the default — always resolved to
-  `slate`. It now asks the terminal, which means a reader on a light terminal
-  gets `paper` by default where they used to get `slate`. Anyone who wants the
-  old answer can say so: `style = "slate"`.
+using. Purely additive — nothing about the default changes.
 
 ### Added
 
@@ -40,29 +31,42 @@ using.
 
   It is listed by `themes`, selectable in the `s` picker, and saved to the
   configuration file like any other. Anything that will not answer falls back
-  to what `auto` would have picked rather than refusing to start: `screen`,
-  which swallows the question, and **tmux**, which answers the device query
-  and nothing else. Only a terminal that answers nothing at all pays the
-  100 ms timeout; where the device query comes back — tmux included — the
-  fallback is immediate.
+  to a shipped palette rather than refusing to start: `screen`, which swallows
+  the question, and **tmux**, which answers the device query and nothing else.
+  Only a terminal that answers nothing at all pays the 100 ms timeout; where
+  the device query comes back — tmux included — the fallback is immediate.
 
 - **`terminal-query`**, in `[general]`, and `MARQUEE_TERMINAL_QUERY`. Default
   on; off stops the terminal being asked anything, for a terminal that prints
   the question instead of answering it.
 
+### Fixed
+
+- **A README key table ran past its own end on Windows.** The doc-drift scan
+  split on a blank line, which a CRLF checkout does not contain, so every
+  table continued to the end of the file and fed the chord parser whatever
+  backticks it met. Nothing after the key tables had a backticked cell in its
+  first column until now, which is why it had never shown.
+
 ### Notes
+
+`--style auto`, the default, still answers the dark palette and asks the
+terminal nothing. It has a documented promise to follow the terminal's
+background that it has never kept — the seam was there from the start and both
+callers passed "unknown" — and this release does not start keeping it, because
+the first release that did would change what every reader on a light terminal
+sees without being asked. `-s system` is where looking at the terminal lives.
 
 The question and its answer travel the same stream as keystrokes, and reading
 is destructive. So the exchange happens once, before the screen is taken and
-before the thread that owns standard input exists; it is declined outright if
-anything is already queued, and abandoned the moment a byte arrives that
-cannot be a reply. What is left is the round trip — single-digit milliseconds
-on a local terminal, before the first frame is drawn. Only `system` and `auto`
-pay for it at all; `-s paper` sends the terminal nothing.
+before the thread that owns standard input exists; on `/dev/tty` rather than
+either standard stream; declined outright if anything is already queued; and
+ended by a device-attributes sentinel rather than by the clock. Only `system`
+asks at all.
 
-Windows falls back to `auto`'s answer for now: the replies arrive there
-through the console input API rather than as bytes on a device, which is a
-different mechanism rather than a variation on this one.
+Windows falls back for now: the replies arrive there through the console input
+API rather than as bytes on a device, which is a different mechanism rather
+than a variation on this one.
 
 `registry::resolve` takes what the terminal answered in place of its old
 `Option<bool>`, and `registry::Origin` has gained a variant and become

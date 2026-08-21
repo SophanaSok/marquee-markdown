@@ -375,7 +375,7 @@ mouse = false
 all = false                # list hidden and ignored files when browsing
 preserve-new-lines = false
 update-check = true        # mention a newer release on the way out
-terminal-query = true      # ask the terminal its colors, for `system` and `auto`
+terminal-query = true      # let `--style system` ask the terminal its colors
 
 [render]
 html = "render"            # render | hide | literal
@@ -419,11 +419,11 @@ keymap rather than written by hand.
 ## Themes
 
 Two palettes ship compiled in — `paper` (light) and `slate` (dark) — and
-`--style auto`, which follows your terminal's background, is the default.
+`--style auto`, which picks the dark one, is the default.
 
-`--style system` goes further and builds the whole palette out of the colors
-your terminal is already using, so a document reads in your own colorscheme
-rather than in Claude's:
+`--style system` builds the whole palette out of the colors your terminal is
+already using, so a document reads in your own colorscheme rather than in
+Claude's:
 
 ```sh
 marquee-markdown -s system doc.md
@@ -437,17 +437,19 @@ floor so a light scheme's yellow does not become an unreadable heading. On
 Solarized Light that floor is what picks the red over the yellow; without it
 the heading would sit at a ratio of 2.0 on its own page.
 
-Anything that will not answer falls back to `auto`, and costs nothing to try:
+Only `system` asks — `auto` and the named palettes send the terminal nothing,
+so the default invocation is unchanged. Anything that will not answer falls
+back to a shipped palette, and costs nothing to try:
 
 | where | `system` gets | asked for |
 | --- | --- | --- |
 | a terminal that answers | its own colors | nothing measurable |
 | **tmux** | falls back — tmux answers the device query and nothing else | nothing measurable |
-| `screen`, or a link slower than 100 ms | falls back | 100 ms, once |
+| `screen`, or a reply slower than 100 ms | falls back | 100 ms, once |
 | Windows | falls back — the replies arrive there by another road | nothing |
 
-`terminal-query = false` stops it being asked at all, and `-s paper` never
-asked in the first place.
+`terminal-query = false` stops it being asked at all, and nothing but
+`-s system` ever asked in the first place.
 
 A theme is also just a file, so adding one needs no Rust and no recompile:
 

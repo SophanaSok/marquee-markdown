@@ -98,8 +98,8 @@ pub fn run() -> Result<()> {
 
     // Ask the terminal about its own colors, once, here — before the screen is
     // taken and therefore before the event thread that owns standard input
-    // exists. Only the two styles that have a use for the answer pay for it:
-    // `-s paper` sends the terminal nothing at all.
+    // exists. Only the one style that has a use for the answer pays for it;
+    // every other invocation, the default included, sends nothing at all.
     let terminal = if stdout_is_tty && config.terminal_query && asks_the_terminal(&config.style) {
         util::osc::query(util::osc::TIMEOUT)
     } else {
@@ -193,15 +193,13 @@ fn options(cli: &Cli, config: &Config, terminal: TerminalColors) -> app::Options
 
 /// Whether resolving this style needs the terminal to be asked anything.
 ///
-/// Only `system` and `auto` have a use for the answer. Everything else — a
-/// named palette, a path, `notty` — resolves to the same theme either way, and
-/// a program that writes escape sequences nobody asked it to write is a
-/// program that will one day write them into a pipe.
+/// Only `system` has a use for the answer. Everything else — `auto`, a named
+/// palette, a path, `notty` — resolves to the same theme either way, so the
+/// default invocation asks the terminal nothing at all. A program that writes
+/// escape sequences nobody asked it to write is a program that will one day
+/// write them into a pipe.
 fn asks_the_terminal(style: &str) -> bool {
-    matches!(
-        style.trim().to_ascii_lowercase().as_str(),
-        "auto" | registry::SYSTEM
-    )
+    style.trim().eq_ignore_ascii_case(registry::SYSTEM)
 }
 
 /// Run a subcommand.

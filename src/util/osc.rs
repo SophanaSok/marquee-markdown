@@ -35,7 +35,8 @@
 //!
 //! A terminal that says nothing is not an error. It is the ordinary case, and
 //! the answer is [`TerminalColors::UNKNOWN`], which every caller already has a
-//! plan for. Measured against a pty that answers on cue:
+//! plan for. Only `--style system` asks at all. Measured against a pty that
+//! answers on cue:
 //!
 //! | terminal | outcome | cost over not asking |
 //! | --- | --- | --- |

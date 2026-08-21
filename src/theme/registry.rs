@@ -2,7 +2,8 @@
 //!
 //! Selection order: a filesystem path wins, then a user theme in the config
 //! directory, then a compiled-in name, then the `auto`/`system`/`notty`
-//! specials. Everything goes through the same constructor — a community
+//! specials. Only `system` looks at the terminal; `auto` is the dark palette,
+//! which is what it has always been and what glow answers too. Everything goes through the same constructor — a community
 //! theme, a shipped one, and the one built from the terminal's own colors are
 //! the same kind of thing.
 
@@ -89,9 +90,9 @@ pub const SYSTEM: &str = "system";
 /// Resolve a `--style` value.
 ///
 /// `terminal` is what the terminal answered when asked about its own colors —
-/// [`TerminalColors::UNKNOWN`] when it was not asked or did not answer. It
-/// decides what `auto` means and it *is* what `system` means; with no answer,
-/// both fall back to the dark palette, matching glow.
+/// [`TerminalColors::UNKNOWN`] when it was not asked or did not answer. It is
+/// what `system` means, and nothing else consults it: `auto` is the dark
+/// palette whatever the terminal says, matching glow.
 ///
 /// # Errors
 /// Returns an error when the name matches no theme, listing what is available.
@@ -105,7 +106,13 @@ pub fn resolve(style: &str, terminal: &TerminalColors) -> Result<Theme> {
     }
 
     match style.to_ascii_lowercase().as_str() {
-        "auto" => Ok(Theme::new(nearest(terminal))),
+        // Deliberately not the terminal's background, and deliberately not
+        // conditional on whether anything happened to ask: `auto` is the
+        // default, so anything it decides differently is decided differently
+        // for everyone who never chose a theme. It answers the dark palette,
+        // as glow does and as it always has. `system` is where looking at the
+        // terminal lives, because asking for it is how you say you want it.
+        "auto" => Ok(Theme::new(ThemeVariant::Slate)),
         // A terminal that answered too little is not an error: falling back to
         // what `auto` would have picked keeps a document on the screen, which
         // is what the reader asked for. Refusing to start over a palette
@@ -134,7 +141,9 @@ pub fn resolve(style: &str, terminal: &TerminalColors) -> Result<Theme> {
 
 /// The shipped palette closest to the terminal's own background.
 ///
-/// The fallback for both `auto` and a `system` the terminal would not describe.
+/// Where `system` lands when the terminal described itself too poorly to build
+/// from. Still its own answer rather than `auto`'s: half an answer about the
+/// background is worth more than no answer at all.
 fn nearest(terminal: &TerminalColors) -> ThemeVariant {
     match terminal.is_dark() {
         Some(false) => ThemeVariant::Paper,
@@ -188,14 +197,14 @@ mod tests {
     }
 
     #[test]
-    fn auto_follows_the_terminal_background() {
-        assert_eq!(resolve("auto", &light_terminal()).unwrap().name, "paper");
-        assert_eq!(resolve("auto", &dark_terminal()).unwrap().name, "slate");
-    }
-
-    #[test]
-    fn auto_defaults_to_dark_when_unknown() {
-        assert_eq!(resolve("auto", &silent()).unwrap().name, "slate");
+    fn auto_is_the_dark_palette_whatever_the_terminal_says() {
+        // `auto` is the default, so what it decides is what everyone who never
+        // chose a theme sees. It stays where it has always been, including
+        // when the answer is sitting right there: `-s system` is how you ask
+        // for the other thing, and asking is the point.
+        for terminal in [silent(), dark_terminal(), light_terminal()] {
+            assert_eq!(resolve("auto", &terminal).unwrap().name, "slate");
+        }
     }
 
     #[test]
@@ -224,7 +233,7 @@ mod tests {
     }
 
     #[test]
-    fn system_falls_back_to_auto_when_the_terminal_says_nothing() {
+    fn system_falls_back_when_the_terminal_says_nothing() {
         // Not an error: `screen` swallows the query outright, and a reader who
         // asked for a document should still get one.
         assert_eq!(resolve("system", &silent()).unwrap().name, "slate");

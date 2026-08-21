@@ -53,7 +53,7 @@ pub struct Config {
     pub preserve_new_lines: bool,
     /// Check crates.io for a newer release, and say so on the way out.
     pub update_check: bool,
-    /// Ask the terminal what colors it is using, for `system` and `auto`.
+    /// Let `--style system` ask the terminal what colors it is using.
     pub terminal_query: bool,
     /// Start with the contents pane showing.
     pub contents: bool,
