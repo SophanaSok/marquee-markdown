@@ -207,6 +207,17 @@ Keys follow glow, so muscle memory carries over; `?` shows the list, rendered
 from the keymap that is actually in force rather than from a fixed page, so it
 stays honest once keys become rebindable.
 
+The wheel moves whichever pane has the keys — the document, the contents pane,
+the file list, the key reference — three steps a tick, on every terminal. This is
+the one place the reader does not follow glow, where the wheel is opt-in: a
+terminal nobody claimed the wheel from answers it by manufacturing arrow keys,
+multiplied by its own scroll factor, and those arrive as ordinary keystrokes —
+so a stray touchpad brush yanks the document away from someone reading it with
+the keyboard. Claiming the wheel is what stops that. Selecting text with the
+mouse needs `shift` held while the reader is open, as it does in `less
+--mouse`; `--no-mouse`, or `mouse = false` in the configuration file, hands the
+wheel back.
+
 Keys are written here the way a configuration file will spell them.
 
 | Key | |
@@ -372,7 +383,7 @@ a different one.
 style = "paper"            # paper | slate | system | a name | a path
 width = 80                 # 0 disables wrapping
 line-numbers = false
-mouse = false
+mouse = true               # the reader takes the wheel; shift to select text
 all = false                # list hidden and ignored files when browsing
 preserve-new-lines = false
 update-check = true        # mention a newer release on the way out

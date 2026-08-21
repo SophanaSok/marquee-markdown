@@ -29,8 +29,19 @@ pub struct Cli {
     pub line_numbers: bool,
 
     /// Enable mouse wheel scrolling.
+    ///
+    /// On by default; accepted for glow's sake, and to override a
+    /// configuration file that turned it off.
     #[arg(short, long)]
     pub mouse: bool,
+
+    /// Hand the wheel back to the terminal.
+    ///
+    /// A separate switch rather than a value on `--mouse`, because a flag that
+    /// was not given has to contribute nothing: `--mouse` alone cannot say
+    /// "leave it alone" and "turn it off" with the same silence.
+    #[arg(long, conflicts_with = "mouse")]
+    pub no_mouse: bool,
 
     /// Display with a pager.
     #[arg(short, long)]
@@ -95,16 +106,20 @@ pub enum RunMode {
 impl Cli {
     /// The settings the command line asked for.
     ///
-    /// A switch that was not given contributes nothing rather than `false`:
-    /// there is no way to say `--no-mouse` on the command line, so an absent
-    /// flag is silence, and silence must not override a configuration file.
+    /// A switch that was not given contributes nothing rather than `false`.
+    /// An absent flag is silence, and silence must not override a
+    /// configuration file — which is why turning the wheel off needs a switch
+    /// of its own rather than the absence of `-m`.
     #[must_use]
     pub fn layer(&self) -> crate::config::Layer {
         crate::config::Layer {
             style: self.style.clone(),
             width: self.width,
             line_numbers: self.line_numbers.then_some(true),
-            mouse: self.mouse.then_some(true),
+            mouse: self
+                .mouse
+                .then_some(true)
+                .or_else(|| self.no_mouse.then_some(false)),
             all: self.all.then_some(true),
             preserve_new_lines: self.preserve_new_lines.then_some(true),
             update_check: None,
@@ -193,6 +208,7 @@ mod tests {
         // invocation that did not pass `-m`.
         let layer = cli_of(&["x.md"]).layer();
         assert_eq!(layer.mouse, None);
+        assert_eq!(cli_of(&["--no-mouse", "x.md"]).layer().mouse, Some(false));
         assert_eq!(layer.line_numbers, None);
         assert_eq!(layer.all, None);
         assert_eq!(layer.preserve_new_lines, None);

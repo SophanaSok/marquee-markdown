@@ -76,7 +76,16 @@ impl Layer {
             style: Some(ThemeVariant::Slate.name().to_owned()),
             width: None,
             line_numbers: Some(false),
-            mouse: Some(false),
+            // On, because off is not neutral. A terminal whose alternate
+            // scroll mode is on — which is the default in most of them —
+            // answers a wheel that nobody claimed by manufacturing arrow
+            // keys, multiplied by whatever scroll factor it was configured
+            // with. Those are indistinguishable from keystrokes by the time
+            // they arrive, so a stray touchpad brush yanks the document out
+            // from under somebody reading it with the keyboard. Claiming the
+            // wheel is what stops the terminal doing that, and it makes a tick
+            // the same three lines everywhere.
+            mouse: Some(true),
             all: Some(false),
             preserve_new_lines: Some(false),
             update_check: Some(true),
@@ -261,13 +270,13 @@ mod tests {
         let file = Layer {
             width: Some(80),
             style: Some("slate".to_owned()),
-            mouse: Some(true),
+            mouse: Some(false),
             ..Layer::default()
         };
         let resolved = flags.over(environment).over(file).over(Layer::defaults());
         assert_eq!(resolved.width, Some(60), "flags lost");
         assert_eq!(resolved.style.as_deref(), Some("paper"), "environment lost");
-        assert_eq!(resolved.mouse, Some(true), "file lost");
+        assert_eq!(resolved.mouse, Some(false), "file lost");
         assert_eq!(resolved.all, Some(false), "defaults lost");
     }
 
@@ -283,6 +292,16 @@ mod tests {
         assert!(defaults.contents.is_some());
         // Width is deliberately undecided: it comes from the terminal.
         assert!(defaults.width.is_none());
+    }
+
+    #[test]
+    fn the_wheel_is_claimed_unless_something_says_otherwise() {
+        // Not a preference. A terminal left holding the wheel answers it with
+        // synthetic arrow keys, which arrive as ordinary keystrokes and scroll
+        // the document out from under whoever was reading it with the
+        // keyboard. Turning this default off again needs that dealt with
+        // first.
+        assert_eq!(Layer::defaults().mouse, Some(true));
     }
 
     #[test]
