@@ -25,6 +25,7 @@ pub use layer::Layer;
 pub use schema::File;
 
 use crate::render::HtmlMode;
+use crate::theme::ThemeVariant;
 
 /// The environment variable naming a configuration file.
 pub const CONFIG_ENV: &str = "MARQUEE_CONFIG";
@@ -142,7 +143,9 @@ impl Config {
         // The defaults layer answers everything except width, so these
         // fallbacks are belt and braces rather than policy.
         Self {
-            style: layer.style.unwrap_or_else(|| "auto".to_owned()),
+            style: layer
+                .style
+                .unwrap_or_else(|| ThemeVariant::Slate.name().to_owned()),
             width: layer.width,
             line_numbers: layer.line_numbers.unwrap_or(false),
             mouse: layer.mouse.unwrap_or(false),
@@ -283,7 +286,7 @@ mod tests {
     #[test]
     fn with_nothing_configured_the_defaults_apply() {
         let config = nothing_configured();
-        assert_eq!(config.style, "auto");
+        assert_eq!(config.style, "slate");
         assert!(!config.line_numbers);
         assert!(config.contents);
         assert!(config.warnings.is_empty());
@@ -313,7 +316,7 @@ mod tests {
         let missing = dir.path().join("config.toml");
         let config =
             Config::load_from(Layer::default(), None, &no_env, Some(&missing)).expect("load");
-        assert_eq!(config.style, "auto");
+        assert_eq!(config.style, "slate");
         assert_eq!(config.path, None);
     }
 

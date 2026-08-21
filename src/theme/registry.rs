@@ -198,6 +198,21 @@ mod tests {
     }
 
     #[test]
+    fn the_default_style_and_auto_are_the_same_theme() {
+        // The shipped default names the palette rather than `auto`, and `auto`
+        // is kept because glow spells it that way. The two have always meant
+        // the same thing; this is what stops them drifting apart, in either
+        // direction, without somebody deciding to.
+        let default = crate::config::Layer::defaults()
+            .style
+            .expect("a default style");
+        assert_eq!(
+            resolve(&default, &silent()).unwrap().name,
+            resolve("auto", &silent()).unwrap().name
+        );
+    }
+
+    #[test]
     fn auto_is_an_alias_for_the_dark_palette() {
         // `auto` is an alias, not an adaptive choice, and it is the default —
         // so what it decides is what every reader who never chose a theme

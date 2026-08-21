@@ -7,6 +7,7 @@
 
 use super::schema::File;
 use crate::render::HtmlMode;
+use crate::theme::ThemeVariant;
 
 /// Settings from one source. `None` means the source said nothing, which is
 /// different from saying "off".
@@ -67,7 +68,12 @@ impl Layer {
     #[must_use]
     pub fn defaults() -> Self {
         Self {
-            style: Some("auto".to_owned()),
+            // The palette itself, not `auto`. `auto` resolves to exactly this
+            // and always has, so naming it here said the default was adaptive
+            // when it was not — and left the default's meaning somewhere else,
+            // where changing it would have moved every reader who never chose
+            // a theme. `auto` stays a name `--style` accepts, for glow.
+            style: Some(ThemeVariant::Slate.name().to_owned()),
             width: None,
             line_numbers: Some(false),
             mouse: Some(false),

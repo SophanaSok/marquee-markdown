@@ -47,11 +47,19 @@ the default, is that its documentation now describes it accurately.
   has carried a promise to follow the terminal's background since the
   beginning and has never kept it — the seam was there from the start and both
   callers passed "unknown", so it has always answered the dark palette. The
-  behavior is untouched, deliberately: `auto` is the default, and the first
+  behavior is untouched, deliberately: it was the default, and the first
   release to start keeping that promise would move every reader on a light
   terminal from slate to paper without being asked. The documentation now
   matches the code instead of the other way round, and `--style system` is
   where following the terminal lives.
+
+- **The default style is now `slate` rather than `auto`**, which is the same
+  theme by another name — `mmd config` says `style = "slate"` where it used to
+  say `style = "auto"`. Naming the palette states the default instead of
+  deferring it to whatever `auto` happens to mean, so changing what a reader
+  who never chose a theme sees now takes changing the default, deliberately,
+  rather than falling out of a change to `auto`. `auto` remains a name
+  `--style` and `[general] style` accept.
 
   Nothing resolves differently. `-s auto` is byte-for-byte `-s slate`, with a
   terminal sitting there answering or without one.

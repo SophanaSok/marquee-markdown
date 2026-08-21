@@ -419,9 +419,10 @@ keymap rather than written by hand.
 
 ## Themes
 
-Two palettes ship compiled in — `paper` (light) and `slate` (dark). The
-default is `--style auto`, which despite the name is not adaptive: it is an
-alias for `slate`, spelled the way `glow` spells it so its flags carry over.
+Two palettes ship compiled in — `paper` (light) and `slate` (dark), and
+`slate` is the default. `--style auto` is accepted too, because `glow` spells
+it that way and its flags carry over here; it is an alias for `slate` rather
+than an adaptive choice, despite the name.
 
 The adaptive one is `--style system`, which builds the whole palette out of
 the colors your terminal is already using, so a document reads in your own
@@ -439,8 +440,8 @@ floor so a light scheme's yellow does not become an unreadable heading. On
 Solarized Light that floor is what picks the red over the yellow; without it
 the heading would sit at a ratio of 2.0 on its own page.
 
-Only `system` asks. `auto` and the named palettes send the terminal nothing at
-all, so the default invocation is unchanged. Anything that will not answer
+Only `system` asks. Every other style — the default included — sends the
+terminal nothing at all. Anything that will not answer
 falls back to a shipped palette, and costs nothing to try:
 
 | where | `system` gets | asked for |
