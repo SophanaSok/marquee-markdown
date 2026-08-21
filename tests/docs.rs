@@ -212,3 +212,57 @@ fn the_scoop_template_fills_in_to_a_manifest_scoop_can_use() {
         "the autoupdate block lost its own placeholder: {autoupdate}"
     );
 }
+
+#[test]
+fn the_homebrew_formula_points_at_a_real_release() {
+    // Unlike the Scoop manifest, this one cannot be generated at release time:
+    // Homebrew wants a formula in a tap, and a tap is edited by pull request.
+    // So the version is pinned here, and pinned is how the Scoop manifest once
+    // sat at 0.1.0 through two releases — and how this formula came to have no
+    // `url` at all through four.
+    //
+    // The check is against the changelog rather than `Cargo.toml`, because the
+    // formula points at a *released* version and `Cargo.toml` is the *next*
+    // one. Between bumping the version and updating the tap they differ, and a
+    // test that demanded they match would go red on every release commit with
+    // no way to fix it — the hash cannot be computed before the tag exists.
+    //
+    // `packaging/` is excluded from the published crate, so inside the package
+    // there is nothing to check.
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let Ok(formula) = std::fs::read_to_string(root.join("packaging/homebrew/marquee-markdown.rb"))
+    else {
+        return;
+    };
+
+    let field = |name: &str| {
+        formula
+            .lines()
+            .find_map(|line| line.trim().strip_prefix(name)?.trim().strip_prefix('"'))
+            .and_then(|rest| rest.split('"').next())
+            .unwrap_or_else(|| panic!("the formula has no {name}"))
+            .to_owned()
+    };
+
+    // A source tarball, because `install` builds with cargo. Pointing at a
+    // release archive would download a binary and then build another.
+    let url = field("url ");
+    let tag = url
+        .rsplit('/')
+        .next()
+        .and_then(|file| file.strip_suffix(".tar.gz"))
+        .unwrap_or_else(|| panic!("not a source tarball: {url}"));
+
+    let changelog = std::fs::read_to_string(root.join("CHANGELOG.md")).expect("CHANGELOG.md");
+    let released = format!("## [{}] - ", tag.trim_start_matches('v'));
+    assert!(
+        changelog.contains(&released),
+        "the formula is at {tag}, which the changelog has no dated release for"
+    );
+
+    let sha = field("sha256 ");
+    assert!(
+        sha.len() == 64 && sha.chars().all(|c| c.is_ascii_hexdigit()),
+        "not a sha256: {sha}"
+    );
+}

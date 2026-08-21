@@ -1,10 +1,20 @@
 # Homebrew formula.
 #
-# The url and sha256 are filled in per release; `brew bump-formula-pr` does it
-# from the checksums.txt attached to the GitHub release.
+# The `url` and `sha256` are the source tarball for a tag, not the release
+# archives: this formula builds with cargo, so the `checksums.txt` on the
+# release describes files it never fetches. Bump it *after* pushing the tag —
+# the hash cannot be computed before the tarball exists — with
+# `brew bump-formula-pr --version=X.Y.Z`, which rewrites both lines and
+# computes the hash itself.
+#
+# `tests/docs.rs` checks that the version here has a dated release in the
+# changelog, because a formula nothing checks is how this one came to sit with
+# no `url` at all through four releases.
 class MarqueeMarkdown < Formula
   desc "TUI markdown reader that renders documents like Claude artifacts"
   homepage "https://github.com/SophanaSok/marquee-markdown"
+  url "https://github.com/SophanaSok/marquee-markdown/archive/refs/tags/v0.5.0.tar.gz"
+  sha256 "ec6458fa9f830b27a8707fd161a6c6efe015bba8c5c692b1b0256da05e98e32b"
   license "MIT"
   head "https://github.com/SophanaSok/marquee-markdown.git", branch: "main"
 

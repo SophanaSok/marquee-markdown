@@ -4,7 +4,7 @@ What is here, and what fills in the blanks.
 
 | File | Filled in by |
 | --- | --- |
-| `homebrew/marquee-markdown.rb` | `brew bump-formula-pr`, from the release checksums |
+| `homebrew/marquee-markdown.rb` | `brew bump-formula-pr`, from the tag's source tarball |
 | `scoop/marquee-markdown.template.json` | the release workflow, from `checksums.txt` |
 
 Neither a Homebrew tap nor a Scoop bucket exists yet; these are the manifests
@@ -82,8 +82,15 @@ attribute cases both programs actually emit.
 2. Bump `version` in `Cargo.toml`, and run `cargo check` so `Cargo.lock`
    follows.
 3. Commit, tag `vX.Y.Z`, and push the tag.
+4. Once the tag is up, bump `homebrew/marquee-markdown.rb` with
+   `brew bump-formula-pr --version=X.Y.Z`. This one is last rather than part
+   of the release commit because it pins the hash of the tag's source tarball,
+   which does not exist until the tag is pushed. `tests/docs.rs` checks the
+   version it names has a dated release in the changelog, so a formula left
+   behind shows up as a red test rather than as an install of the wrong
+   version.
 
-That is the whole of it — there is no step afterwards. The workflow does the
+Steps 1 to 3 are the whole of the release itself. The workflow does the
 rest, in an order that cannot leave the two sides disagreeing: it first
 refuses a tag that does not match `Cargo.toml` or a changelog with no notes
 for the version, then builds the archives, the Debian and RPM packages, and
