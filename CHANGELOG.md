@@ -13,7 +13,7 @@ to change in any release: the pipeline — `parse`, `block`, `frag`, `wrap`,
 `sink`, `layout`, `highlight`, `html`.
 Until 1.0 both halves may change.
 
-## [Unreleased]
+## [0.5.0] - 2026-08-21
 
 ### Added
 
@@ -563,7 +563,9 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
 - Resizing re-lays out on every event; a large document dragged by a window
   edge will work harder than it needs to until a debounce lands.
 
-[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/SophanaSok/marquee-markdown/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.1.0...v0.2.0
