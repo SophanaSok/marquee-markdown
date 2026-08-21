@@ -768,7 +768,11 @@ fn paste(app: &mut App, mut text: String) {
     prompt.input.push_str(&text);
 }
 
-/// Mouse wheel scrolling, when `-m` asked for it.
+/// Mouse wheel scrolling.
+///
+/// Three lines a tick, and the same three on every terminal — which is the
+/// point of asking for the wheel at all, rather than a number the terminal
+/// picked and multiplied by its own scroll factor on the way past.
 fn mouse_event(app: &mut App, mouse: MouseEvent) {
     if !app.options.mouse {
         return;
@@ -779,6 +783,9 @@ fn mouse_event(app: &mut App, mouse: MouseEvent) {
         MouseEventKind::ScrollUp => app.view.scroll(-3, extent),
         MouseEventKind::ScrollLeft => app.view.pan(-3, extent),
         MouseEventKind::ScrollRight => app.view.pan(3, extent),
+        // `event::translate` drops everything else before it reaches the
+        // queue; this arm is what makes the match exhaustive for the events a
+        // test can still hand straight to `handle`.
         _ => {}
     }
 }

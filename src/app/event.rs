@@ -10,7 +10,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use anyhow::Result;
-use crossterm::event::{self, KeyEvent, KeyEventKind, MouseEvent};
+use crossterm::event::{self, KeyEvent, KeyEventKind, MouseEvent, MouseEventKind};
 
 use super::gate;
 use crate::browser::Scan;
@@ -21,7 +21,8 @@ use crate::browser::Scan;
 pub enum Event {
     /// A key was pressed.
     Key(KeyEvent),
-    /// The mouse moved, was clicked, or was scrolled.
+    /// The wheel was scrolled, and only the wheel: `translate` drops every
+    /// other mouse report before it reaches here.
     Mouse(MouseEvent),
     /// The terminal changed size.
     Resize(u16, u16),
@@ -217,11 +218,32 @@ pub fn translate(event: event::Event) -> Option<Event> {
         // Terminals with the enhanced keyboard protocol report releases and
         // repeats too; acting on both halves of a keypress would scroll twice.
         event::Event::Key(key) if key.kind == KeyEventKind::Press => Some(Event::Key(key)),
-        event::Event::Mouse(mouse) => Some(Event::Mouse(mouse)),
+        event::Event::Mouse(mouse) if is_wheel(mouse.kind) => Some(Event::Mouse(mouse)),
         event::Event::Resize(cols, rows) => Some(Event::Resize(cols, rows)),
         event::Event::Paste(text) => Some(Event::Paste(text)),
         _ => None,
     }
+}
+
+/// Whether a mouse report is one of the wheel's.
+///
+/// The wheel is the only thing this program does with a mouse, and
+/// `terminal::setup` asks the terminal for no more than that — but a mode
+/// change is a request, not a guarantee. A terminal that ignores it, a report
+/// already in flight when it went out, and the Windows console, where mouse
+/// input is one flag with no separate motion bit, all still deliver movement.
+/// Dropped here alongside the key releases rather than carried into the update
+/// loop: reaching `update::mouse_event` only to fall through its catch-all arm
+/// costs a reconcile and a whole frame drawn and diffed away, once per cell the
+/// pointer crosses.
+const fn is_wheel(kind: MouseEventKind) -> bool {
+    matches!(
+        kind,
+        MouseEventKind::ScrollUp
+            | MouseEventKind::ScrollDown
+            | MouseEventKind::ScrollLeft
+            | MouseEventKind::ScrollRight
+    )
 }
 
 /// An event source backed by a fixed list, for tests.
@@ -251,7 +273,7 @@ impl EventSource for ScriptedEvents {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crossterm::event::{KeyCode, KeyModifiers};
+    use crossterm::event::{KeyCode, KeyModifiers, MouseButton};
 
     #[test]
     fn key_releases_are_dropped_so_a_press_acts_once() {
@@ -261,6 +283,39 @@ mod tests {
         assert!(translate(event::Event::Key(key)).is_none());
         key.kind = KeyEventKind::Repeat;
         assert!(translate(event::Event::Key(key)).is_none());
+    }
+
+    #[test]
+    fn only_the_wheel_survives_translation() {
+        // Everything else is a report this program asked the terminal not to
+        // send and would throw away on arrival — after a redraw.
+        let report = |kind| {
+            event::Event::Mouse(MouseEvent {
+                kind,
+                column: 4,
+                row: 2,
+                modifiers: KeyModifiers::NONE,
+            })
+        };
+        for kind in [
+            MouseEventKind::ScrollUp,
+            MouseEventKind::ScrollDown,
+            MouseEventKind::ScrollLeft,
+            MouseEventKind::ScrollRight,
+        ] {
+            assert!(translate(report(kind)).is_some(), "{kind:?} was dropped");
+        }
+        for kind in [
+            MouseEventKind::Moved,
+            MouseEventKind::Down(MouseButton::Left),
+            MouseEventKind::Up(MouseButton::Left),
+            MouseEventKind::Drag(MouseButton::Left),
+        ] {
+            assert!(
+                translate(report(kind)).is_none(),
+                "{kind:?} reached the loop"
+            );
+        }
     }
 
     #[test]
