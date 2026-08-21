@@ -88,8 +88,25 @@ impl Config {
         explicit: Option<&Path>,
         get: &dyn Fn(&str) -> Option<String>,
     ) -> Result<Self> {
+        Self::load_from(flags, explicit, get, default_path().as_deref())
+    }
+
+    /// [`load`](Self::load), with the usual place handed in rather than found.
+    ///
+    /// The one impure step in this module was `locate` reaching for
+    /// `default_path()` on its own, which made "nothing configured" mean
+    /// "nothing configured, unless whoever is running this has a file" — so
+    /// the tests for the defaults asserted on the developer's own settings and
+    /// passed only because most machines have none. Handing the location in
+    /// keeps the promise the module header makes.
+    fn load_from(
+        flags: Layer,
+        explicit: Option<&Path>,
+        get: &dyn Fn(&str) -> Option<String>,
+        default: Option<&Path>,
+    ) -> Result<Self> {
         let (environment, mut warnings) = Layer::from_env(get);
-        let (file, path) = match locate(explicit, get) {
+        let (file, path) = match locate(explicit, get, default) {
             Some(found) => {
                 let (file, unknown) = read(&found)?;
                 warnings.extend(unknown.into_iter().map(|key| {
@@ -189,15 +206,18 @@ impl Config {
 /// why nothing they wrote took effect. The default location is returned only
 /// if something is there, because most people have no configuration file and
 /// that is not a problem.
-fn locate(explicit: Option<&Path>, get: &dyn Fn(&str) -> Option<String>) -> Option<PathBuf> {
+fn locate(
+    explicit: Option<&Path>,
+    get: &dyn Fn(&str) -> Option<String>,
+    default: Option<&Path>,
+) -> Option<PathBuf> {
     if let Some(path) = explicit {
         return Some(path.to_path_buf());
     }
     if let Some(path) = get(CONFIG_ENV).filter(|value| !value.trim().is_empty()) {
         return Some(PathBuf::from(path));
     }
-    let path = default_path()?;
-    path.is_file().then_some(path)
+    default.filter(|path| path.is_file()).map(Path::to_path_buf)
 }
 
 /// Where the configuration file lives when nobody says otherwise.
@@ -238,6 +258,17 @@ mod tests {
         }
     }
 
+    /// The configuration of a machine with no file anywhere.
+    ///
+    /// Not `Config::load(.., None, &no_env)`: that falls back to the real
+    /// `default_path()`, so on a machine that *has* a configuration file these
+    /// tests assert on its contents rather than on the defaults. They passed
+    /// for as long as they did only because hardly anyone had one — and then
+    /// the theme picker started writing it.
+    fn nothing_configured() -> Config {
+        Config::load_from(Layer::default(), None, &no_env, None).expect("load")
+    }
+
     fn write(text: &str) -> (tempfile::TempDir, PathBuf) {
         let dir = tempfile::tempdir().expect("temp dir");
         let path = dir.path().join("config.toml");
@@ -247,11 +278,39 @@ mod tests {
 
     #[test]
     fn with_nothing_configured_the_defaults_apply() {
-        let config = Config::load(Layer::default(), None, &no_env).expect("load");
+        let config = nothing_configured();
         assert_eq!(config.style, "auto");
         assert!(!config.line_numbers);
         assert!(config.contents);
         assert!(config.warnings.is_empty());
+    }
+
+    /// The other half of handing the location in: it must still be read.
+    ///
+    /// This covers `locate`'s treatment of a default, not `load` passing one —
+    /// that single line reaches `dirs`, so nothing here can see it, and a
+    /// version of it that passed `None` would leave every reader's
+    /// configuration silently unread with the whole suite green. The smoke job
+    /// is what stands behind that line: it runs the binary against a
+    /// configuration file in the usual place.
+    #[test]
+    fn the_usual_place_is_read_when_nothing_names_a_file() {
+        let (_dir, path) = write("[general]\nstyle = \"paper\"\n");
+        let config = Config::load_from(Layer::default(), None, &no_env, Some(&path)).expect("load");
+        assert_eq!(config.style, "paper");
+        assert_eq!(config.path.as_deref(), Some(path.as_path()));
+    }
+
+    /// Unlike a file named with `--config`, one that simply is not there is
+    /// the ordinary case rather than an error.
+    #[test]
+    fn the_usual_place_not_existing_is_not_an_error() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let missing = dir.path().join("config.toml");
+        let config =
+            Config::load_from(Layer::default(), None, &no_env, Some(&missing)).expect("load");
+        assert_eq!(config.style, "auto");
+        assert_eq!(config.path, None);
     }
 
     #[test]
@@ -371,7 +430,7 @@ mod tests {
 
     #[test]
     fn the_effective_configuration_says_where_it_came_from() {
-        let config = Config::load(Layer::default(), None, &no_env).expect("load");
+        let config = nothing_configured();
         assert!(config.to_toml().contains("No file was found"));
 
         let (_dir, path) = write("[general]\nstyle = \"paper\"\n");
@@ -381,7 +440,7 @@ mod tests {
 
     #[test]
     fn an_unset_width_is_shown_as_a_comment_rather_than_a_number() {
-        let config = Config::load(Layer::default(), None, &no_env).expect("load");
+        let config = nothing_configured();
         let printed = config.to_toml();
         assert!(printed.contains("# width"), "{printed}");
     }

@@ -142,6 +142,19 @@ jobs:
           # The effective configuration round-trips as a configuration file.
           "$BIN" --config "$OUT"/config.toml config > /dev/null
 
+          # A file in the usual place is read when nothing names one. This is
+          # the only check that covers it: `Config::load` finds that location
+          # through `dirs`, so no unit test can see the call, and a version of
+          # it that found nothing would leave every reader's configuration
+          # silently unread with all five hundred of them still passing.
+          mkdir -p "$OUT/config/marquee-markdown"
+          printf '[general]\nstyle = "paper"\nwidth = 42\n' \
+              > "$OUT/config/marquee-markdown/config.toml"
+          XDG_CONFIG_HOME="$OUT/config" "$BIN" config > "$OUT"/found.toml
+          grep -q 'marquee-markdown/config.toml' "$OUT"/found.toml
+          grep -q 'style = "paper"' "$OUT"/found.toml
+          grep -q 'width = 42' "$OUT"/found.toml
+
           # The update check stays inert here: `CI` is set and standard error
           # is no terminal, so nothing is fetched and nothing is cached. The
           # cache directory not appearing is the proof that no thread ran.
