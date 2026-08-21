@@ -273,6 +273,15 @@ binary rather than the repository.
   - Feed the keys with a delay between them. Sent in one burst, `esc` followed
     by a letter is indistinguishable from Alt+letter, which is exactly the
     ambiguity a real terminal has.
+  - **`-s system` additionally needs a delay in front of the *first* key.** It
+    asks the terminal about its colors, and the question and its answer travel
+    the same stream as keystrokes, so a burst arriving before the answer does
+    is read as the answer and thrown away — and the reader then waits forever
+    for keys it was already sent. `src/util/osc.rs` declines to ask when input
+    is already queued and stops the moment a byte turns up that cannot be a
+    reply, which bounds the loss to the round trip; a bare pty answers nothing,
+    so there the bound is the full 100 ms. Half a second is enough. No other
+    style asks, so the default recipe below is unaffected.
 
   Two P6 bugs were invisible to 470 passing tests and obvious on the first run:
   the file watch never fired for a relative path, and restoring the screen

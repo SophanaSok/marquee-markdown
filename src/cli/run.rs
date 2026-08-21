@@ -13,6 +13,7 @@ use super::{Cli, Command, RunMode};
 use crate::config::{Config, Layer};
 use crate::source::{self, HttpFetcher, RealFs};
 use crate::theme::registry;
+use crate::theme::system::TerminalColors;
 use crate::{app, cli, oneshot, update_check, util};
 
 /// The whole program. Returns the process exit code.
@@ -95,9 +96,19 @@ pub fn run() -> Result<()> {
     let stdout_is_tty = util::tty::stdout_is_terminal();
     let mode = cli::run_mode(&cli, &spec, stdout_is_tty);
 
+    // Ask the terminal about its own colors, once, here — before the screen is
+    // taken and therefore before the event thread that owns standard input
+    // exists. Only the one style that has a use for the answer pays for it;
+    // every other invocation, the default included, sends nothing at all.
+    let terminal = if stdout_is_tty && config.terminal_query && asks_the_terminal(&config.style) {
+        util::osc::query(util::osc::TIMEOUT)
+    } else {
+        TerminalColors::UNKNOWN
+    };
+
     // Redirected output gets no styling, matching glow.
     let theme = if stdout_is_tty {
-        registry::resolve(&config.style, None)?
+        registry::resolve(&config.style, &terminal)?
     } else {
         crate::theme::Theme::plain()
     };
@@ -113,14 +124,19 @@ pub fn run() -> Result<()> {
         }
         RunMode::Tui => {
             let source = source::resolve(&spec, &HttpFetcher::new())?;
-            app::run(source, theme, options(&cli, &config), config.keymap)
+            app::run(
+                source,
+                theme,
+                options(&cli, &config, terminal),
+                config.keymap,
+            )
         }
         RunMode::Browser => {
             let root = match &spec {
                 source::SourceSpec::Dir(path) => path.clone(),
                 _ => std::env::current_dir()?,
             };
-            app::browse(root, theme, options(&cli, &config), config.keymap)
+            app::browse(root, theme, options(&cli, &config, terminal), config.keymap)
         }
         RunMode::Pager => {
             let source = source::resolve(&spec, &HttpFetcher::new())?;
@@ -151,7 +167,7 @@ fn settings(config: &Config) -> oneshot::Settings {
 }
 
 /// The settings the reader cares about.
-fn options(cli: &Cli, config: &Config) -> app::Options {
+fn options(cli: &Cli, config: &Config, terminal: TerminalColors) -> app::Options {
     // Asked of the same two layers that would supply the theme, rather than by
     // naming the environment variable again here: one definition of where a
     // style can come from, so this cannot drift from what actually wins.
@@ -171,7 +187,19 @@ fn options(cli: &Cli, config: &Config) -> app::Options {
         html: config.html,
         config_path: config.path.clone(),
         style_overridden,
+        terminal,
     }
+}
+
+/// Whether resolving this style needs the terminal to be asked anything.
+///
+/// Only `system` has a use for the answer. Everything else — `auto`, a named
+/// palette, a path, `notty` — resolves to the same theme either way, so the
+/// default invocation asks the terminal nothing at all. A program that writes
+/// escape sequences nobody asked it to write is a program that will one day
+/// write them into a pipe.
+fn asks_the_terminal(style: &str) -> bool {
+    style.trim().eq_ignore_ascii_case(registry::SYSTEM)
 }
 
 /// Run a subcommand.
@@ -200,6 +228,7 @@ fn run_command(command: &Command, cli: &Cli) -> Result<()> {
                 let origin = match &entry.origin {
                     registry::Origin::BuiltIn => "built-in".to_owned(),
                     registry::Origin::User(path) => path.display().to_string(),
+                    registry::Origin::Terminal => "your terminal".to_owned(),
                 };
                 format!("{:<12} {origin}\n", entry.name)
             })

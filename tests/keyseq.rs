@@ -11,7 +11,8 @@ use marquee_markdown::app::keymap::Chord;
 use marquee_markdown::app::{App, Options, drive};
 use marquee_markdown::doc::search::Match;
 use marquee_markdown::source::{Base, Source};
-use marquee_markdown::theme::{Theme, ThemeVariant};
+use marquee_markdown::theme::system::TerminalColors;
+use marquee_markdown::theme::{Rgb, Theme, ThemeVariant};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 
@@ -117,6 +118,40 @@ fn the_theme_picker_previews_as_it_moves_and_puts_it_back_on_escape() {
         run(&text, "sk<esc>").summary(),
         "mode=document top=0 left=0 section=heading-1 toc=heading-1 search=- theme=slate quit=false"
     );
+}
+
+#[test]
+fn the_picker_offers_the_terminals_own_colors() {
+    // The reader asked once, before the screen was taken; the answer is
+    // carried on `Options` from then on. Previewing `system` on a key press is
+    // exactly what that is for — a question put to the terminal now would wait
+    // on a reply the event thread has already swallowed.
+    let mut options = Options::default();
+    options.terminal = TerminalColors {
+        fg: Some(Rgb(0xd8, 0xd8, 0xd8)),
+        bg: Some(Rgb(0x18, 0x18, 0x18)),
+        ..TerminalColors::UNKNOWN
+    };
+    // `system` sorts after the built-ins, so `j` from `slate` lands on it.
+    let app = run_with(&document(), "sj", options);
+    assert_eq!(
+        app.summary(),
+        "mode=themes top=0 left=0 section=heading-1 toc=heading-1 search=- theme=system quit=false"
+    );
+    assert_eq!(app.theme.palette.bg, Rgb(0x18, 0x18, 0x18));
+}
+
+#[test]
+fn the_picker_still_offers_system_when_the_terminal_would_not_answer() {
+    // The row is always there, so the list says the same thing down a pipe as
+    // on a screen. Landing on it with nothing to build from is the fallback,
+    // not an unreadable row and not a reader that will not open.
+    let app = run(&document(), "sj");
+    assert_eq!(
+        app.summary(),
+        "mode=themes top=0 left=0 section=heading-1 toc=heading-1 search=- theme=slate quit=false"
+    );
+    assert!(app.message.is_none(), "{:?}", app.message);
 }
 
 #[test]

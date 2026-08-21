@@ -108,6 +108,7 @@ impl Cli {
             all: self.all.then_some(true),
             preserve_new_lines: self.preserve_new_lines.then_some(true),
             update_check: None,
+            terminal_query: None,
             contents: None,
             // No flag: this module keeps glow's surface, and glow has no
             // equivalent. `MARQUEE_RENDER_HTML` covers the one-shot case.

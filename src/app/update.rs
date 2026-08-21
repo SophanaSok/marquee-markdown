@@ -473,7 +473,9 @@ fn preview_theme(app: &mut App) {
         return;
     };
     let name = entry.name.clone();
-    match crate::theme::registry::resolve(&name, None) {
+    // The terminal was asked once, before the screen was taken; asking again
+    // here would put a question to a stream the event thread is reading.
+    match crate::theme::registry::resolve(&name, &app.options.terminal) {
         Ok(theme) => app.theme = theme,
         Err(error) => {
             // A theme file somebody wrote can be malformed. Landing the cursor

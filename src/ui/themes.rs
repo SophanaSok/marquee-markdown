@@ -94,6 +94,7 @@ fn row(picker: &ThemePicker, entry: &crate::theme::registry::Entry) -> Row {
         let origin = match entry.origin {
             Origin::BuiltIn => "built-in",
             Origin::User(_) => "yours",
+            Origin::Terminal => "your terminal",
         };
         match appearance(entry) {
             Some(Appearance::Light) => format!("light · {origin}"),
@@ -118,7 +119,10 @@ fn appearance(entry: &crate::theme::registry::Entry) -> Option<Appearance> {
             .parse::<crate::theme::ThemeVariant>()
             .ok()
             .map(|variant| variant.definition().appearance),
-        Origin::User(_) => None,
+        // `system` is light or dark depending on what the terminal answered,
+        // which the list does not carry; the row says where it came from and
+        // the preview says the rest.
+        Origin::User(_) | Origin::Terminal => None,
     }
 }
 

@@ -13,6 +13,83 @@ to change in any release: the pipeline — `parse`, `block`, `frag`, `wrap`,
 `sink`, `layout`, `highlight`, `html`.
 Until 1.0 both halves may change.
 
+## [0.6.0] - 2026-08-21
+
+`--style system`: a palette built from the colors your terminal is already
+using. Nothing resolves differently than it did — the only change to `auto`,
+the default, is that its documentation now describes it accurately.
+
+### Added
+
+- **`--style system`** builds the whole palette out of the terminal's own
+  colors rather than shipping one. The page and the text are taken verbatim
+  from `OSC 10` and `OSC 11`; cards, borders and the muted tone step off them;
+  headings, links and the five callout hues come from the `OSC 4` ANSI slots.
+  Every color that ends up as text is held to a WCAG contrast floor against
+  the page and walked toward the foreground until it clears — which is what
+  keeps a light scheme's yellow from becoming an unreadable heading, and what
+  makes this survive a colorscheme that reports every slot as black.
+
+  It is listed by `themes`, selectable in the `s` picker, and saved to the
+  configuration file like any other. Anything that will not answer falls back
+  to a shipped palette rather than refusing to start: `screen`, which swallows
+  the question, and **tmux**, which answers the device query and nothing else.
+  Only a terminal that answers nothing at all pays the 100 ms timeout; where
+  the device query comes back — tmux included — the fallback is immediate.
+
+- **`terminal-query`**, in `[general]`, and `MARQUEE_TERMINAL_QUERY`. Default
+  on; off stops the terminal being asked anything, for a terminal that prints
+  the question instead of answering it.
+
+### Changed
+
+- **`--style auto` is now documented as what it is: an alias for `slate`.** It
+  has carried a promise to follow the terminal's background since the
+  beginning and has never kept it — the seam was there from the start and both
+  callers passed "unknown", so it has always answered the dark palette. The
+  behavior is untouched, deliberately: it was the default, and the first
+  release to start keeping that promise would move every reader on a light
+  terminal from slate to paper without being asked. The documentation now
+  matches the code instead of the other way round, and `--style system` is
+  where following the terminal lives.
+
+- **The default style is now `slate` rather than `auto`**, which is the same
+  theme by another name — `mmd config` says `style = "slate"` where it used to
+  say `style = "auto"`. Naming the palette states the default instead of
+  deferring it to whatever `auto` happens to mean, so changing what a reader
+  who never chose a theme sees now takes changing the default, deliberately,
+  rather than falling out of a change to `auto`. `auto` remains a name
+  `--style` and `[general] style` accept.
+
+  Nothing resolves differently. `-s auto` is byte-for-byte `-s slate`, with a
+  terminal sitting there answering or without one.
+
+### Fixed
+
+- **A README key table ran past its own end on Windows.** The doc-drift scan
+  split on a blank line, which a CRLF checkout does not contain, so every
+  table continued to the end of the file and fed the chord parser whatever
+  backticks it met. Nothing after the key tables had a backticked cell in its
+  first column until now, which is why it had never shown.
+
+### Notes
+
+The question and its answer travel the same stream as keystrokes, and reading
+is destructive. So the exchange happens once, before the screen is taken and
+before the thread that owns standard input exists; on `/dev/tty` rather than
+either standard stream; declined outright if anything is already queued; and
+ended by a device-attributes sentinel rather than by the clock. Only `system`
+asks at all.
+
+Windows falls back for now: the replies arrive there through the console input
+API rather than as bytes on a device, which is a different mechanism rather
+than a variation on this one.
+
+`registry::resolve` takes what the terminal answered in place of its old
+`Option<bool>`, and `registry::Origin` has gained a variant and become
+`#[non_exhaustive]`. Both are in the stable half of the API, which is what
+makes this 0.6.0 rather than 0.5.2.
+
 ## [0.5.1] - 2026-08-21
 
 Packaging and test-suite fixes. Nothing a reader will notice: of the three
@@ -593,7 +670,8 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
 - Resizing re-lays out on every event; a large document dragged by a window
   edge will work harder than it needs to until a debounce lands.
 
-[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/SophanaSok/marquee-markdown/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.3.0...v0.4.0

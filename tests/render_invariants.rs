@@ -8,9 +8,48 @@
 use marquee_markdown::render::{
     self, Document, HtmlMode, LayoutOptions, LineKind, ParseOptions, RenderedDoc,
 };
-use marquee_markdown::theme::{Theme, ThemeVariant};
+use marquee_markdown::theme::system::{self, TerminalColors};
+use marquee_markdown::theme::{Rgb, Theme, ThemeVariant};
 
 const FIXTURE: &str = include_str!("fixtures/kitchen-sink.md");
+
+/// Every theme the invariants have to hold for, by the name to blame.
+///
+/// The shipped two plus one built from a terminal's own colors. A `system`
+/// palette is chosen by somebody else's colorscheme rather than by us, so
+/// including it is what stops the invariants from quietly meaning "holds for
+/// the two palettes we happened to write".
+fn themes() -> Vec<(String, Theme)> {
+    let mut out: Vec<(String, Theme)> = ThemeVariant::all()
+        .iter()
+        .map(|variant| (variant.name().to_owned(), Theme::new(*variant)))
+        .collect();
+    out.push((
+        "system".to_owned(),
+        system::theme(&terminal()).expect("theme"),
+    ));
+    out
+}
+
+/// What a terminal with a real colorscheme answers.
+fn terminal() -> TerminalColors {
+    let mut colors = TerminalColors {
+        fg: Some(Rgb(0xd8, 0xd8, 0xd8)),
+        bg: Some(Rgb(0x18, 0x18, 0x18)),
+        ..TerminalColors::UNKNOWN
+    };
+    for (slot, value) in [
+        (1usize, Rgb(0xab, 0x46, 0x42)),
+        (2, Rgb(0xa1, 0xb5, 0x6c)),
+        (3, Rgb(0xf7, 0xca, 0x88)),
+        (4, Rgb(0x7c, 0xaf, 0xc2)),
+        (5, Rgb(0xba, 0x8b, 0xaf)),
+        (8, Rgb(0x58, 0x58, 0x58)),
+    ] {
+        colors.ansi[slot] = Some(value);
+    }
+    colors
+}
 
 fn opts(width: u16) -> LayoutOptions {
     LayoutOptions {
@@ -22,15 +61,14 @@ fn opts(width: u16) -> LayoutOptions {
 
 #[test]
 fn every_line_is_exactly_the_content_width_at_every_width() {
-    for variant in ThemeVariant::all() {
-        let theme = Theme::new(variant);
+    for (name, theme) in themes() {
         for width in [10u16, 20, 32, 40, 55, 72, 80, 100, 120, 200] {
             let doc = render::render(FIXTURE, &theme, opts(width));
             for (i, line) in doc.lines.iter().enumerate() {
                 assert_eq!(
                     line.width(),
                     usize::from(width),
-                    "{variant} width {width}: line {i} is {} cells\n{:?}",
+                    "{name} width {width}: line {i} is {} cells\n{:?}",
                     line.width(),
                     line
                 );
@@ -336,8 +374,7 @@ fn text_of(doc: &RenderedDoc) -> String {
 
 #[test]
 fn every_html_mode_keeps_the_width_invariant() {
-    for variant in ThemeVariant::all() {
-        let theme = Theme::new(variant);
+    for (name, theme) in themes() {
         for html in HtmlMode::ALL {
             for width in [10u16, 20, 32, 40, 55, 72, 80, 100, 120, 200] {
                 let doc = render_html(FIXTURE, &theme, width, html);
@@ -345,7 +382,7 @@ fn every_html_mode_keeps_the_width_invariant() {
                     assert_eq!(
                         line.width(),
                         usize::from(width),
-                        "line {i} at width {width} under {html:?} in {variant:?}"
+                        "line {i} at width {width} under {html:?} in {name}"
                     );
                 }
             }

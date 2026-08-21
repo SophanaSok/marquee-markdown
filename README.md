@@ -175,6 +175,7 @@ marquee-markdown https://example.com/doc.md      # any URL
 marquee-markdown -t doc.md          # full-screen reader
 marquee-markdown -w 80 doc.md       # fixed width (0 disables wrapping)
 marquee-markdown -s paper doc.md    # light theme
+marquee-markdown -s system doc.md   # your terminal's own colors
 marquee-markdown -l doc.md          # line numbers
 
 marquee-markdown -p doc.md          # through your pager
@@ -368,13 +369,14 @@ a different one.
 
 ```toml
 [general]
-style = "paper"            # theme name or path to a theme file
+style = "paper"            # paper | slate | system | a name | a path
 width = 80                 # 0 disables wrapping
 line-numbers = false
 mouse = false
 all = false                # list hidden and ignored files when browsing
 preserve-new-lines = false
 update-check = true        # mention a newer release on the way out
+terminal-query = true      # let `--style system` ask the terminal its colors
 
 [render]
 html = "render"            # render | hide | literal
@@ -395,7 +397,8 @@ then file, then defaults**. A flag that was not given contributes nothing, so
 Environment variables are the setting name in `MARQUEE_` form, with
 `[general]` left out: `MARQUEE_STYLE`, `MARQUEE_WIDTH`, `MARQUEE_LINE_NUMBERS`,
 `MARQUEE_MOUSE`, `MARQUEE_ALL`, `MARQUEE_PRESERVE_NEW_LINES`,
-`MARQUEE_UPDATE_CHECK`, `MARQUEE_RENDER_HTML`, and `MARQUEE_UI_CONTENTS`.
+`MARQUEE_UPDATE_CHECK`, `MARQUEE_TERMINAL_QUERY`, `MARQUEE_RENDER_HTML`, and
+`MARQUEE_UI_CONTENTS`.
 
 A setting this version does not recognize is reported and ignored rather than
 refused, so a file written for a newer version still works with an older
@@ -416,9 +419,42 @@ keymap rather than written by hand.
 
 ## Themes
 
-Two palettes ship compiled in — `paper` (light) and `slate` (dark) — and
-`--style auto` is the default. A theme is also just a file, so adding one needs
-no Rust and no recompile:
+Two palettes ship compiled in — `paper` (light) and `slate` (dark), and
+`slate` is the default. `--style auto` is accepted too, because `glow` spells
+it that way and its flags carry over here; it is an alias for `slate` rather
+than an adaptive choice, despite the name.
+
+The adaptive one is `--style system`, which builds the whole palette out of
+the colors your terminal is already using, so a document reads in your own
+colorscheme rather than in Claude's:
+
+```sh
+marquee-markdown -s system doc.md
+```
+
+It asks the terminal directly — `OSC 10`, `OSC 11` and `OSC 4`, the same
+questions any terminal program asks — and takes the page and the text
+verbatim. The rest is derived: cards and borders step off the page, and
+headings, links and callouts come from the ANSI slots, each held to a contrast
+floor so a light scheme's yellow does not become an unreadable heading. On
+Solarized Light that floor is what picks the red over the yellow; without it
+the heading would sit at a ratio of 2.0 on its own page.
+
+Only `system` asks. Every other style — the default included — sends the
+terminal nothing at all. Anything that will not answer
+falls back to a shipped palette, and costs nothing to try:
+
+| where | `system` gets | asked for |
+| --- | --- | --- |
+| a terminal that answers | its own colors | nothing measurable |
+| **tmux** | falls back — tmux answers the device query and nothing else | nothing measurable |
+| `screen`, or a reply slower than 100 ms | falls back | 100 ms, once |
+| Windows | falls back — the replies arrive there by another road | nothing |
+
+`terminal-query = false` stops it being asked at all, and nothing but
+`-s system` ever asked in the first place.
+
+A theme is also just a file, so adding one needs no Rust and no recompile:
 
 ```sh
 mkdir -p ~/.config/marquee-markdown/themes
@@ -471,7 +507,8 @@ caution = ""
 image = ""
 ```
 
-`marquee-markdown themes` lists what is available and where each came from.
+`marquee-markdown themes` lists what is available and where each came from —
+built-ins, your own files, and `system`.
 
 In the reader, `s` opens the same list to pick from. The document behind it
 redraws as you move, so you are choosing by looking at your own text rather
