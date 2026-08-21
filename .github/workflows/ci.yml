@@ -126,6 +126,14 @@ jobs:
           "$BIN" README.md > "$OUT"/out.txt
           ! grep -q $'\x1b' "$OUT"/out.txt
 
+          # Including the two styles that ask the terminal about its colors.
+          # The question is a write of escape sequences, and a question asked
+          # down a pipe is a question written into somebody's file.
+          MARQUEE_STYLE=system "$BIN" README.md > "$OUT"/system.txt
+          ! grep -q $'\x1b' "$OUT"/system.txt
+          MARQUEE_STYLE=auto "$BIN" README.md > "$OUT"/auto.txt
+          ! grep -q $'\x1b' "$OUT"/auto.txt
+
           # `-n` keeps the author's line breaks; without it they are re-flowed.
           printf '# T\n\nalpha\nbeta\n' > "$OUT"/n.md
           "$BIN" -n -w 40 "$OUT"/n.md | grep -q '^alpha  *$'
@@ -136,6 +144,7 @@ jobs:
           "$BIN" man > "$OUT"/man.1 && test -s "$OUT"/man.1
           "$BIN" completion bash > "$OUT"/completion.bash && test -s "$OUT"/completion.bash
           "$BIN" themes > "$OUT"/themes.txt && grep -q slate "$OUT"/themes.txt
+          grep -q system "$OUT"/themes.txt
           "$BIN" keys > "$OUT"/keys.md && grep -q line-down "$OUT"/keys.md
           "$BIN" config > "$OUT"/config.toml && grep -q '\[general\]' "$OUT"/config.toml
 

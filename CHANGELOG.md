@@ -13,6 +13,62 @@ to change in any release: the pipeline — `parse`, `block`, `frag`, `wrap`,
 `sink`, `layout`, `highlight`, `html`.
 Until 1.0 both halves may change.
 
+## [0.6.0] - 2026-08-21
+
+`--style system`: a palette built from the colors your terminal is already
+using.
+
+### Changed
+
+- **`--style auto` now follows the terminal's background, which is what it has
+  always claimed to do.** The seam for it was there from the start and both
+  callers passed "unknown", so `auto` — the default — always resolved to
+  `slate`. It now asks the terminal, which means a reader on a light terminal
+  gets `paper` by default where they used to get `slate`. Anyone who wants the
+  old answer can say so: `style = "slate"`.
+
+### Added
+
+- **`--style system`** builds the whole palette out of the terminal's own
+  colors rather than shipping one. The page and the text are taken verbatim
+  from `OSC 10` and `OSC 11`; cards, borders and the muted tone step off them;
+  headings, links and the five callout hues come from the `OSC 4` ANSI slots.
+  Every color that ends up as text is held to a WCAG contrast floor against
+  the page and walked toward the foreground until it clears — which is what
+  keeps a light scheme's yellow from becoming an unreadable heading, and what
+  makes this survive a colorscheme that reports every slot as black.
+
+  It is listed by `themes`, selectable in the `s` picker, and saved to the
+  configuration file like any other. Anything that will not answer falls back
+  to what `auto` would have picked rather than refusing to start: `screen`,
+  which swallows the question, and **tmux**, which answers the device query
+  and nothing else. Only a terminal that answers nothing at all pays the
+  100 ms timeout; where the device query comes back — tmux included — the
+  fallback is immediate.
+
+- **`terminal-query`**, in `[general]`, and `MARQUEE_TERMINAL_QUERY`. Default
+  on; off stops the terminal being asked anything, for a terminal that prints
+  the question instead of answering it.
+
+### Notes
+
+The question and its answer travel the same stream as keystrokes, and reading
+is destructive. So the exchange happens once, before the screen is taken and
+before the thread that owns standard input exists; it is declined outright if
+anything is already queued, and abandoned the moment a byte arrives that
+cannot be a reply. What is left is the round trip — single-digit milliseconds
+on a local terminal, before the first frame is drawn. Only `system` and `auto`
+pay for it at all; `-s paper` sends the terminal nothing.
+
+Windows falls back to `auto`'s answer for now: the replies arrive there
+through the console input API rather than as bytes on a device, which is a
+different mechanism rather than a variation on this one.
+
+`registry::resolve` takes what the terminal answered in place of its old
+`Option<bool>`, and `registry::Origin` has gained a variant and become
+`#[non_exhaustive]`. Both are in the stable half of the API, which is what
+makes this 0.6.0 rather than 0.5.2.
+
 ## [0.5.1] - 2026-08-21
 
 Packaging and test-suite fixes. Nothing a reader will notice: of the three
@@ -593,7 +649,8 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
 - Resizing re-lays out on every event; a large document dragged by a window
   edge will work harder than it needs to until a debounce lands.
 
-[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/SophanaSok/marquee-markdown/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.3.0...v0.4.0

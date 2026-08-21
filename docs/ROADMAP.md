@@ -23,6 +23,15 @@ scroll-tracking table-of-contents sidebar and in-document search.
 | **P7** Config + keymaps | TOML schema, `MARQUEE_` env layer, precedence, user keymap merge, `config` subcommand | 2 | **Done** |
 | **P8** Release | `packaging/`, deb/rpm, release workflow, `docs/ARCHITECTURE.md`, crates.io | 2 | **Done** |
 
+## Known gaps
+
+- **`--style system` does not ask on Windows.** The `OSC` replies arrive there
+  through the console input API rather than as bytes on a device, which is a
+  different mechanism from the `/dev/tty` exchange in `src/util/osc.rs` rather
+  than a variation on it. Windows Terminal does answer these questions, so
+  this is worth writing; until it is, `system` falls back to what `auto` would
+  have picked, as it does for any terminal that stays quiet.
+
 ## What works today
 
 `marquee-markdown file.md` is a working replacement for `glow file.md` on local

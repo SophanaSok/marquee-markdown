@@ -259,8 +259,9 @@ binary rather than the repository.
   For the full-screen reader that means a pty, which `script` provides:
 
   ```sh
-  printf 'jjq' | script -qec "stty rows 24 cols 80; \
-      ./target/debug/marquee-markdown -t README.md" /dev/null
+  { sleep 0.5; printf 'j'; sleep 0.2; printf 'j'; sleep 0.2; printf 'q'; } \
+      | script -qec "stty rows 24 cols 80; \
+          ./target/debug/marquee-markdown -t README.md" /dev/null
   ```
 
   Three things to know before writing one of these:
@@ -273,6 +274,16 @@ binary rather than the repository.
   - Feed the keys with a delay between them. Sent in one burst, `esc` followed
     by a letter is indistinguishable from Alt+letter, which is exactly the
     ambiguity a real terminal has.
+  - The *first* key needs a delay in front of it, too, for any style that asks
+    the terminal about its colors — which `auto`, the default, does. The
+    question and its answer travel the same stream as keystrokes, so a burst
+    arriving before the answer does is read as the answer and thrown away, and
+    the reader then waits forever for keys it was already sent. `src/util/osc.rs`
+    declines to ask when input is already queued and stops the moment a byte
+    turns up that cannot be a reply, which bounds the loss to the round trip;
+    a bare pty answers nothing, so there the bound is the full 100 ms. Half a
+    second in front of the first key is enough, and `-s slate` skips the
+    question entirely when the test is not about it.
 
   Two P6 bugs were invisible to 470 passing tests and obvious on the first run:
   the file watch never fired for a relative path, and restoring the screen

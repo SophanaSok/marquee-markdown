@@ -14,6 +14,7 @@ use crate::browser::Browser;
 use crate::doc::{DocCache, Links, Search, View};
 use crate::render::{HtmlMode, ParseOptions};
 use crate::source::Source;
+use crate::theme::system::TerminalColors;
 use crate::theme::{Appearance, Theme, ThemeVariant, registry};
 
 use super::event::Event;
@@ -54,6 +55,14 @@ pub struct Options {
     /// next run, so a theme saved from the picker would appear not to take —
     /// which is worth saying rather than letting the reader discover it.
     pub style_overridden: bool,
+    /// What the terminal said about its own colors, asked once before the
+    /// screen was taken.
+    ///
+    /// Carried rather than re-asked because the event thread owns standard
+    /// input from here on: a question put to the terminal now would wait for
+    /// a reply that thread has already swallowed. This is what lets the
+    /// picker preview `system` on a key press.
+    pub terminal: TerminalColors,
 }
 
 impl Default for Options {
@@ -68,6 +77,7 @@ impl Default for Options {
             contents: true,
             config_path: None,
             style_overridden: false,
+            terminal: TerminalColors::UNKNOWN,
         }
     }
 }

@@ -53,6 +53,8 @@ pub struct Config {
     pub preserve_new_lines: bool,
     /// Check crates.io for a newer release, and say so on the way out.
     pub update_check: bool,
+    /// Ask the terminal what colors it is using, for `system` and `auto`.
+    pub terminal_query: bool,
     /// Start with the contents pane showing.
     pub contents: bool,
     /// What to do with raw HTML.
@@ -147,6 +149,7 @@ impl Config {
             all: layer.all.unwrap_or(false),
             preserve_new_lines: layer.preserve_new_lines.unwrap_or(false),
             update_check: layer.update_check.unwrap_or(true),
+            terminal_query: layer.terminal_query.unwrap_or(true),
             contents: layer.contents.unwrap_or(true),
             html: layer.html.unwrap_or_default(),
             keymap,
@@ -181,6 +184,7 @@ impl Config {
         let _ = writeln!(out, "all = {}", self.all);
         let _ = writeln!(out, "preserve-new-lines = {}", self.preserve_new_lines);
         let _ = writeln!(out, "update-check = {}", self.update_check);
+        let _ = writeln!(out, "terminal-query = {}", self.terminal_query);
         let _ = writeln!(out, "\n[render]\nhtml = {:?}", self.html.name());
         let _ = writeln!(out, "\n[ui]\ncontents = {}", self.contents);
 

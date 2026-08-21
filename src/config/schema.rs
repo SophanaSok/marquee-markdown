@@ -50,6 +50,13 @@ pub struct General {
     pub preserve_new_lines: Option<bool>,
     /// Check crates.io for a newer release, and say so on the way out.
     pub update_check: Option<bool>,
+    /// Ask the terminal what colors it is using, for `system` and `auto`.
+    ///
+    /// Off is for a terminal that prints the question instead of answering it,
+    /// or a link slow enough that waiting for an answer is worse than not
+    /// having one. With it off, `system` and `auto` fall back to the dark
+    /// palette and every other style is unaffected.
+    pub terminal_query: Option<bool>,
 }
 
 /// `[render]`.
@@ -95,6 +102,7 @@ const KNOWN: &[(&str, &[&str])] = &[
             "all",
             "preserve-new-lines",
             "update-check",
+            "terminal-query",
         ],
     ),
     ("render", &["html"]),

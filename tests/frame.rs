@@ -9,7 +9,8 @@
 use marquee_markdown::app::{App, Options, reconcile};
 use marquee_markdown::render::measure;
 use marquee_markdown::source::{Base, Source};
-use marquee_markdown::theme::{Theme, ThemeVariant};
+use marquee_markdown::theme::system::{self, TerminalColors};
+use marquee_markdown::theme::{Rgb, Theme, ThemeVariant};
 use marquee_markdown::ui;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -157,12 +158,34 @@ fn a_scrolled_key_reference_stays_painted_on_a_short_terminal() {
     assert_fully_painted(&buf, "scrolled help at 60x12");
 }
 
+/// Every theme a frame has to be fully painted in.
+///
+/// The shipped two, and one built from a terminal's own colors — a palette
+/// somebody else's colorscheme chose. The page is painted edge to edge in all
+/// of them or in none of them.
+fn themes() -> Vec<(String, Theme)> {
+    let terminal = TerminalColors {
+        fg: Some(Rgb(0xd8, 0xd8, 0xd8)),
+        bg: Some(Rgb(0x18, 0x18, 0x18)),
+        ..TerminalColors::UNKNOWN
+    };
+    let mut out: Vec<(String, Theme)> = [ThemeVariant::Paper, ThemeVariant::Slate]
+        .into_iter()
+        .map(|variant| (variant.name().to_owned(), Theme::new(variant)))
+        .collect();
+    out.push((
+        "system".to_owned(),
+        system::theme(&terminal).expect("theme"),
+    ));
+    out
+}
+
 #[test]
 fn the_theme_picker_paints_every_cell_at_every_size() {
     for &(width, height) in SIZES {
-        for variant in [ThemeVariant::Paper, ThemeVariant::Slate] {
+        for (name, theme) in themes() {
             let mut app = fixture();
-            app.theme = Theme::new(variant);
+            app.theme = theme;
             // Through the update loop rather than by hand, so the panel is
             // drawn from a picker the reader could actually have opened.
             marquee_markdown::app::update::handle(
@@ -173,21 +196,18 @@ fn the_theme_picker_paints_every_cell_at_every_size() {
             );
             assert_eq!(app.overlay, Some(marquee_markdown::app::Overlay::Themes));
             let buf = frame(&mut app, width, height);
-            assert_fully_painted(
-                &buf,
-                &format!("theme picker at {width}x{height} in {}", variant.name()),
-            );
+            assert_fully_painted(&buf, &format!("theme picker at {width}x{height} in {name}"));
         }
     }
 }
 
 #[test]
-fn every_cell_is_painted_in_both_themes() {
-    for variant in [ThemeVariant::Paper, ThemeVariant::Slate] {
+fn every_cell_is_painted_in_every_theme() {
+    for (name, theme) in themes() {
         let mut app = fixture();
-        app.theme = Theme::new(variant);
+        app.theme = theme;
         let buf = frame(&mut app, 80, 24);
-        assert_fully_painted(&buf, variant.name());
+        assert_fully_painted(&buf, &name);
     }
 }
 

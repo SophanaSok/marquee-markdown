@@ -135,6 +135,45 @@ fn only_one_module_reads_the_terminal() {
     );
 }
 
+/// Only one module may ask the terminal a question.
+///
+/// A question is a write followed by a read of the reply, and a reply that
+/// reaches the wrong reader is gone. `src/util/osc.rs` puts its questions on
+/// `/dev/tty` exactly once, before the screen is taken and before the event
+/// thread exists; a second place doing the same thing would race that thread
+/// for the answer and swallow a keystroke to get it. This is the same bug
+/// `src/app/gate.rs` exists to prevent, approached from the other side.
+#[test]
+fn only_one_module_asks_the_terminal_a_question() {
+    const ASKER: &str = "src/util/osc.rs";
+    let mut offenders = Vec::new();
+    for path in rust_files(Path::new("src")) {
+        if path == Path::new(ASKER) {
+            continue;
+        }
+        let source = std::fs::read_to_string(&path).expect("source is readable");
+        for (lineno, line) in source.lines().enumerate() {
+            if line.trim_start().starts_with("//") {
+                continue;
+            }
+            if line.contains("/dev/tty") {
+                offenders.push(format!(
+                    "{}:{}: {}",
+                    path.display(),
+                    lineno + 1,
+                    line.trim()
+                ));
+            }
+        }
+    }
+    assert!(
+        offenders.is_empty(),
+        "only {ASKER} may ask the terminal about itself; route it through there \
+         instead:\n{}",
+        offenders.join("\n")
+    );
+}
+
 fn rust_files(dir: &Path) -> Vec<PathBuf> {
     let mut files = Vec::new();
     let mut stack = vec![dir.to_path_buf()];

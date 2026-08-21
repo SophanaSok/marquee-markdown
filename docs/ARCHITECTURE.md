@@ -116,7 +116,10 @@ config/      A file, the environment, and the command line, resolved into one
 source/      What an argument means (classify, pure, behind FsProbe) and how to
              get it (resolve; local files, and remote behind the Fetcher trait).
 theme/       Two Claude palettes, and the TOML theme format they are instances
-             of. Built-ins and user themes load through the same constructor.
+             of. Built-ins, user themes, and the one derived from the
+             terminal's own colors all load through the same constructor;
+             `system.rs` is a pure function of what the terminal answered, so
+             asking it stays somebody else's job (`util/osc.rs`).
 doc/         Document state with no terminal in it: the layout cache, the
              heading tree, search, links, the scroll position, the file watch.
 browser/     The file list with no terminal in it: the walk, the filter, the

@@ -33,6 +33,8 @@ pub struct Layer {
     pub preserve_new_lines: Option<bool>,
     /// Check crates.io for a newer release, and say so on the way out.
     pub update_check: Option<bool>,
+    /// Ask the terminal about its own colors.
+    pub terminal_query: Option<bool>,
     /// Start with the contents pane showing.
     pub contents: Option<bool>,
     /// What to do with raw HTML.
@@ -55,6 +57,7 @@ impl Layer {
             all: self.all.or(lower.all),
             preserve_new_lines: self.preserve_new_lines.or(lower.preserve_new_lines),
             update_check: self.update_check.or(lower.update_check),
+            terminal_query: self.terminal_query.or(lower.terminal_query),
             contents: self.contents.or(lower.contents),
             html: self.html.or(lower.html),
         }
@@ -71,6 +74,7 @@ impl Layer {
             all: Some(false),
             preserve_new_lines: Some(false),
             update_check: Some(true),
+            terminal_query: Some(true),
             // The contents pane is the reason the program exists; it still
             // hides itself on a narrow terminal or a document with nothing to
             // list.
@@ -92,6 +96,7 @@ impl Layer {
             all: file.general.all,
             preserve_new_lines: file.general.preserve_new_lines,
             update_check: file.general.update_check,
+            terminal_query: file.general.terminal_query,
             contents: file.ui.contents,
             html: file
                 .render
@@ -119,6 +124,7 @@ impl Layer {
             all: flag(get, "MARQUEE_ALL", &mut warnings),
             preserve_new_lines: flag(get, "MARQUEE_PRESERVE_NEW_LINES", &mut warnings),
             update_check: flag(get, "MARQUEE_UPDATE_CHECK", &mut warnings),
+            terminal_query: flag(get, "MARQUEE_TERMINAL_QUERY", &mut warnings),
             contents: flag(get, "MARQUEE_UI_CONTENTS", &mut warnings),
             html: choice(get, "MARQUEE_RENDER_HTML", &mut warnings),
         };

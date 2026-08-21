@@ -10,6 +10,7 @@
 
 pub mod palette;
 pub mod registry;
+pub mod system;
 
 use std::fmt;
 use std::path::Path;
