@@ -207,7 +207,8 @@ Keys follow glow, so muscle memory carries over; `?` shows the list, rendered
 from the keymap that is actually in force rather than from a fixed page, so it
 stays honest once keys become rebindable.
 
-The wheel scrolls the document, three lines a tick, on every terminal. This is
+The wheel moves whichever pane has the keys — the document, the contents pane,
+the file list, the key reference — three steps a tick, on every terminal. This is
 the one place the reader does not follow glow, where the wheel is opt-in: a
 terminal nobody claimed the wheel from answers it by manufacturing arrow keys,
 multiplied by its own scroll factor, and those arrive as ordinary keystrokes —

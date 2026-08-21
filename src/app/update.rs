@@ -8,6 +8,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKi
 
 use super::action::Action;
 use super::event::Event;
+use super::keymap::Mode;
 use super::state::{App, Focus, Overlay, Prompt, PromptKind, Screen, ThemePicker};
 use crate::theme::{Appearance, Theme, ThemeVariant};
 
@@ -768,32 +769,66 @@ fn paste(app: &mut App, mut text: String) {
     prompt.input.push_str(&text);
 }
 
-/// Mouse wheel scrolling.
+/// Mouse wheel scrolling, in whatever the movement keys would move.
 ///
-/// Three lines a tick, and the same three on every terminal — which is the
+/// Three steps a tick, and the same three on every terminal — which is the
 /// point of asking for the wheel at all, rather than a number the terminal
 /// picked and multiplied by its own scroll factor on the way past.
+///
+/// Resolved to an [`Action`] rather than aimed at the view, so the wheel and
+/// the keys cannot disagree about which pane is being read. A reader who has
+/// tabbed into the contents pane and scrolls means that pane; one with the key
+/// reference open means the reference. Aiming it at the document regardless
+/// was invisible while the wheel was something you had to ask for, and is not
+/// now that it is on by default.
 fn mouse_event(app: &mut App, mouse: MouseEvent) {
     if !app.options.mouse {
         return;
     }
-    let extent = app.extent();
-    match mouse.kind {
-        MouseEventKind::ScrollDown => app.view.scroll(3, extent),
-        MouseEventKind::ScrollUp => app.view.scroll(-3, extent),
-        MouseEventKind::ScrollLeft => app.view.pan(-3, extent),
-        MouseEventKind::ScrollRight => app.view.pan(3, extent),
+    let (down, up) = match app.mode() {
+        // The key reference scrolls itself: `apply` hands these to
+        // `scroll_help` before the view ever sees them.
+        Mode::Help => (Action::LineDown, Action::LineUp),
+        Mode::Themes => (Action::ThemeDown, Action::ThemeUp),
+        // Anything else, including a prompt, belongs to the pane underneath —
+        // a filter being typed at the browser is still the browser.
+        _ => match app.pane_mode() {
+            Mode::Browser => (Action::BrowserDown, Action::BrowserUp),
+            Mode::Toc => (Action::TocDown, Action::TocUp),
+            _ => (Action::LineDown, Action::LineUp),
+        },
+    };
+    let action = match mouse.kind {
+        MouseEventKind::ScrollDown => down,
+        MouseEventKind::ScrollUp => up,
+        // Sideways, only where sideways means anything. Panning moves the
+        // document, so a list has nothing to do with it, and under an overlay
+        // it would move a document nobody can see. `h` and `l` fold the
+        // outline rather than panning it, which is not something to do to
+        // somebody by accident.
+        MouseEventKind::ScrollLeft if pans(app) => Action::ScrollLeft,
+        MouseEventKind::ScrollRight if pans(app) => Action::ScrollRight,
         // `event::translate` drops everything else before it reaches the
         // queue; this arm is what makes the match exhaustive for the events a
         // test can still hand straight to `handle`.
-        _ => {}
+        _ => return,
+    };
+    for _ in 0..WHEEL_STEP {
+        apply(app, action);
     }
+}
+
+/// How far one tick of the wheel goes, in whatever the pane counts in.
+const WHEEL_STEP: usize = 3;
+
+/// Whether a sideways tick has a document to move, with nothing over it.
+fn pans(app: &App) -> bool {
+    app.pane_mode() == Mode::Document && matches!(app.mode(), Mode::Document | Mode::Prompt)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::keymap::Mode;
     use crate::app::state::Options;
     use crate::source::{Base, Source};
     use crate::theme::{Theme, ThemeVariant};
@@ -808,6 +843,36 @@ mod tests {
         );
         crate::app::reconcile(&mut app, ratatui::layout::Rect::new(0, 0, 60, 24));
         app
+    }
+
+    /// A document with an outline, so the contents pane exists and can be
+    /// focused. The plain `app()` above has no headings and no pane.
+    fn outlined() -> App {
+        let text: String = (1..=40)
+            .map(|n| format!("## Section {n}\n\nline {n}\n\n"))
+            .collect();
+        let mut app = App::new(
+            Source::from_text(&text, None, "t.md".into(), Base::Cwd),
+            Theme::new(ThemeVariant::Slate),
+            Options {
+                mouse: true,
+                ..Options::default()
+            },
+        );
+        crate::app::reconcile(&mut app, ratatui::layout::Rect::new(0, 0, 100, 24));
+        app
+    }
+
+    fn wheel(app: &mut App, kind: MouseEventKind) {
+        handle(
+            app,
+            Event::Mouse(MouseEvent {
+                kind,
+                column: 0,
+                row: 0,
+                modifiers: KeyModifiers::NONE,
+            }),
+        );
     }
 
     fn press(app: &mut App, code: KeyCode) {
@@ -1030,6 +1095,93 @@ mod tests {
         app.options.mouse = true;
         handle(&mut app, Event::Mouse(wheel));
         assert_eq!(app.view.top, 3);
+    }
+
+    #[test]
+    fn the_wheel_moves_the_pane_that_has_the_keys() {
+        let mut app = outlined();
+        press(&mut app, KeyCode::Tab);
+        assert_eq!(app.mode(), Mode::Toc, "the contents pane never took focus");
+
+        wheel(&mut app, MouseEventKind::ScrollDown);
+        assert_eq!(app.toc.cursor, 3, "the wheel did not reach the outline");
+        assert_eq!(
+            app.view.top, 0,
+            "the wheel moved the document out from under a reader who was in \
+             the contents pane"
+        );
+
+        press(&mut app, KeyCode::Tab);
+        wheel(&mut app, MouseEventKind::ScrollDown);
+        assert_eq!(app.view.top, 3, "focus came back but the wheel did not");
+        assert_eq!(app.toc.cursor, 3, "the outline moved without being asked");
+    }
+
+    #[test]
+    fn the_wheel_moves_the_file_list_when_that_is_what_is_on_show() {
+        use crate::browser::{Entry, Scan};
+
+        let mut app = App::browsing(
+            "/nowhere".into(),
+            Theme::new(ThemeVariant::Slate),
+            Options {
+                mouse: true,
+                ..Options::default()
+            },
+        );
+        // Reported rather than walked: the walk needs a directory and a
+        // thread, and neither is what this is about.
+        let entries = (0..10)
+            .map(|n| Entry {
+                path: format!("/nowhere/{n}.md").into(),
+                display: format!("{n}.md"),
+                modified: None,
+            })
+            .collect();
+        handle(
+            &mut app,
+            Event::Scan {
+                generation: 0,
+                scan: Scan::Found(entries),
+            },
+        );
+        crate::app::reconcile(&mut app, ratatui::layout::Rect::new(0, 0, 80, 24));
+        wheel(&mut app, MouseEventKind::ScrollDown);
+        let browser = app.browser.as_ref().expect("the browser");
+        assert_eq!(browser.cursor(), 3, "the wheel did not reach the file list");
+    }
+
+    #[test]
+    fn the_wheel_scrolls_the_key_reference_rather_than_the_page_behind_it() {
+        let mut app = outlined();
+        press(&mut app, KeyCode::Char('?'));
+        wheel(&mut app, MouseEventKind::ScrollDown);
+        assert_eq!(app.help_scroll, 3);
+        assert_eq!(app.view.top, 0, "the document scrolled under the overlay");
+    }
+
+    #[test]
+    fn the_wheel_moves_the_theme_picker_while_it_is_open() {
+        let mut app = outlined();
+        press(&mut app, KeyCode::Char('s'));
+        wheel(&mut app, MouseEventKind::ScrollDown);
+        let picker = app.picker.as_ref().expect("the picker closed");
+        // Clamped to the last theme, in case fewer than four ship.
+        assert_eq!(picker.cursor, 3.min(picker.entries.len() - 1));
+        assert_eq!(app.view.top, 0);
+    }
+
+    #[test]
+    fn a_sideways_tick_leaves_a_list_alone() {
+        // `h` and `l` fold the outline. A wheel tilted by accident must not
+        // collapse the section somebody was reading.
+        let mut app = outlined();
+        press(&mut app, KeyCode::Tab);
+        let before = app.toc.visible.len();
+        wheel(&mut app, MouseEventKind::ScrollLeft);
+        wheel(&mut app, MouseEventKind::ScrollRight);
+        assert_eq!(app.toc.visible.len(), before, "the outline folded");
+        assert_eq!(app.view.left, 0, "the document panned from another pane");
     }
 
     #[test]

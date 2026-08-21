@@ -80,6 +80,14 @@ the default, is that its documentation now describes it accurately.
   `mouse = false` hand the wheel back; `-m` is still accepted, still means the
   same thing, and still overrides a configuration file that turned it off.
 
+- **The wheel moves the pane the movement keys would move**, rather than the
+  document whatever has focus. Tab into the contents pane and the wheel moves
+  the outline; open the key reference and it moves the reference; in the file
+  browser it moves the list. It resolves to the same `Action` a key does, so
+  the two cannot drift apart, and a pane that grows movement keys gets the
+  wheel with them. A sideways tick still only pans a document — `h` and `l`
+  fold the outline, which is not something to do to somebody by accident.
+
 ### Fixed
 
 - **Pointer movement redrew the reader, for nothing.** Asking a terminal to
