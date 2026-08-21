@@ -179,12 +179,16 @@ jobs:
 
   handoff:
     # The smoke job above covers what can be checked without a terminal. This
-    # is the other half, and it exists because the bug it protects against was
-    # invisible to five hundred passing tests: the reader thread went on
-    # reading standard input while an editor owned the terminal, so the two
-    # processes split the keystrokes between them and the editor lost words.
-    # Reproducing it needs two processes and a real pty, which is what the
-    # script builds.
+    # is the other half: everything that needs a real pty, which is two scripts
+    # now rather than the one this job is named after.
+    #
+    # It exists because the bug it protects against was invisible to five
+    # hundred passing tests: the reader thread went on reading standard input
+    # while an editor owned the terminal, so the two processes split the
+    # keystrokes between them and the editor lost words. Reproducing it needs
+    # two processes and a real pty, which is what the script builds. The wheel
+    # check is here for the same reason in a different shape — what the process
+    # puts on a terminal on the way up is not what a unit test can see.
     #
     # Linux only. Windows has no pty to hand over and no `$EDITOR` convention,
     # and macOS hung on this script rather than running it — the build
@@ -208,6 +212,7 @@ jobs:
       # terminal, and the thing being timed is a handshake between threads,
       # not throughput.
       - run: python3 scripts/handoff-check.py target/debug/marquee-markdown
+      - run: python3 scripts/wheel-check.py target/debug/marquee-markdown
 
   msrv:
     name: MSRV

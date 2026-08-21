@@ -64,7 +64,36 @@ the default, is that its documentation now describes it accurately.
   Nothing resolves differently. `-s auto` is byte-for-byte `-s slate`, with a
   terminal sitting there answering or without one.
 
+- **The reader takes the mouse wheel by default**, where it used to wait to be
+  asked with `-m`. Not a preference: a terminal whose alternate scroll mode is
+  on — which is the default in most of them — answers a wheel that nobody
+  claimed by manufacturing arrow keys, multiplied by whatever scroll factor it
+  was configured with. They arrive as ordinary keystrokes, indistinguishable
+  from a hand on `j`, so a stray touchpad brush would yank the document away
+  from someone reading it with the keyboard, and only while the pointer
+  happened to be over the window. Claiming the wheel is what stops the terminal
+  doing that, and it makes a tick the same three lines everywhere instead of a
+  number the terminal picked.
+
+  The cost is that selecting text with the mouse needs `shift` held while the
+  reader is open, which is the trade `less --mouse` makes. **`--no-mouse`** and
+  `mouse = false` hand the wheel back; `-m` is still accepted, still means the
+  same thing, and still overrides a configuration file that turned it off.
+
 ### Fixed
+
+- **Pointer movement redrew the reader, for nothing.** Asking a terminal to
+  report the mouse asked it, through crossterm, for any-event tracking as well
+  as the wheel — a report per cell the pointer crossed, each one a wakeup, a
+  re-layout and a whole frame drawn and diffed away, for as long as a hand
+  rested on the mouse. Nothing here has ever read a mouse column. The reader
+  now asks for the wheel and nothing else, and drops the rest on arrival in
+  case it was asked anyway.
+
+- **Mouse tracking left on by another program is now turned off on the way
+  in.** An editor opened with `e` and then killed leaves it on for good, and
+  the reader it comes back to had no way to know: it would report every pointer
+  movement into a program with no use for a mouse at all.
 
 - **A README key table ran past its own end on Windows.** The doc-drift scan
   split on a blank line, which a CRLF checkout does not contain, so every

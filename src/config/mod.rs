@@ -148,7 +148,7 @@ impl Config {
                 .unwrap_or_else(|| ThemeVariant::Slate.name().to_owned()),
             width: layer.width,
             line_numbers: layer.line_numbers.unwrap_or(false),
-            mouse: layer.mouse.unwrap_or(false),
+            mouse: layer.mouse.unwrap_or(true),
             all: layer.all.unwrap_or(false),
             preserve_new_lines: layer.preserve_new_lines.unwrap_or(false),
             update_check: layer.update_check.unwrap_or(true),
