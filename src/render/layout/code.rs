@@ -13,6 +13,7 @@
 //! can widen a line, so escape is structurally impossible.
 
 use std::ops::Range;
+use std::sync::Arc;
 
 use ratatui::text::Span;
 
@@ -24,6 +25,14 @@ use crate::render::measure;
 use crate::render::wrap::{self, WrapMode};
 
 pub(super) fn emit(ctx: &mut Context<'_>, language: Option<&str>, text: &str, span: &Range<usize>) {
+    // First, and before the width is so much as read. This counts code blocks
+    // in the tree, which is what makes it the same number for a given block
+    // at every width — and the cache is keyed on it. The early return below
+    // is exactly the kind of thing that would make it width-dependent if the
+    // count came after it.
+    let cache_index = ctx.code_blocks_seen;
+    ctx.code_blocks_seen += 1;
+
     let avail = ctx.available_width();
     // Degenerate widths: fall back to plain hard-wrapped text.
     if avail < 8 {
@@ -65,14 +74,19 @@ pub(super) fn emit(ctx: &mut Context<'_>, language: Option<&str>, text: &str, sp
     push_row(ctx, top, LineKind::CodeBorder { block: block_index }, span);
 
     // Body: highlighted spans per source line, wrapped hard at the column.
-    let highlighted = highlight::highlight(text, language, ctx.theme);
-    for (i, line_spans) in highlighted.into_iter().enumerate() {
+    // Computed once per document per theme; the width the wrapping happens at
+    // is not something highlighting depends on.
+    let highlighted = match ctx.highlights {
+        Some(cache) => cache.get_or_insert(cache_index, span, text, language, ctx.theme),
+        None => Arc::new(highlight::highlight(text, language, ctx.theme)),
+    };
+    for (i, line_spans) in highlighted.iter().enumerate() {
         let frags: Vec<Frag> = line_spans
-            .into_iter()
+            .iter()
             .map(|(style, piece)| Frag {
-                width: measure::width(&piece),
-                text: piece,
-                style,
+                width: measure::width(piece),
+                text: piece.clone(),
+                style: *style,
                 link: None,
                 kind: FragKind::Word,
             })

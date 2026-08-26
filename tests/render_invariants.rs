@@ -77,6 +77,92 @@ fn every_line_is_exactly_the_content_width_at_every_width() {
     }
 }
 
+/// Code at several nesting depths, so that a narrow column pushes some blocks
+/// into the bare fallback while leaving others drawing a container. That is
+/// what makes the *number* of containers drawn depend on the width — and the
+/// highlight cache must not be indexed by anything that moves with it.
+const NESTED_CODE: &str = "\
+# Code at depth
+
+```rust
+fn top_level() { let x = 1; }
+```
+
+> ```rust
+> fn in_a_quote() { let y = 2; }
+> ```
+
+> > > > > ```rust
+> > > > > fn deep() { let z = 3; }
+> > > > > ```
+
+- item
+  ```toml
+  key = \"value\"
+  ```
+
+```
+no language at all
+```
+";
+
+#[test]
+fn a_cached_layout_is_identical_to_an_uncached_one() {
+    // The memo has to be invisible. It is keyed by a count of the code blocks
+    // the layout walk has reached, kept by hand in another module, and if it
+    // ever came to depend on the width then a resize would serve one block's
+    // colors on another's code — silently, and only on documents that nest.
+    //
+    // So: one document laid out across many widths and both themes, reusing
+    // whatever the previous widths cached, checked against a fresh uncached
+    // layout every time.
+    let cached = Document::parse(NESTED_CODE);
+    for (name, theme) in themes() {
+        for width in [10u16, 12, 16, 24, 40, 80, 120, 24, 10, 200] {
+            let hot = cached.layout(&theme, opts(width));
+            let cold =
+                marquee_markdown::render::layout::layout(cached.blocks(), &theme, opts(width));
+            assert_eq!(
+                hot.lines, cold.lines,
+                "{name} at {width}: cached and uncached layouts differ"
+            );
+            assert_eq!(
+                hot.plain, cold.plain,
+                "{name} at {width}: plain mirror differs"
+            );
+        }
+    }
+}
+
+#[test]
+fn a_resize_does_not_highlight_anything_twice() {
+    // The whole point: the number stops going up when only the width moves.
+    let doc = Document::parse(NESTED_CODE);
+    let theme = Theme::new(ThemeVariant::Slate);
+    // Narrow widths included deliberately: below about 16 columns the
+    // deeply-quoted block has no room for a container and takes the bare
+    // fallback, so the number of containers drawn is not the same at every
+    // width. A cache keyed on that count would start missing here.
+    for width in [10u16, 16, 24, 40, 80, 120, 10, 200] {
+        let _ = doc.layout(&theme, opts(width));
+    }
+    let after_resizing = doc.highlight_computations();
+
+    // Five fenced blocks in the fixture, and the sixth `> > > > >` one is
+    // reached at every width even when it is too narrow to draw a container.
+    assert_eq!(
+        after_resizing,
+        doc.code_block_count(),
+        "one highlight per code block, however many widths it was drawn at"
+    );
+
+    // A theme change is the one thing that does cost again — once.
+    let other = Theme::new(ThemeVariant::Paper);
+    let _ = doc.layout(&other, opts(80));
+    let _ = doc.layout(&other, opts(90));
+    assert_eq!(doc.highlight_computations(), after_resizing * 2);
+}
+
 #[test]
 fn pathological_nesting_renders_instead_of_aborting() {
     // A document may not choose how deep the renderer recurses. Layout walks

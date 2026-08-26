@@ -15,6 +15,39 @@ Until 1.0 both halves may change.
 
 ## [Unreleased]
 
+### Changed
+
+- **Resizing a document full of code is no longer dominated by re-highlighting
+  it.** Syntax highlighting depends on the text, the language and the theme,
+  and a resize changes none of them — but it was being done from inside the
+  layout emitter, so every width change re-ran syntect over every fenced block
+  in the document and threw the result away.
+
+  It was not a small part of the bill. A document of 120 `rust` fences laid
+  out in 199 ms, against 6 ms for the same text with the language taken off:
+  about 97% of a re-layout was highlighting, paid again for every step of a
+  drag. Six hundred fences took a full second, each time.
+
+  Highlighting is now kept for as long as the parse it belongs to, which is
+  exactly how long it stays valid:
+
+  | document | before | after |
+  | --- | --- | --- |
+  | this README | 8.6 ms | 2.0 ms |
+  | 120 `rust` fences | 198.8 ms | 8.9 ms |
+  | 600 `rust` fences | 999.3 ms | 49.8 ms |
+  | 600 fences, no language | 32.4 ms | 32.0 ms |
+
+  The last row is the control: nothing to highlight, so nothing to save.
+
+  Switching themes does pay again, once, because the theme is one of the three
+  things highlighting depends on — the syntax theme it names, the surface
+  colour forced onto every span, and the fill used where there is no language.
+  A one-shot render keeps nothing, since it lays the document out once and a
+  memo could only cost it memory; its peak stays where it was. A reader
+  holding a 300 KB code-heavy document pays about 10 MB for this, and about
+  0.1 MB for a document the size of this README.
+
 ### Fixed
 
 - **A document can no longer take the terminal down with it.** Nesting deeply
