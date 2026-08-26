@@ -10,6 +10,37 @@ use std::ops::Range;
 
 pub use crate::theme::AlertKind;
 
+/// The deepest nesting a document is allowed to build.
+///
+/// The trees in this module and in [`html`](super::html) are walked by
+/// recursion in several places — layout above all, plus the heading counter
+/// behind [`Document::heading_count`](super::Document::heading_count), the
+/// plain-text flattener, and the derived `Drop` that frees them — so tree
+/// depth is call-stack depth, and a *document* chooses it. Layout is by far
+/// the deepest of them: on an 8 MiB stack it runs out at around 3,000 levels
+/// of `> - `, where dropping the tree survives to roughly 40,000.
+///
+/// Running out is not a clean failure. A stack overflow **aborts**, and an
+/// abort does not unwind, so neither the RAII terminal guard nor the panic
+/// hook that exists to restore the screen ever runs: the reader dies with the
+/// alternate screen still up, the cursor still hidden, and bracketed paste
+/// and mouse reporting still on — a terminal that needs `reset`. Nor is the
+/// document necessarily the reader's own, since `https://` and `github://`
+/// are sources like any other.
+///
+/// 256 sits far below the first failure and far above anything a terminal can
+/// show. Every level of quote or list costs two cells of lead, so 256 levels
+/// is 512 cells of decoration before a character of text — wider than any
+/// real column, and `LineSink::fit_lead` already gives the decoration away to
+/// keep the text on the page. Past a few dozen levels at 80 columns the text
+/// is pinned to a one-cell column already.
+///
+/// Past the cap a container is not represented: its children are spliced into
+/// its parent, so the content still renders, at the capped indent rather than
+/// a deeper one. That is the same trade `Role::Other` makes in
+/// [`html`](super::html) — keep the children, drop the tag.
+pub(super) const MAX_NESTING: usize = 256;
+
 /// One block-level element, with the byte range of the markdown source it came
 /// from. Source ranges are what let the viewer keep the reading position stable
 /// across re-layout: remember the top line's range, re-lay, seek back to it.
