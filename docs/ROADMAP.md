@@ -15,9 +15,9 @@ scroll-tracking table-of-contents sidebar and in-document search.
 | --- | --- | --- | --- |
 | **P0** Skeleton | Manifest with crates.io + deb/rpm metadata, lib/bin split, clippy config, pure-Rust syntect backend, layering test | 2 | **Done** |
 | **P1** One-shot render + theming | Source classification, frontmatter, code-file wrapping, ANSI output, `-l -n -w -s`, theme loader, `themes`/`man`/`completion` | 3 | **Done** |
-| **P2** Document reader | Terminal guard + panic hook, event loop, view/anchor/render cache, pager keys via `Action`, status bar, keymap-rendered help, `-t` | 3 | **Done** (resize debounce open) |
-| **P3** TOC + search | Outline tree, active-section derivation, focus model, filter/collapse/auto-hide, `/` `n` `N` | 3 | **Done** (no TOC filter) |
-| **P4** Browser | Streaming gitignore-aware walk, paging, fuzzy filter with Unicode normalization, humanized modtimes, `-a` | 3 | **Done** (no rescan) |
+| **P2** Document reader | Terminal guard + panic hook, event loop, view/anchor/render cache, pager keys via `Action`, status bar, keymap-rendered help, `-t` | 3 | **Done** |
+| **P3** TOC + search | Outline tree, active-section derivation, focus model, collapse/auto-hide, `/` `n` `N` | 3 | **Done** (no TOC filter) |
+| **P4** Browser | Streaming gitignore-aware walk, paging, fuzzy filter with Unicode normalization, humanized modtimes, rescan and a live hidden-files toggle, `-a` | 3 | **Done** |
 | **P5** Remote sources | `Fetcher` trait, http(s), `github://`/`gitlab://`, bare-host README API | 2 | **Done** |
 | **P6** Parity polish | Live reload, `e` at scroll line, `c` copy, `-p` pager, `ctrl+z`, link following, `y` | 2 | **Done** |
 | **P7** Config + keymaps | TOML schema, `MARQUEE_` env layer, precedence, user keymap merge, `config` subcommand | 2 | **Done** |
@@ -39,19 +39,19 @@ sources: files, directory READMEs, stdin, and syntax-highlighted source files.
 Themes load from TOML. Output degrades correctly when redirected.
 
 `marquee-markdown -t file.md` is a working pager: every glow pager key, a
-status bar, a key reference rendered from the live keymap, light/dark switching,
-and a resize that keeps your place instead of teleporting you.
+status bar, a scrolling key reference rendered from the live keymap, the mouse
+wheel claimed from the terminal, light/dark switching, and a resize that keeps
+your place instead of teleporting you.
 
-662 tests, plus five `#[ignore]`d live checks against the real forges;
-`cargo clippy --all-targets -- -D warnings` and `cargo doc --no-deps`
+747 tests and a doctest, plus five `#[ignore]`d live checks against the real
+forges; `cargo clippy --all-targets -- -D warnings` and `cargo doc --no-deps`
 clean.
 
-## What is left
+## How it got here
 
-The build is done. What remains is the part that needs a person rather than a
-commit:
+The pre-1.0 launch runbook, kept because each item records what it cost:
 
-1. ~~Push to GitHub and watch CI go green.~~ **Done**, and worth what it cost:
+1. **Push to GitHub and watch CI go green.** Worth what it cost:
    the first four runs found a licence to allow, two advisories (removed by
    narrowing syntect's features rather than waived), an MSRV violation that
    compiles fine on a current toolchain, three Windows tests that assumed `/`
@@ -70,13 +70,12 @@ commit:
      split possible: parse-once-lay-out-many is the thing a consumer actually
      needs, and having it opaque means the block tree never has to be frozen.
      `cargo semver-checks` now runs in CI against the published version.
-3. ~~Tag `v0.1.0` and publish.~~ **Done.** On crates.io and GitHub releases,
+3. **Tag `v0.1.0` and publish.** On crates.io and GitHub releases,
    verified by installing from both. The release workflow's first run found
    the retired Intel macOS runners; the Intel build is now cross-compiled.
 
-Beyond that, the deferrals below are the backlog — images, a scrollable wide
-table, and a scrollable key reference are the three most likely to be asked
-for.
+Beyond that, the deferrals below are the backlog — HTML tables and lists, a
+scrollable wide table, and images are the three most likely to be asked for.
 
 ## What each phase built, and why it is shaped that way
 
@@ -207,8 +206,13 @@ the design:
    a revision counter. Nothing else may assign to `lines`, and P3's search
    matches must join the remapping rather than being remapped separately.
    P3 joined search hits to it by re-finding them on a revision change rather
-   than remapping them separately. **Still open:** a resize debounce (~80 ms),
-   or dragging a window edge re-renders a large document on every event.
+   than remapping them separately. A resize *burst* is already coalesced: the
+   loop drains the whole queue per iteration and `Event::Resize` is a no-op, so
+   dragging an edge costs one re-layout per frame rather than one per event.
+   **Still open:** the cost of that single re-layout on a code-heavy document,
+   which is re-highlighting rather than event frequency — `highlight` runs
+   inside the per-layout emitter although its output depends only on the text,
+   the language and the theme.
 
 3. **Purity vs. layout-dependent state.** Half-page scroll, TOC auto-scroll,
    clamping, and TOC auto-hide all need pane dimensions that naturally only
@@ -253,15 +257,10 @@ and cross-wrap search that narrows as you type). What remains is smaller:
   narrow widths well enough. A horizontally pannable wide-table view is the
   right answer for data-heavy documents; the solver is already factored so it
   slots in without disturbing the fitting logic.
-- **Workspace split.** One crate with a strict lib/bin split, with the render
-  isolation test keeping extraction mechanical. Split only if someone actually
-  wants to depend on the renderer.
-- **A workspace split.** The layering test keeps extracting `render` into its
-  own crate a move rather than an excavation. Do it if someone actually wants
-  to depend on the renderer without the reader.
-- **A scrollable key reference.** Below about 22 rows the overlay clips its
-  last few bindings. `marquee-markdown keys` shows all of them, so nothing is
-  unreachable, but the overlay should scroll.
+- **A workspace split.** One crate with a strict lib/bin split; the layering
+  test keeps extracting `render` into its own crate a move rather than an
+  excavation. Do it if someone actually wants to depend on the renderer
+  without the reader.
 
 ## Reference
 

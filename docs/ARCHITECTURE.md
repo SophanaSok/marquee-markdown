@@ -126,7 +126,11 @@ browser/     The file list with no terminal in it: the walk, the filter, the
              selection.
 app/         State, input, and the loop.
 ui/          Draw-only widgets, each taking &App.
+util/        The things with no home: the OSC exchange that asks the terminal
+             about its colors, and the small shared helpers.
 oneshot.rs   The non-interactive path, and the pager.
+update_check.rs
+             Whether a newer release is out, asked once and cached.
 ```
 
 ### The loop
@@ -229,8 +233,13 @@ Each of these cost a debugging session. They are here so the next one does not.
   ordinary Enter: it submitted the search prompt and left the rest of the paste
   being dispatched as bindings, where `q` quits. What the terminal is set to on
   the way in is whatever the last program left behind, and an editor launched
-  with `e` leaves its own settings, not ours. `terminal::setup` and
-  `terminal::teardown` are mirrors and a test holds them to it.
+  with `e` leaves its own settings, not ours. The mouse is the same lesson a
+  second time: the reader asks for `?1000h`/`?1006h` by hand rather than
+  through crossterm's `EnableMouseCapture`, because a terminal whose alternate
+  scroll mode is on answers an unclaimed wheel with manufactured arrow keys —
+  indistinguishable from a hand on `j`. `terminal::setup` and
+  `terminal::teardown` are mirrors and a test holds them to it;
+  `scripts/wheel-check.py` holds the wheel end of it under a pty.
 - **Pane geometry may not depend on anything only a layout can produce.** The
   contents pane first decided whether to show itself from the outline, which
   does not exist until the first layout — so it appeared on frame two, changed

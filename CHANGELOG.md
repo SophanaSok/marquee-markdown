@@ -13,7 +13,7 @@ to change in any release: the pipeline — `parse`, `block`, `frag`, `wrap`,
 `sink`, `layout`, `highlight`, `html`.
 Until 1.0 both halves may change.
 
-## [0.6.0] - 2026-08-21
+## [0.6.0] - 2026-08-26
 
 `--style system`: a palette built from the colors your terminal is already
 using. Nothing resolves differently than it did — the only change to `auto`,

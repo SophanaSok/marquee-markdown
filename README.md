@@ -115,8 +115,9 @@ the same command upgrades them later:
 cargo binstall marquee-markdown
 ```
 
-Homebrew and Scoop manifests live in [`packaging/`](packaging/); there is no
-tap or bucket yet.
+The Homebrew formula lives in [`packaging/`](packaging/); the Scoop manifest is
+built from the checksums and attached to each release. There is no tap or
+bucket yet.
 
 ### From source
 
