@@ -92,6 +92,19 @@ where
 {
     let mut batch = Vec::new();
     loop {
+        // Ask the terminal how big it is before deciding what fits in it.
+        // `get_frame` reports the area as of the last draw, which is one
+        // behind: a resize is reported as an event, the event is deliberately
+        // a no-op because geometry is recomputed here anyway, and this then
+        // recomputes it from the size the terminal used to be. The document
+        // comes out laid out for the old width and drawn into the new one,
+        // and a resize that stops — the common case, not a drag — leaves that
+        // standing until some other event happens along. Same call and same
+        // reason as after an external program below; an ioctl, and the only
+        // question a terminal answers without a round trip. Failure needs no
+        // handling here because `draw` asks again on the next line and does
+        // propagate it.
+        let _ = terminal.autoresize();
         reconcile(app, terminal.get_frame().area());
         terminal.draw(|frame| crate::ui::draw(frame, app))?;
         if app.should_quit {
@@ -205,6 +218,53 @@ mod tests {
         (1..=100)
             .map(|n| format!("## Heading {n}\n\nbody {n}\n\n"))
             .collect()
+    }
+
+    #[test]
+    fn a_resize_while_the_loop_was_blocked_is_laid_out_before_it_is_drawn() {
+        // The window changes size while the loop sits in `events.next()`. The
+        // resize event that wakes it is deliberately a no-op, on the grounds
+        // that pane geometry is recomputed before every draw anyway — but the
+        // recompute read `Terminal::get_frame`, whose area ratatui only
+        // updates inside `draw`. So it saw the size of the *previous* frame,
+        // and the document was laid out one width behind the terminal it was
+        // then drawn into, with nothing else coming to correct it. A resize
+        // that stops is the common case, not a drag.
+        let text = long();
+        let make = || {
+            App::new(
+                Source::from_text(&text, None, "t.md".into(), Base::Cwd),
+                Theme::new(ThemeVariant::Slate),
+                Options::default(),
+            )
+        };
+
+        let mut app = make();
+        let mut terminal = Terminal::new(TestBackend::new(100, 30)).unwrap();
+        // One frame, so the viewport is established at the old size — which
+        // is what the loop is looking at when it next asks.
+        terminal.draw(|_| {}).unwrap();
+        terminal.backend_mut().resize(60, 30);
+
+        // Nothing left to report: the loop draws once more and returns, so
+        // what it leaves behind is what the reader would be looking at.
+        let mut events = event::ScriptedEvents::default();
+        drive(&mut app, &mut terminal, &mut events).unwrap();
+
+        // Against a reconcile at the new size rather than a number, so the
+        // test says "laid out for the terminal it is in" rather than
+        // restating how wide the panes come out.
+        let mut reference = make();
+        reconcile(&mut reference, Rect::new(0, 0, 60, 30));
+        assert_eq!(
+            app.panes.content_width, reference.panes.content_width,
+            "the panes are the 60-column ones"
+        );
+        assert_eq!(
+            app.doc.doc().width,
+            reference.doc.doc().width,
+            "and the document was laid out for them"
+        );
     }
 
     #[test]

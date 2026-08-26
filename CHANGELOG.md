@@ -39,6 +39,23 @@ Until 1.0 both halves may change.
   cells of lead, so 80 columns is full of decoration by about level 40, and
   from there the content is already pinned to the one cell the lead leaves it.
 
+- **A resize that stops no longer leaves the last frame mangled.** Pane
+  geometry is recomputed before every draw, which is why the resize event
+  itself does nothing — but the recompute asked `Terminal::get_frame` for the
+  area, and ratatui only updates that inside `draw`. So it was always reading
+  the size of the *previous* frame: the resize event woke the loop, the loop
+  laid the document out for the width the terminal used to be, and drew it
+  into the width it now is. Ratatui clips widgets to the buffer, so nothing
+  overflowed — it just came out wrong, with the contents pane still divided
+  where it had been and headings cut off mid-word.
+
+  Dragging a window edge hid this, because each new event redrew from the
+  freshly-learned size. A resize that *stops* — the ordinary case — had
+  nothing following it, so the mangled frame stayed up until a key was
+  pressed. The terminal is now asked its size before the geometry is decided,
+  the same call the loop already makes after handing the screen to an editor,
+  and for the same reason.
+
 ## [0.6.0] - 2026-08-26
 
 `--style system`: a palette built from the colors your terminal is already
