@@ -13,6 +13,32 @@ to change in any release: the pipeline — `parse`, `block`, `frag`, `wrap`,
 `sink`, `layout`, `highlight`, `html`.
 Until 1.0 both halves may change.
 
+## [Unreleased]
+
+### Fixed
+
+- **A document can no longer take the terminal down with it.** Nesting deeply
+  enough — about 3,000 levels of `> - `, or 8,000 nested `<div>`s — overflowed
+  the stack while the document was being laid out: layout walks the block tree
+  by recursion, so the depth of the call chain was the depth of the document,
+  and the document chose it.
+
+  That is the worst way this program can fail. A stack overflow *aborts*, and
+  an abort does not unwind, so neither the RAII terminal guard nor the panic
+  hook that exists for exactly this ever ran. The reader died with the
+  alternate screen still up, the cursor still hidden and mouse reporting still
+  on — a terminal that needed `reset` before it could be used again. Nor did
+  the document have to be your own: `https://` and `github://` are ordinary
+  sources.
+
+  Nesting is now capped at 256 levels, in the markdown tree and the HTML one
+  alike. Past the cap a container is not represented and its children are
+  spliced into its parent, so the text still renders — at the capped indent
+  rather than a deeper one — instead of being truncated or refused. The cap is
+  far above anything a terminal can show: each level of quote or list costs two
+  cells of lead, so 80 columns is full of decoration by about level 40, and
+  from there the content is already pinned to the one cell the lead leaves it.
+
 ## [0.6.0] - 2026-08-26
 
 `--style system`: a palette built from the colors your terminal is already

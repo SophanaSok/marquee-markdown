@@ -17,7 +17,7 @@
 use std::ops::Range;
 use std::str::FromStr;
 
-use super::block::{Alignment, Block, BlockKind, Inline};
+use super::block::{Alignment, Block, BlockKind, Inline, MAX_NESTING};
 use super::parse::InlineKind;
 
 /// What to do with raw HTML in a document.
@@ -402,21 +402,35 @@ pub(super) fn tree(tokens: Vec<Token>) -> Vec<Node> {
         name: String,
         attrs: Vec<(String, String)>,
         children: Vec<Node>,
+        /// Past [`MAX_NESTING`], the element is not represented in the tree:
+        /// its children are spliced into its parent instead, exactly as
+        /// `Role::Other` does for a tag that carries no meaning. It stays on
+        /// the stack regardless, because `Token::Close` finds its match by
+        /// name — drop the entry and a later `</div>` closes an *outer* div
+        /// instead, unwinding structure that was perfectly fine.
+        flattened: bool,
     }
 
     let mut stack: Vec<Open> = Vec::new();
     let mut root: Vec<Node> = Vec::new();
+    // Open elements that the tree actually nests, kept as a running count so
+    // a document of `<div>`s does not make each open O(depth) to record.
+    let mut represented = 0usize;
 
     /// Close the innermost open element and hand it to its parent.
-    fn close_one(stack: &mut Vec<Open>, root: &mut Vec<Node>) {
+    fn close_one(stack: &mut Vec<Open>, root: &mut Vec<Node>, represented: &mut usize) {
         let Some(open) = stack.pop() else { return };
-        let element = Node::Element {
+        let target = stack.last_mut().map_or(root, |parent| &mut parent.children);
+        if open.flattened {
+            target.extend(open.children);
+            return;
+        }
+        *represented -= 1;
+        target.push(Node::Element {
             name: open.name,
             attrs: open.attrs,
             children: open.children,
-        };
-        let target = stack.last_mut().map_or(root, |parent| &mut parent.children);
-        target.push(element);
+        });
     }
 
     for token in tokens {
@@ -433,25 +447,32 @@ pub(super) fn tree(tokens: Vec<Token>) -> Vec<Node> {
                     children: Vec::new(),
                 });
             }
-            Token::Open { name, attrs } => stack.push(Open {
-                name,
-                attrs,
-                children: Vec::new(),
-            }),
+            Token::Open { name, attrs } => {
+                let flattened = represented >= MAX_NESTING;
+                if !flattened {
+                    represented += 1;
+                }
+                stack.push(Open {
+                    name,
+                    attrs,
+                    children: Vec::new(),
+                    flattened,
+                });
+            }
             Token::Close(name) => {
                 let Some(depth) = stack.iter().rposition(|open| open.name == name) else {
                     continue; // a close with nothing open: ignore it
                 };
                 // Everything opened inside it closes with it.
                 while stack.len() > depth {
-                    close_one(&mut stack, &mut root);
+                    close_one(&mut stack, &mut root, &mut represented);
                 }
             }
         }
     }
 
     while !stack.is_empty() {
-        close_one(&mut stack, &mut root);
+        close_one(&mut stack, &mut root, &mut represented);
     }
     root
 }
@@ -930,6 +951,67 @@ pub(super) fn inline_kind(name: &str) -> Option<InlineKind> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// How deeply the element tree nests.
+    fn node_depth(nodes: &[Node]) -> usize {
+        nodes
+            .iter()
+            .map(|node| match node {
+                Node::Element { children, .. } => 1 + node_depth(children),
+                Node::Text(_) => 0,
+            })
+            .max()
+            .unwrap_or(0)
+    }
+
+    #[test]
+    fn html_nesting_past_the_cap_is_flattened_rather_than_followed() {
+        // `blocks_from` and `inlines_from` walk this tree by recursion, so a
+        // document of 8,000 nested divs aborted on a stack overflow — which
+        // does not unwind, and so left the terminal unrestored.
+        let deep = MAX_NESTING + 50;
+        let raw = format!("{}x{}", "<div>".repeat(deep), "</div>".repeat(deep));
+        let nodes = tree(scan(&raw).expect("scans"));
+        assert_eq!(node_depth(&nodes), MAX_NESTING);
+    }
+
+    #[test]
+    fn a_close_past_the_cap_matches_its_own_element_not_an_outer_one() {
+        // Past the cap an element is not represented, but it stays on the
+        // open stack, because `Token::Close` finds its match by *name*. Drop
+        // the entry outright and this `</div>` matches the outer div instead
+        // — closing it and everything inside it, and spilling the rest of the
+        // document out to the root.
+        //
+        // The outer div plus the filler take the count exactly to the cap, so
+        // the inner div is the first element past it. The filler is a
+        // different tag on purpose: with every element named `div` the two
+        // behaviours coincide and this test cannot tell them apart.
+        let filler = MAX_NESTING - 1;
+        let raw = format!("<div>{}<div>inner</div>after", "<b>".repeat(filler));
+        let nodes = tree(scan(&raw).expect("scans"));
+        assert_eq!(
+            nodes.len(),
+            1,
+            "`after` belongs inside the outer div, not beside it: {nodes:#?}"
+        );
+        assert!(
+            matches!(&nodes[0], Node::Element { name, .. } if name == "div"),
+            "the one root node is the outer div: {nodes:#?}"
+        );
+        // Flattened, not dropped: what the inner div held still arrives.
+        let mut text = String::new();
+        fn collect(nodes: &[Node], out: &mut String) {
+            for node in nodes {
+                match node {
+                    Node::Element { children, .. } => collect(children, out),
+                    Node::Text(t) => out.push_str(t),
+                }
+            }
+        }
+        collect(&nodes, &mut text);
+        assert_eq!(text, "innerafter");
+    }
 
     fn names(raw: &str) -> Vec<String> {
         scan(raw)

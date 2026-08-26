@@ -78,6 +78,57 @@ fn every_line_is_exactly_the_content_width_at_every_width() {
 }
 
 #[test]
+fn pathological_nesting_renders_instead_of_aborting() {
+    // A document may not choose how deep the renderer recurses. Layout walks
+    // the block tree by recursion, so nesting *is* call depth, and at around
+    // 3,000 levels of `> - ` it used to run off an 8 MiB stack.
+    //
+    // A stack overflow is the worst way for this program to fail: it aborts,
+    // and an abort does not unwind, so neither the RAII terminal guard nor
+    // the panic hook that exists to restore the screen ever runs. The reader
+    // died with the alternate screen up, the cursor hidden and mouse
+    // reporting still on — a terminal needing `reset`. Nor need the document
+    // be the reader's own: `https://` and `github://` are ordinary sources.
+    //
+    // If this regresses the process aborts rather than failing an assertion,
+    // so a dead test binary is the symptom to expect.
+    //
+    // What is asserted is that it renders *and stays on the page*. The text
+    // itself is not: two cells of lead per level fills an 80-column line by
+    // about level 40, long before any cap, and from there the content is
+    // pinned to the single cell `fit_lead` leaves it. That the text survives
+    // the flattening at all is `parse`'s business, and is tested there.
+    let deep = 12_000;
+    for (name, source) in [
+        ("quotes", format!("{}deep\n", "> ".repeat(deep))),
+        ("quoted lists", format!("{}deep\n", "> - ".repeat(deep))),
+        ("lists", format!("{}deep\n", "- ".repeat(deep))),
+        (
+            "html",
+            format!("{}deep{}", "<div>".repeat(deep), "</div>".repeat(deep)),
+        ),
+    ] {
+        for (theme_name, theme) in themes() {
+            for width in [10u16, 40, 80] {
+                let doc = render::render(&source, &theme, opts(width));
+                assert!(
+                    !doc.lines.is_empty(),
+                    "{name} at {width} on {theme_name}: rendered nothing at all"
+                );
+                for (i, line) in doc.lines.iter().enumerate() {
+                    assert_eq!(
+                        line.width(),
+                        usize::from(width),
+                        "{name} at {width} on {theme_name}: line {i} is {} cells",
+                        line.width()
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn code_lines_never_escape_their_container() {
     // The glow bug this project exists to fix: a long line inside a fence must
     // stay bounded by the card, at every width.

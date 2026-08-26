@@ -11,7 +11,7 @@ use pulldown_cmark::{
     BlockQuoteKind, CodeBlockKind, Event, HeadingLevel, Options, Parser, Tag, TagEnd,
 };
 
-use super::block::{AlertKind, Alignment, Block, BlockKind, Inline, ListItem};
+use super::block::{AlertKind, Alignment, Block, BlockKind, Inline, ListItem, MAX_NESTING};
 use super::html::{self, HtmlMode};
 
 /// Options for one parse.
@@ -46,10 +46,92 @@ pub fn parse_with(source: &str, options: ParseOptions) -> Vec<Block> {
         options,
         ..TreeBuilder::default()
     };
-    for (event, span) in Parser::new_ext(source, parser).into_offset_iter() {
+    for (event, span) in CapNesting::new(Parser::new_ext(source, parser).into_offset_iter()) {
         builder.event(event, span);
     }
     builder.finish()
+}
+
+/// Drops container `Start`/`End` pairs nested deeper than [`MAX_NESTING`].
+///
+/// Both halves of a pair are dropped, so the stream stays balanced and
+/// [`TreeBuilder`] needs to know nothing about the cap. The content inside
+/// still arrives and still lands in whatever container is open at the cap,
+/// which is what makes this a flattening rather than a truncation — a
+/// pathological document renders as its text at the capped indent, not as an
+/// error and not as nothing.
+struct CapNesting<I> {
+    inner: I,
+    /// Containers open and represented in the tree.
+    depth: usize,
+    /// Containers open whose `Start` was dropped.
+    suppressed: usize,
+}
+
+impl<I> CapNesting<I> {
+    fn new(inner: I) -> Self {
+        Self {
+            inner,
+            depth: 0,
+            suppressed: 0,
+        }
+    }
+}
+
+/// The tags that open a [`Frame`] which can contain another one.
+///
+/// `Tag::HtmlBlock` opens a frame too, but cannot nest: pulldown-cmark
+/// delivers an HTML block as a flat run of `Event::Html` lines rather than as
+/// a tree, so it adds one level and no more.
+fn nests(tag: &Tag<'_>) -> bool {
+    matches!(
+        tag,
+        Tag::BlockQuote(_) | Tag::List(_) | Tag::Item | Tag::FootnoteDefinition(_)
+    )
+}
+
+/// The closing half of [`nests`].
+fn nests_end(tag: TagEnd) -> bool {
+    matches!(
+        tag,
+        TagEnd::BlockQuote(_) | TagEnd::List(_) | TagEnd::Item | TagEnd::FootnoteDefinition
+    )
+}
+
+impl<'a, I> Iterator for CapNesting<I>
+where
+    I: Iterator<Item = (Event<'a>, Range<usize>)>,
+{
+    type Item = (Event<'a>, Range<usize>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let (event, span) = self.inner.next()?;
+            match &event {
+                Event::Start(tag) if nests(tag) => {
+                    if self.depth >= MAX_NESTING {
+                        self.suppressed += 1;
+                        continue;
+                    }
+                    self.depth += 1;
+                }
+                Event::End(tag) if nests_end(*tag) => {
+                    // A suppressed container always closes before any
+                    // container still represented: the stream is properly
+                    // nested, so whatever opened last closes first, and
+                    // everything opened after the cap was suppressed too.
+                    if self.suppressed > 0 {
+                        self.suppressed -= 1;
+                        continue;
+                    }
+                    debug_assert!(self.depth > 0, "container End with nothing open");
+                    self.depth = self.depth.saturating_sub(1);
+                }
+                _ => {}
+            }
+            return Some((event, span));
+        }
+    }
 }
 
 /// Reconstructs nesting from the flat event stream.
@@ -775,6 +857,85 @@ mod tests {
 
     fn kinds(source: &str) -> Vec<BlockKind> {
         parse(source).into_iter().map(|b| b.kind).collect()
+    }
+
+    /// Container levels in the tree, counted the way [`MAX_NESTING`] counts
+    /// them: a list and each of its items are a level apiece, because each
+    /// opens a frame that another can nest inside.
+    fn depth(blocks: &[Block]) -> usize {
+        blocks
+            .iter()
+            .map(|block| match &block.kind {
+                BlockKind::BlockQuote { children, .. }
+                | BlockKind::FootnoteDefinition { children, .. } => 1 + depth(children),
+                BlockKind::List { items, .. } => {
+                    1 + items
+                        .iter()
+                        .map(|item| 1 + depth(&item.children))
+                        .max()
+                        .unwrap_or(0)
+                }
+                _ => 0,
+            })
+            .max()
+            .unwrap_or(0)
+    }
+
+    /// Every scrap of text in the tree, however deep.
+    fn plain(blocks: &[Block]) -> String {
+        fn walk(blocks: &[Block], out: &mut String) {
+            for block in blocks {
+                match &block.kind {
+                    BlockKind::Paragraph(content) | BlockKind::Heading { content, .. } => {
+                        out.push_str(&Inline::plain_text(content));
+                    }
+                    BlockKind::BlockQuote { children, .. }
+                    | BlockKind::FootnoteDefinition { children, .. } => walk(children, out),
+                    BlockKind::List { items, .. } => {
+                        for item in items {
+                            walk(&item.children, out);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+        let mut out = String::new();
+        walk(blocks, &mut out);
+        out
+    }
+
+    #[test]
+    fn nesting_past_the_cap_is_flattened_rather_than_followed() {
+        // 12,000 levels used to abort. Layout recurses once per level, and a
+        // stack overflow does not unwind — so the reader died with the screen
+        // still on the alternate buffer and the cursor still hidden, and the
+        // document need not be the reader's own to do it.
+        for source in [
+            "> ".repeat(12_000),
+            "> - ".repeat(12_000),
+            "- ".repeat(12_000),
+        ] {
+            let blocks = parse(&format!("{source}deep\n"));
+            assert_eq!(
+                depth(&blocks),
+                MAX_NESTING,
+                "capped at MAX_NESTING and no deeper"
+            );
+            assert!(
+                plain(&blocks).contains("deep"),
+                "flattened, not truncated: the text inside still has to arrive"
+            );
+        }
+    }
+
+    #[test]
+    fn nesting_within_the_cap_is_left_exactly_as_written() {
+        // The cap has to be invisible to any document anyone would write.
+        for levels in [1usize, 2, 8, 64] {
+            let blocks = parse(&format!("{}deep\n", "> ".repeat(levels)));
+            assert_eq!(depth(&blocks), levels);
+        }
     }
 
     #[test]
