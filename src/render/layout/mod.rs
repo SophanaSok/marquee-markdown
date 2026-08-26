@@ -16,6 +16,7 @@ use ratatui::text::Span;
 
 use super::block::{Alignment, Block, BlockKind};
 use super::doc::{LineKind, RenderedDoc};
+use super::highlight::HighlightCache;
 use super::sink::LineSink;
 use crate::theme::Theme;
 
@@ -32,8 +33,37 @@ pub struct LayoutOptions {
 }
 
 /// Lay out a parsed document at a fixed content width.
+///
+/// Highlights every code block from scratch and keeps none of it, which is
+/// what a caller laying the document out exactly once wants. A caller laying
+/// the same document out repeatedly — which is what a resize is — wants
+/// [`layout_with_cache`] instead.
 #[must_use]
 pub fn layout(blocks: &[Block], theme: &Theme, options: LayoutOptions) -> RenderedDoc {
+    lay_out(blocks, theme, options, None)
+}
+
+/// Lay out a parsed document, reusing highlighting already computed for it.
+///
+/// The cache must belong to *this* document: entries are found by a count of
+/// the code blocks the walk has reached, and verified against the byte range
+/// each one came from.
+#[must_use]
+pub fn layout_with_cache(
+    blocks: &[Block],
+    theme: &Theme,
+    options: LayoutOptions,
+    highlights: &HighlightCache,
+) -> RenderedDoc {
+    lay_out(blocks, theme, options, Some(highlights))
+}
+
+fn lay_out(
+    blocks: &[Block],
+    theme: &Theme,
+    options: LayoutOptions,
+    highlights: Option<&HighlightCache>,
+) -> RenderedDoc {
     let width = usize::from(options.width.max(10));
     let mut sink = LineSink::new(width, theme.page());
     let mut ctx = Context {
@@ -42,6 +72,8 @@ pub fn layout(blocks: &[Block], theme: &Theme, options: LayoutOptions) -> Render
         options,
         prefix: Vec::new(),
         code_blocks_emitted: 0,
+        code_blocks_seen: 0,
+        highlights,
         align: Alignment::Left,
     };
     ctx.blocks(blocks);
@@ -56,8 +88,23 @@ pub(super) struct Context<'a> {
     pub theme: &'a Theme,
     pub options: LayoutOptions,
     pub prefix: Vec<PrefixPart>,
-    /// Sequential index assigned to the next code block.
+    /// Sequential index assigned to the next code block that draws a
+    /// container. Skipped for a block too narrow to draw one, so it counts
+    /// containers rather than code blocks and cannot key the cache.
     pub code_blocks_emitted: u32,
+    /// Code blocks the walk has reached, whether or not they drew anything.
+    ///
+    /// The cache is keyed on this, so it must stay a property of the tree
+    /// alone. It is incremented before `code::emit` looks at the width, and
+    /// every entry is verified against the block's source range when it is
+    /// read back, which is what would catch this drifting.
+    pub code_blocks_seen: usize,
+    /// Highlighting already computed for this document.
+    /// Highlighting already computed for this document, when there is a
+    /// document to hang it on. `None` for a one-shot render, which would
+    /// otherwise hold every block's highlighting until the end of a layout
+    /// that is never going to run again.
+    pub highlights: Option<&'a HighlightCache>,
     /// Which edge the block being emitted is set against.
     pub align: Alignment,
 }

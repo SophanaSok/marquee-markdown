@@ -10,16 +10,53 @@
 
 use super::block::{Block, BlockKind};
 use super::doc::RenderedDoc;
+use super::highlight::HighlightCache;
 use super::layout::LayoutOptions;
 use super::parse::ParseOptions;
 use super::{layout, parse};
 use crate::theme::Theme;
 
 /// Markdown that has been parsed but not yet laid out.
-#[derive(Debug, Clone, PartialEq)]
 pub struct Document {
     blocks: Vec<Block>,
     headings: usize,
+    /// Work that neither the width nor the options change, kept across
+    /// layouts. Not part of what a `Document` *is*, which is why the three
+    /// impls below step around it rather than deriving over it.
+    highlights: HighlightCache,
+}
+
+/// Written out rather than derived so the cache stays out of it: a memo of
+/// what has been asked for so far is not something to print.
+impl std::fmt::Debug for Document {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Document")
+            .field("blocks", &self.blocks)
+            .field("headings", &self.headings)
+            .finish_non_exhaustive()
+    }
+}
+
+/// A clone starts with an empty cache rather than duplicating however much of
+/// one had been filled. The copy renders identically either way; this only
+/// decides whether it pays for the first layout again.
+impl Clone for Document {
+    fn clone(&self) -> Self {
+        Self {
+            blocks: self.blocks.clone(),
+            headings: self.headings,
+            highlights: HighlightCache::default(),
+        }
+    }
+}
+
+/// Two documents are equal when they say the same thing. What either has
+/// happened to highlight so far is not part of that — and a cache that could
+/// make `==` false would make it depend on what had been drawn.
+impl PartialEq for Document {
+    fn eq(&self, other: &Self) -> bool {
+        self.blocks == other.blocks && self.headings == other.headings
+    }
 }
 
 impl Document {
@@ -39,15 +76,22 @@ impl Document {
     pub fn parse_with(source: &str, options: ParseOptions) -> Self {
         let blocks = parse::parse_with(source, options);
         let headings = count_headings(&blocks);
-        Self { blocks, headings }
+        Self {
+            blocks,
+            headings,
+            highlights: HighlightCache::default(),
+        }
     }
 
     /// Lay the document out at one width.
     ///
-    /// Cheap enough to call on every resize; the parsing is not repeated.
+    /// Cheap enough to call on every resize: neither the parsing nor the
+    /// syntax highlighting is repeated. Highlighting depends on the theme
+    /// rather than the width, so switching themes does pay for it again —
+    /// once.
     #[must_use]
     pub fn layout(&self, theme: &Theme, options: LayoutOptions) -> RenderedDoc {
-        layout::layout(&self.blocks, theme, options)
+        layout::layout_with_cache(&self.blocks, theme, options, &self.highlights)
     }
 
     /// How many headings the document has, anywhere in it.
@@ -72,6 +116,54 @@ impl Document {
     pub fn blocks(&self) -> &[Block] {
         &self.blocks
     }
+
+    /// How many code blocks this document has had to highlight so far.
+    ///
+    /// Internal, and here so the memo can be held to its promise mechanically:
+    /// a resize must not move this number. Timing would say the same thing
+    /// far less reliably.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn highlight_computations(&self) -> usize {
+        self.highlights.computed()
+    }
+
+    /// How many code blocks the document contains, at any depth.
+    ///
+    /// Internal, and the number [`Self::highlight_computations`] is expected
+    /// to settle at.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn code_block_count(&self) -> usize {
+        count_code_blocks(&self.blocks)
+    }
+}
+
+/// `Document` is in the promised API, so its auto traits are part of what is
+/// promised — `cargo semver-checks` fails the build if they change. Holding
+/// the highlight cache behind a `RefCell` rather than a `Mutex` would have
+/// taken `Sync` away, and this is where that gets caught: at compile time,
+/// here, rather than in CI on the way to a release.
+const _: () = {
+    const fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<Document>();
+};
+
+/// Count code blocks anywhere in the tree, including inside quotes and lists.
+fn count_code_blocks(blocks: &[Block]) -> usize {
+    blocks
+        .iter()
+        .map(|block| match &block.kind {
+            BlockKind::CodeBlock { .. } => 1,
+            BlockKind::BlockQuote { children, .. }
+            | BlockKind::FootnoteDefinition { children, .. } => count_code_blocks(children),
+            BlockKind::List { items, .. } => items
+                .iter()
+                .map(|item| count_code_blocks(&item.children))
+                .sum(),
+            _ => 0,
+        })
+        .sum()
 }
 
 /// Count headings anywhere in the tree, including inside quotes and lists.

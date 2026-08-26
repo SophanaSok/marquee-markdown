@@ -95,7 +95,12 @@ use crate::theme::Theme;
 /// half and its result does not depend on the width.
 #[must_use]
 pub fn render(source: &str, theme: &Theme, options: LayoutOptions) -> RenderedDoc {
-    Document::parse(source).layout(theme, options)
+    // Laid out through the uncached path deliberately. The document is a
+    // temporary here, so anything memoized on it is freed before it could be
+    // asked for a second time — all the memo could do is cost a copy of the
+    // highlighting for the length of the one layout that uses it.
+    let document = Document::parse(source);
+    layout::layout(document.blocks(), theme, options)
 }
 
 /// Parse and lay out, saying how raw HTML should be treated.
@@ -108,7 +113,9 @@ pub fn render_with(
     source: &str,
     theme: &Theme,
     parse: ParseOptions,
-    layout: LayoutOptions,
+    options: LayoutOptions,
 ) -> RenderedDoc {
-    Document::parse_with(source, parse).layout(theme, layout)
+    // Uncached, for the reason given on [`render`].
+    let document = Document::parse_with(source, parse);
+    layout::layout(document.blocks(), theme, options)
 }
