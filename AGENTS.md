@@ -88,6 +88,8 @@ wrap.rs      Span-aware line breaking. WrapMode::{Word, HardAtColumn}.
 sink.rs      LineSink: the ONLY emitter of lines. Owns the width invariant.
 layout/      Per-block emitters: heading, para, list, quote, rule, code, table.
 highlight.rs syntect -> ratatui styles directly, surface background forced.
+             HighlightCache memoizes it per Document, keyed on the theme: a
+             resize must not re-run syntect, which was 97% of a re-layout.
 doc.rs       RenderedDoc: lines, per-line meta, outline, links, plain mirror.
 overlay.rs   Draw-time restyling of column ranges (search highlight).
 ansi.rs      RenderedDoc -> SGR bytes + OSC 8, for the stdout path.

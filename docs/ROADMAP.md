@@ -25,6 +25,13 @@ scroll-tracking table-of-contents sidebar and in-document search.
 
 ## Known gaps
 
+- **Block nesting is capped at 256 levels.** Deeper than that, a container is
+  not represented and its children are laid out at the capped indent instead.
+  Layout walks the tree by recursion, and a stack overflow aborts rather than
+  unwinding, so a document could otherwise kill the reader without the panic
+  hook ever restoring the terminal. Two cells of lead per level fills an
+  80-column line by about level 40, so nothing showable is lost.
+
 - **`--style system` does not ask on Windows.** The `OSC` replies arrive there
   through the console input API rather than as bytes on a device, which is a
   different mechanism from the `/dev/tty` exchange in `src/util/osc.rs` rather
@@ -43,7 +50,7 @@ status bar, a scrolling key reference rendered from the live keymap, the mouse
 wheel claimed from the terminal, light/dark switching, and a resize that keeps
 your place instead of teleporting you.
 
-747 tests and a doctest, plus five `#[ignore]`d live checks against the real
+759 tests and a doctest, plus five `#[ignore]`d live checks against the real
 forges; `cargo clippy --all-targets -- -D warnings` and `cargo doc --no-deps`
 clean.
 
@@ -209,10 +216,16 @@ the design:
    than remapping them separately. A resize *burst* is already coalesced: the
    loop drains the whole queue per iteration and `Event::Resize` is a no-op, so
    dragging an edge costs one re-layout per frame rather than one per event.
-   **Still open:** the cost of that single re-layout on a code-heavy document,
-   which is re-highlighting rather than event frequency — `highlight` runs
-   inside the per-layout emitter although its output depends only on the text,
-   the language and the theme.
+   The cost of that one re-layout was almost entirely re-highlighting — 97% of
+   it on a document of `rust` fences — and highlighting is now memoized on the
+   `Document` for as long as the parse it belongs to, keyed on the theme it
+   was produced for. Nothing here is open.
+
+   The other half of this is that the geometry has to be decided from the size
+   the terminal *is*. `drive` asks `Terminal::autoresize` before `reconcile`,
+   because `get_frame` reports the area as of the last draw: reading it
+   directly laid the document out one width behind the window it was drawn
+   into, and a resize that stopped left that standing.
 
 3. **Purity vs. layout-dependent state.** Half-page scroll, TOC auto-scroll,
    clamping, and TOC auto-hide all need pane dimensions that naturally only

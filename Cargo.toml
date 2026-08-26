@@ -1,6 +1,6 @@
 [package]
 name = "marquee-markdown"
-version = "0.6.0"
+version = "0.6.1"
 # Two binaries ship (`mmd` is the short alias), so `cargo run` needs telling
 # which one is meant — without this, the documented
 # `cargo run -- keys > docs/KEYBINDINGS.md` truncates the file and then fails.
