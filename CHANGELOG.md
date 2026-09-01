@@ -15,6 +15,12 @@ Until 1.0 both halves may change.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-01
+
+The reader tells you how to use it. A hint line above the status bar names the
+handful of keys worth knowing, rendered from the keymap in force rather than
+written out, so it cannot advertise a key you rebound.
+
 ### Added
 
 - **A hint line above the status bar**, naming the handful of keys worth
@@ -954,7 +960,8 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
 - Resizing re-lays out on every event; a large document dragged by a window
   edge will work harder than it needs to until a debounce lands.
 
-[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.7.1...HEAD
+[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/SophanaSok/marquee-markdown/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/SophanaSok/marquee-markdown/compare/v0.6.0...v0.6.1
