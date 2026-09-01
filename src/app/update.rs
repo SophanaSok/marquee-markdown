@@ -68,6 +68,10 @@ pub fn apply(app: &mut App, action: Action) {
                 }
             }
         }
+        // Costs a row of document, so it is the reader's to spend: the key is
+        // advertised on the line itself, and `[ui] hints = false` makes the
+        // choice stick without this having to write to a file.
+        Action::ToggleHints => app.hints = !app.hints,
         Action::ToggleTheme => {
             std::mem::swap(&mut app.theme, &mut app.alternate);
             // The layout cache notices the change on the next reconcile and

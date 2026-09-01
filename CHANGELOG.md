@@ -15,6 +15,47 @@ Until 1.0 both halves may change.
 
 ## [Unreleased]
 
+### Added
+
+- **A hint line above the status bar**, naming the handful of keys worth
+  knowing — `j/k scroll · / search · t contents · ? help · q quit · s theme ·
+  H hints`. Rendered from the live keymap, like the key reference, so it never
+  advertises a key that has been rebound, and it follows the pane in force: the
+  contents pane offers folding, a prompt offers the way out of it, the theme
+  picker says that moving previews.
+
+  **On by default.** The keys are the part of a full-screen reader that nothing
+  else announces, and a reader who does not already know `?` has no way in;
+  against that, the line costs one row of document on every screen. So it is
+  the reader's row to spend either way: `H` hides it for the session — the key
+  is advertised on the line itself, so nobody has to go looking for it — and
+  `hints = false` under `[ui]`, or `MARQUEE_UI_HINTS=0`, hides it for good.
+  Nothing writes to the configuration file behind a keystroke.
+
+  It degrades by dropping hints from the end rather than wrapping, and a
+  terminal too narrow for even the first one spends the row on the document
+  instead — measured against what the keymap actually produces, so a reader
+  who rebound `j` to `ctrl+alt+n` moves the threshold with them. The reader
+  still works down to 1x1.
+
+- `toggle-hints`, bound to `H` in the document, browser and contents modes,
+  and `[ui] hints` alongside `[ui] contents`.
+
+- `Panes::hints()` and `Panes::height()`. The hint row is derived from the gap
+  between the document and the status bar rather than stored — the rows below
+  the document are contiguous, so there is no second place for the two to
+  disagree, and the public shape of `Panes` is unchanged. `height()` is the
+  whole terminal, for the callers that were adding two of the three rows up
+  and coming out one short.
+
+### Changed
+
+- **The status bar no longer ends in `? help` while the hint line is offering
+  it.** The bar pointed at the key reference because nothing else did; two of
+  them a row apart read as a stutter. It asks rather than assumes — the hint
+  line has to be on screen *and* wide enough to have kept that chip, which it
+  is not below about 44 columns, so a narrow terminal still gets told once.
+
 ## [0.7.1] - 2026-09-01
 
 Nothing in the reader changed. This is a test that could fail on a busy

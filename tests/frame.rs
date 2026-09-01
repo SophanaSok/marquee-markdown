@@ -214,6 +214,7 @@ fn every_cell_is_painted_in_every_theme() {
 #[test]
 fn the_status_bar_occupies_the_last_row_and_all_of_it() {
     let mut app = fixture();
+    app.hints = false;
     let buf = frame(&mut app, 80, 24);
     let expected = app.theme.status_bar().bg;
     for x in 0..80 {
@@ -225,6 +226,95 @@ fn the_status_bar_occupies_the_last_row_and_all_of_it() {
     }
     // And the row above it is document, not status bar.
     assert_eq!(buf[(0, 22)].style().bg, app.theme.page().bg);
+}
+
+#[test]
+fn the_hint_line_takes_the_row_above_the_status_bar_and_all_of_it() {
+    let mut app = fixture();
+    let buf = frame(&mut app, 80, 24);
+    let row = app.panes.hints().expect("a hint line on an 80x24 terminal");
+    assert_eq!(row.y, 22);
+    for x in 0..80 {
+        assert_eq!(
+            buf[(x, row.y)].style().bg,
+            app.theme.status_bar().bg,
+            "hint line at column {x}"
+        );
+    }
+    // The document has the row above it, and the status bar the one below.
+    assert_eq!(buf[(0, 21)].style().bg, app.theme.page().bg);
+    assert_eq!(buf[(0, 23)].style().bg, app.theme.status_bar().bg);
+}
+
+/// The keys it names are the keys that are bound, at every width it survives.
+#[test]
+fn the_hint_line_says_what_the_keymap_says() {
+    for width in [40, 60, 80, 120, 200] {
+        let mut app = fixture();
+        let buf = frame(&mut app, width, 24);
+        let row = app.panes.hints().expect("a hint line");
+        let text: String = (0..width).map(|x| buf[(x, row.y)].symbol()).collect();
+        assert!(text.starts_with(" j/k scroll"), "at {width}: {text:?}");
+        assert_eq!(
+            measure::width(&text),
+            usize::from(width),
+            "the hint line is not the width of its row at {width}"
+        );
+    }
+}
+
+/// Narrowing drops hints from the end rather than wrapping or overflowing,
+/// and the row goes back to the document once nothing fits in it.
+#[test]
+fn the_hint_line_gives_way_from_the_end_as_the_terminal_narrows() {
+    let mut previous = usize::MAX;
+    for width in (4..=120u16).rev() {
+        let mut app = fixture();
+        let buf = frame(&mut app, width, 24);
+        let Some(row) = app.panes.hints() else {
+            // Once the line is gone it stays gone as the terminal narrows
+            // further, and the document has every row but the status bar.
+            assert_eq!(app.panes.body.height, 23, "at width {width}");
+            continue;
+        };
+        let text: String = (0..width).map(|x| buf[(x, row.y)].symbol()).collect();
+        let hints = text.matches('\u{b7}').count() + 1;
+        assert!(
+            hints <= previous,
+            "width {width} showed more hints than a wider terminal: {text:?}"
+        );
+        previous = hints;
+        assert_eq!(
+            measure::width(&text),
+            usize::from(width),
+            "at width {width}"
+        );
+    }
+}
+
+#[test]
+fn every_cell_is_painted_with_the_hint_line_on_and_off() {
+    for &(width, height) in SIZES {
+        for hints in [true, false] {
+            let mut app = fixture();
+            app.hints = hints;
+            let buf = frame(&mut app, width, height);
+            assert_fully_painted(&buf, &format!("hints={hints} at {width}x{height}"));
+        }
+    }
+}
+
+#[test]
+fn the_browser_gets_a_hint_line_of_its_own() {
+    let mut app = browsing();
+    let buf = frame(&mut app, 80, 24);
+    let row = app.panes.hints().expect("a hint line over the file list");
+    let text: String = (0..80).map(|x| buf[(x, row.y)].symbol()).collect();
+    assert!(text.contains("enter read"), "{text:?}");
+    assert!(
+        !text.contains("contents"),
+        "document hints in the browser: {text:?}"
+    );
 }
 
 #[test]

@@ -120,6 +120,14 @@ pub enum Action {
     ThemeBottom,
     /// Keep the previewed theme, and remember it for next time.
     ThemeAccept,
+    // A new variant goes here, at the end, however well it would read
+    // elsewhere: a fieldless enum's discriminants are its declaration order,
+    // and inserting into the middle renumbers everything after it — which
+    // `cargo semver-checks` reports as breaking, because a downstream `as
+    // isize` would silently change meaning. `ALL` below is where the reading
+    // order lives, and it is free to put this wherever it belongs.
+    /// Show or hide the hint line above the status bar.
+    ToggleHints,
 }
 
 impl Action {
@@ -177,6 +185,7 @@ impl Action {
         Self::ThemeBottom,
         Self::ThemeAccept,
         Self::ToggleHelp,
+        Self::ToggleHints,
         Self::Escape,
         Self::Quit,
     ];
@@ -188,6 +197,7 @@ impl Action {
             Self::Quit => "quit",
             Self::Escape => "escape",
             Self::ToggleHelp => "toggle-help",
+            Self::ToggleHints => "toggle-hints",
             Self::ToggleTheme => "toggle-theme",
             Self::ThemePicker => "theme-picker",
             Self::ThemeDown => "theme-down",
@@ -249,6 +259,7 @@ impl Action {
             Self::Quit => "quit",
             Self::Escape => "close overlay",
             Self::ToggleHelp => "toggle this help",
+            Self::ToggleHints => "show / hide the hint line",
             Self::ToggleTheme => "switch light / dark",
             Self::ThemePicker => "choose a theme",
             Self::ThemeDown => "next theme",
@@ -347,6 +358,7 @@ mod tests {
             Action::Quit
             | Action::Escape
             | Action::ToggleHelp
+            | Action::ToggleHints
             | Action::ToggleTheme
             | Action::LineDown
             | Action::LineUp
@@ -406,7 +418,7 @@ mod tests {
         // Suspending is a unix idea, and the action does not exist elsewhere
         // rather than existing and doing nothing — the key reference is
         // generated from what is bound, so an inert entry would be a lie.
-        let expected = if cfg!(unix) { 53 } else { 52 };
+        let expected = if cfg!(unix) { 54 } else { 53 };
         assert_eq!(Action::ALL.len(), expected, "Action::ALL is out of date");
     }
 

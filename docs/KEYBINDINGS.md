@@ -38,6 +38,7 @@ here can be pasted into `[keys.<mode>]`.
 | `T` | `toggle-theme` | switch light / dark |
 | `s` | `theme-picker` | choose a theme |
 | `?` | `toggle-help` | toggle this help |
+| `H` | `toggle-hints` | show / hide the hint line |
 | `esc` | `escape` | close overlay |
 | `q` `ctrl+c` | `quit` | quit |
 | `ctrl+z` | `suspend` | suspend to the shell |
@@ -59,6 +60,7 @@ here can be pasted into `[keys.<mode>]`.
 | `T` | `toggle-theme` | switch light / dark |
 | `s` | `theme-picker` | choose a theme |
 | `?` | `toggle-help` | toggle this help |
+| `H` | `toggle-hints` | show / hide the hint line |
 | `esc` | `escape` | close overlay |
 | `q` `ctrl+c` | `quit` | quit |
 
@@ -79,6 +81,7 @@ here can be pasted into `[keys.<mode>]`.
 | `T` | `toggle-theme` | switch light / dark |
 | `s` | `theme-picker` | choose a theme |
 | `?` | `toggle-help` | toggle this help |
+| `H` | `toggle-hints` | show / hide the hint line |
 | `esc` | `escape` | close overlay |
 | `q` `ctrl+c` | `quit` | quit |
 

@@ -38,6 +38,8 @@ pub struct Layer {
     pub terminal_query: Option<bool>,
     /// Start with the contents pane showing.
     pub contents: Option<bool>,
+    /// Start with the hint line showing above the status bar.
+    pub hints: Option<bool>,
     /// What to do with raw HTML.
     pub html: Option<HtmlMode>,
 }
@@ -60,6 +62,7 @@ impl Layer {
             update_check: self.update_check.or(lower.update_check),
             terminal_query: self.terminal_query.or(lower.terminal_query),
             contents: self.contents.or(lower.contents),
+            hints: self.hints.or(lower.hints),
             html: self.html.or(lower.html),
         }
     }
@@ -94,6 +97,12 @@ impl Layer {
             // hides itself on a narrow terminal or a document with nothing to
             // list.
             contents: Some(true),
+            // On, because the keys are the part of a full-screen reader
+            // nothing else announces: a first-time reader who does not know
+            // `?` has no way in. It costs one row of document, which is why
+            // `H` turns it off for the session and this setting turns it off
+            // for good.
+            hints: Some(true),
             // Documentation is written in markdown with HTML holes in it, and
             // the tags are not what the author meant to say.
             html: Some(HtmlMode::Render),
@@ -113,6 +122,7 @@ impl Layer {
             update_check: file.general.update_check,
             terminal_query: file.general.terminal_query,
             contents: file.ui.contents,
+            hints: file.ui.hints,
             html: file
                 .render
                 .html
@@ -141,6 +151,7 @@ impl Layer {
             update_check: flag(get, "MARQUEE_UPDATE_CHECK", &mut warnings),
             terminal_query: flag(get, "MARQUEE_TERMINAL_QUERY", &mut warnings),
             contents: flag(get, "MARQUEE_UI_CONTENTS", &mut warnings),
+            hints: flag(get, "MARQUEE_UI_HINTS", &mut warnings),
             html: choice(get, "MARQUEE_RENDER_HTML", &mut warnings),
         };
         (layer, warnings)
@@ -355,23 +366,26 @@ mod tests {
             ("MARQUEE_WIDTH", "72"),
             ("MARQUEE_PRESERVE_NEW_LINES", "true"),
             ("MARQUEE_UI_CONTENTS", "false"),
+            ("MARQUEE_UI_HINTS", "off"),
         ]));
         assert_eq!(layer.style.as_deref(), Some("paper"));
         assert_eq!(layer.width, Some(72));
         assert_eq!(layer.preserve_new_lines, Some(true));
         assert_eq!(layer.contents, Some(false), "sections are spelled out");
+        assert_eq!(layer.hints, Some(false));
     }
 
     #[test]
     fn a_file_becomes_a_layer_field_for_field() {
         let (file, _) = super::super::schema::parse(
-            "[general]\nstyle = \"paper\"\nall = true\n\n[ui]\ncontents = false\n",
+            "[general]\nstyle = \"paper\"\nall = true\n\n[ui]\ncontents = false\nhints = false\n",
         )
         .expect("parse");
         let layer = Layer::from_file(&file);
         assert_eq!(layer.style.as_deref(), Some("paper"));
         assert_eq!(layer.all, Some(true));
         assert_eq!(layer.contents, Some(false));
+        assert_eq!(layer.hints, Some(false));
         assert_eq!(layer.mouse, None);
     }
 }

@@ -125,6 +125,7 @@ impl Cli {
             update_check: None,
             terminal_query: None,
             contents: None,
+            hints: None,
             // No flag: this module keeps glow's surface, and glow has no
             // equivalent. `MARQUEE_RENDER_HTML` covers the one-shot case.
             html: None,

@@ -18,6 +18,7 @@ pub mod derived;
 pub mod event;
 pub mod external;
 pub mod gate;
+pub mod hints;
 pub mod keymap;
 pub mod layout;
 pub mod state;

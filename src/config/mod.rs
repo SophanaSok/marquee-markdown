@@ -58,6 +58,8 @@ pub struct Config {
     pub terminal_query: bool,
     /// Start with the contents pane showing.
     pub contents: bool,
+    /// Start with the hint line showing above the status bar.
+    pub hints: bool,
     /// What to do with raw HTML.
     pub html: HtmlMode,
     /// Key bindings, defaults with the file's changes laid over them.
@@ -154,6 +156,7 @@ impl Config {
             update_check: layer.update_check.unwrap_or(true),
             terminal_query: layer.terminal_query.unwrap_or(true),
             contents: layer.contents.unwrap_or(true),
+            hints: layer.hints.unwrap_or(true),
             html: layer.html.unwrap_or_default(),
             keymap,
             path,
@@ -190,6 +193,7 @@ impl Config {
         let _ = writeln!(out, "terminal-query = {}", self.terminal_query);
         let _ = writeln!(out, "\n[render]\nhtml = {:?}", self.html.name());
         let _ = writeln!(out, "\n[ui]\ncontents = {}", self.contents);
+        let _ = writeln!(out, "hints = {}", self.hints);
 
         for mode in Mode::ALL {
             let bindings: Vec<_> = self.keymap.bindings(*mode).collect();

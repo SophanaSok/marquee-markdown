@@ -72,7 +72,7 @@ fn sync_help(app: &mut App) {
         return;
     }
     let rows = app.keymap.help_rows(app.pane_mode()).len();
-    let terminal = app.panes.body.height + app.panes.status.height;
+    let terminal = app.panes.height();
     let visible = usize::from(terminal.saturating_sub(2)).min(rows);
     let max = rows.saturating_sub(visible);
     app.help_scroll = app.help_scroll.min(u16::try_from(max).unwrap_or(u16::MAX));

@@ -184,6 +184,7 @@ fn options(cli: &Cli, config: &Config, terminal: TerminalColors) -> app::Options
         all: config.all,
         preserve_new_lines: config.preserve_new_lines,
         contents: config.contents,
+        hints: config.hints,
         html: config.html,
         config_path: config.path.clone(),
         style_overridden,

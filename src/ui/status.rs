@@ -4,6 +4,7 @@ use ratatui::Frame;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 
+use crate::app::action::Action;
 use crate::app::state::{App, Screen};
 use crate::render::{measure, tui};
 
@@ -107,7 +108,7 @@ fn browser_right_side(app: &App) -> (String, Style) {
     }
     let total = browser.entries().len();
     let text = if count == total {
-        format!(" {count} {files}  ? help ")
+        format!(" {count} {files}{} ", help_tail(app))
     } else {
         format!(" {count} of {total} {files} ")
     };
@@ -153,9 +154,24 @@ fn right_side(app: &App) -> (String, Style) {
         return (text, app.theme.status_message());
     }
     (
-        format!(" {}%  ? help ", app.view.progress(app.extent())),
+        format!(" {}%{} ", app.view.progress(app.extent()), help_tail(app)),
         app.theme.status_bar(),
     )
+}
+
+/// The `? help` the bar ends with, or nothing when the hint line above it is
+/// already saying so.
+///
+/// The bar pointed at the key reference because nothing else did. The hint
+/// line does now, and two of them a row apart reads as a stutter rather than
+/// as emphasis — but only while the line is there and wide enough to have kept
+/// the hint, so this asks rather than assumes.
+fn help_tail(app: &App) -> &'static str {
+    if app.hint_names(Action::ToggleHelp) {
+        ""
+    } else {
+        "  ? help"
+    }
 }
 
 #[cfg(test)]
@@ -316,6 +332,73 @@ mod tests {
         app.search
             .search(app.doc.doc(), app.doc.revision(), "absent", 0);
         assert!(text_of(&compose(&app, 60)).contains("no matches"));
+    }
+
+    /// The bar and the hint line are a row apart, and one `? help` between
+    /// them is the point of having the line at all.
+    #[test]
+    fn the_bar_does_not_repeat_the_help_the_hint_line_is_already_offering() {
+        let app = app("# T\n", "doc.md");
+        assert!(
+            app.panes.hints().is_some(),
+            "the hint line is not on screen"
+        );
+        let text = text_of(&compose(&app, 60));
+        assert!(!text.contains("? help"), "said twice: {text:?}");
+        assert!(
+            text.contains('%'),
+            "the progress readout went with it: {text:?}"
+        );
+    }
+
+    #[test]
+    fn the_bar_says_it_again_once_the_hint_line_is_gone() {
+        let mut app = app("# T\n", "doc.md");
+        app.hints = false;
+        crate::app::reconcile(&mut app, Rect::new(0, 0, 60, 24));
+        let text = text_of(&compose(&app, 60));
+        assert!(text.contains("? help"), "{text:?}");
+    }
+
+    /// The help chip is fourth in the line, so a narrow terminal drops it —
+    /// and the bar has to notice that rather than assume the line covers it.
+    #[test]
+    fn a_hint_line_too_narrow_to_offer_help_leaves_the_bar_saying_it() {
+        for width in [20u16, 30, 40] {
+            let mut app = app("# T\n", "doc.md");
+            crate::app::reconcile(&mut app, Rect::new(0, 0, width, 24));
+            let text = text_of(&compose(&app, width));
+            assert!(
+                !app.hint_names(crate::app::action::Action::ToggleHelp),
+                "the hint line kept help at {width} columns"
+            );
+            assert!(text.contains("? help"), "at {width}: {text:?}");
+        }
+    }
+
+    #[test]
+    fn the_browser_bar_drops_its_help_for_the_same_reason() {
+        use crate::browser::Entry;
+        let mut app = App::browsing(
+            "/notes".into(),
+            Theme::new(ThemeVariant::Slate),
+            Options::default(),
+        );
+        let browser = app.browser.as_mut().unwrap();
+        browser.extend([Entry {
+            path: "/notes/a.md".into(),
+            display: "a.md".into(),
+            modified: None,
+        }]);
+        browser.scanning = false;
+        crate::app::reconcile(&mut app, Rect::new(0, 0, 60, 24));
+        let text = text_of(&compose(&app, 60));
+        assert!(text.contains("1 file"), "{text:?}");
+        assert!(!text.contains("? help"), "said twice: {text:?}");
+
+        app.hints = false;
+        crate::app::reconcile(&mut app, Rect::new(0, 0, 60, 24));
+        assert!(text_of(&compose(&app, 60)).contains("? help"));
     }
 
     #[test]

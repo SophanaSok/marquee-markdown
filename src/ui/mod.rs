@@ -9,6 +9,7 @@
 pub mod browser;
 pub mod document;
 pub mod help;
+pub mod hints;
 pub mod status;
 pub mod themes;
 pub mod toc;
@@ -29,6 +30,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
             toc::draw(frame, app);
         }
     }
+    hints::draw(frame, app);
     status::draw(frame, app);
     match app.overlay {
         Some(Overlay::Help) => help::draw(frame, app),
