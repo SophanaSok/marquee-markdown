@@ -94,6 +94,26 @@ mod tests {
         false
     }
 
+    /// Throw away whatever the setup caused, so that what follows is an
+    /// assertion about the change the test makes.
+    ///
+    /// Creating the document is a write like any other, and arming the watch
+    /// immediately afterwards does not reliably exclude it: the close can be
+    /// reported once the watch is up. Rare — one round in forty of four suites
+    /// running at once found it, and a quiet machine never does — but a test
+    /// suite running at a machine's full width meets it, which is how the nix
+    /// sandbox found it while every local run and three CI platforms did not.
+    ///
+    /// It costs a reader one redundant re-read of a document it has only just
+    /// opened, which is the same bargain the sibling case already accepts on
+    /// macOS. For a test it is the difference between asserting on the change
+    /// and asserting on the setup, in both directions: a positive test can
+    /// pass on the leaked event without the watch working at all.
+    fn discard_setup_events(hits: &AtomicUsize) {
+        std::thread::sleep(SETTLE * 3);
+        hits.store(0, Ordering::SeqCst);
+    }
+
     #[test]
     fn a_save_is_noticed() {
         let dir = tempfile::tempdir().expect("temp dir");
@@ -107,6 +127,7 @@ mod tests {
             true
         })
         .expect("watch");
+        discard_setup_events(&hits);
 
         std::fs::write(&path, "# Two\n").expect("write");
         assert!(
@@ -130,6 +151,7 @@ mod tests {
             true
         })
         .expect("watch");
+        discard_setup_events(&hits);
 
         std::fs::write(&temporary, "# Two\n").expect("write");
         std::fs::rename(&temporary, &path).expect("rename");
@@ -158,6 +180,7 @@ mod tests {
             true
         })
         .expect("watch");
+        discard_setup_events(&hits);
 
         std::fs::write(dir.path().join("other.md"), "# Other\n").expect("write");
         // Give the watcher long enough that a false positive would have shown.

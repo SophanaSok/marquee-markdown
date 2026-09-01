@@ -39,15 +39,20 @@ rustPlatform.buildRustPackage (finalAttrs: {
   # The live-forge checks are `#[ignore]`d, so the suite needs no network.
   # `--all-targets` skips doctests, and the render module's public example is
   # one, so both are run.
+  # DELETE THIS WITH THE NEXT TAG. The test is fixed in the repository, and
+  # this builds `src` — a released tag — so the fix arrives here only when a
+  # release carries it. Until then the skip is what keeps 0.7.0 building.
+  #
+  # It was never about siblings. The test creates the document, arms the watch
+  # and asserts that writing a *different* file reports nothing — but the
+  # write that created the document can itself be reported once the watch is
+  # up, and that counts as the failure. Cutting the sibling write out of the
+  # test entirely still failed, which is what identified it: 3 rounds in 20 of
+  # the suite inside this sandbox, 1 in 40 locally with four suites at once,
+  # and never on an idle machine, which is why CI on three platforms and every
+  # local run called it green. The tests now discard what their own setup
+  # caused before asserting, and that runs 20 rounds in 20 here.
   checkFlags = [
-    # Sees one change event where it asserts none, but only inside the nix
-    # sandbox: 25 runs in isolation, 5 full-suite runs, a btrfs `TMPDIR`
-    # rather than the tmpfs `/tmp` uses by default, and CI on three platforms
-    # all pass. Something about the sandbox's view of the directory produces
-    # an event naming the watched file when only a sibling was written, and
-    # what that is has not been established — so this is a suppression, not a
-    # diagnosis. Filesystem-watch tests are routinely skipped in nixpkgs for
-    # this shape of reason; the open question is tracked outside the manifest.
     "--skip=doc::watch::tests::a_sibling_file_changing_is_not_reported"
   ];
 
