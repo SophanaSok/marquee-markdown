@@ -6,3 +6,6 @@
 
 # python bytecode from scripts/
 __pycache__/
+
+# `nix-build packaging/nix` drops a symlink here, into /nix/store
+/result
