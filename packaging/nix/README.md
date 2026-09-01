@@ -35,8 +35,10 @@ They cannot be filled before the tag exists, for the same reason the Homebrew
 formula and the AUR `sha256sums` cannot — which is why all three are bumped
 after pushing a tag rather than in the release commit.
 
-`cargoHash` changes whenever `Cargo.lock` does, not only when the version
-does.
+`cargoHash` changes whenever `Cargo.lock` does — which is every release, since
+the version bump edits the lockfile's own entry for this crate, and also any
+time a dependency moves. Expect to refresh both hashes each time, not just the
+source one.
 
 `src.hash` is a hash of the unpacked source tree, not of the tarball, so it is
 not the `sha256` the Homebrew formula and the AUR PKGBUILD carry for the same
