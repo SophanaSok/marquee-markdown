@@ -9,7 +9,7 @@
 # Homebrew formula is.
 
 pkgname=marquee-markdown
-pkgver=0.7.1
+pkgver=0.8.0
 pkgrel=1
 pkgdesc="TUI markdown reader that renders documents like Claude artifacts, with a table-of-contents panel"
 arch=('x86_64' 'aarch64')
@@ -20,7 +20,7 @@ makedepends=('cargo')
 provides=('mmd')
 conflicts=('marquee-markdown-bin')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('a52711ff6677b4576364b90dcfdab4182ac214a051517262dba025a16ea0b94d')
+sha256sums=('09c3be4e2d2462e58afd044e33d39d0b239e0d31c2b98595f59ceaf1330ab6ea')
 
 prepare() {
   cd "$pkgname-$pkgver"

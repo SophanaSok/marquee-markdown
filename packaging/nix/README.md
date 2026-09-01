@@ -26,7 +26,7 @@ form of the same thing.
 
 ## The two hashes
 
-Both are real as of 0.7.0. They go stale on the next release, and the way to
+Both are real as of 0.8.0. They go stale on the next release, and the way to
 refresh one is to put the conventional row of `A`s back: nix fails the build
 and prints the hash it actually computed, and that is the value to paste in.
 Two builds, because the second hash is only reached once the first is right.
@@ -54,6 +54,8 @@ from GitHub by tag. To submit, copy it to
 there the enclosing `default.nix` is the attribute set that calls this file.
 
 Check the hashes against the release being submitted rather than trusting the
-ones here, and read the `checkFlags` comment before dropping the skip it
-carries: one watch test sees an event inside the nix sandbox that it sees
-nowhere else, and that is suppressed rather than understood.
+ones here. `checkFlags` is empty and the whole suite runs in the sandbox: it
+carried a skip for one watch test until 0.7.1, whose fix is what let the skip
+go. If a test ever has to be suppressed again, suppress it there and say why —
+a manifest that narrows the suite to stay green is only honest while it admits
+to it.
