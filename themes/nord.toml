@@ -1,0 +1,20 @@
+# Nord — https://github.com/nordtheme/nord
+name = "nord"
+appearance = "dark"
+syntax = "base16-ocean.dark"
+
+[palette]
+bg = "#2e3440"            # nord0
+surface = "#272c36"
+fg = "#eceff4"            # nord6
+muted = "#7b88a1"
+accent = "#88c0d0"        # nord8
+accent_soft = "#8fbcbb"   # nord7
+border = "#3b4252"        # nord1
+
+[palette.alerts]
+note = "#81a1c1"          # nord9
+tip = "#a3be8c"           # nord14
+important = "#b48ead"     # nord15
+warning = "#ebcb8b"       # nord13
+caution = "#bf616a"       # nord11

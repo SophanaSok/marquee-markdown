@@ -298,3 +298,59 @@ fn the_homebrew_formula_points_at_a_real_release() {
         "not a sha256: {sha}"
     );
 }
+
+/// The versions pinned in every manifest that cannot be generated at release
+/// time, and how far behind the changelog each is allowed to be.
+///
+/// Homebrew has its own test above, because it also has a `sha256` to check.
+/// These three are the same problem in a different file: a version that has to
+/// be written down, and so can be forgotten. All of them are bumped *after*
+/// the tag — a source tarball's hash cannot exist before the tag it is made
+/// from — so one release of lag is the process and two is a forgotten bump.
+const PINNED: &[(&str, &str)] = &[
+    ("packaging/aur/marquee-markdown/PKGBUILD", "pkgver="),
+    ("packaging/aur/marquee-markdown-bin/PKGBUILD", "pkgver="),
+    ("packaging/nix/default.nix", "version = \""),
+];
+
+#[test]
+fn every_pinned_package_manifest_points_at_a_real_release() {
+    // `packaging/` is excluded from the published crate, so inside the package
+    // there is nothing to check.
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+
+    let changelog = std::fs::read_to_string(root.join("CHANGELOG.md")).expect("CHANGELOG.md");
+    let dated: Vec<&str> = changelog
+        .lines()
+        .filter_map(|line| Some(line.strip_prefix("## [")?.split_once("] - ")?.0))
+        .collect();
+
+    for (path, key) in PINNED {
+        let Ok(text) = std::fs::read_to_string(root.join(path)) else {
+            continue;
+        };
+        // Take the version characters themselves rather than trimming the
+        // punctuation around them: `pkgver=0.6.1` and `version = "0.6.1";`
+        // are the same value wearing different syntax.
+        let version: String = text
+            .lines()
+            .find_map(|line| line.trim().strip_prefix(key))
+            .map(|rest| {
+                rest.trim_start_matches(['"', ' '])
+                    .chars()
+                    .take_while(|c| c.is_ascii_digit() || *c == '.')
+                    .collect()
+            })
+            .unwrap_or_else(|| panic!("{path} has no line starting {key:?}"));
+
+        match dated.iter().position(|&v| v == version) {
+            Some(0 | 1) => {}
+            Some(behind) => panic!(
+                "{path} is at {version}, {behind} releases behind {}: it was \
+                 not bumped after the last one",
+                dated[0]
+            ),
+            None => panic!("{path} is at {version}, which the changelog has no dated release for"),
+        }
+    }
+}

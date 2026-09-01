@@ -11,7 +11,7 @@
 
 use ratatui::Frame;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, BorderType, Clear, Paragraph};
+use ratatui::widgets::{Block, BorderType, Paragraph};
 
 use crate::app::state::{App, ThemePicker};
 use crate::render::measure;
@@ -73,7 +73,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
         .map(|(index, row)| line(app, row, offset + index == picker.cursor, name_width))
         .collect();
 
-    frame.render_widget(Clear, area);
+    super::clear_panel(frame, area, theme.page());
     frame.render_widget(block, area);
     frame.render_widget(Paragraph::new(lines).style(theme.overlay_body()), inner);
 }
@@ -118,7 +118,13 @@ fn appearance(entry: &crate::theme::registry::Entry) -> Option<Appearance> {
             .name
             .parse::<crate::theme::ThemeVariant>()
             .ok()
-            .map(|variant| variant.definition().appearance),
+            .map(|variant| variant.definition().appearance)
+            // A bundled community palette is built-in too, but it is not a
+            // `ThemeVariant` — its appearance comes from its own file.
+            .or_else(|| {
+                let bundled = crate::theme::bundled::find(&entry.name)?;
+                Some(crate::theme::bundled::load(bundled).ok()?.appearance)
+            }),
         // `system` is light or dark depending on what the terminal answered,
         // which the list does not carry; the row says where it came from and
         // the preview says the rest.

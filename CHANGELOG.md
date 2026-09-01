@@ -13,6 +13,94 @@ to change in any release: the pipeline — `parse`, `block`, `frag`, `wrap`,
 `sink`, `layout`, `highlight`, `html`.
 Until 1.0 both halves may change.
 
+## [Unreleased]
+
+### Added
+
+- **Eight ports of established colorschemes ship with the reader**:
+  `catppuccin-latte`, `catppuccin-mocha`, `dracula`, `gruvbox-dark`, `nord`,
+  `solarized-dark`, `solarized-light` and `tokyo-night`. `--style <name>`
+  selects one, `themes` lists them, and the picker previews them like any
+  other.
+
+  They are TOML files in `themes/`, embedded with `include_str!` and parsed by
+  the same loader a user theme goes through — the rule that a shipped theme
+  must not be a privileged code path, now that there is more than one kind of
+  shipped theme. A file of the same name in the user's theme directory still
+  wins, so retuning one is a copy and an edit rather than a fork.
+
+  Only Solarized has an exact counterpart among the seven syntax themes the
+  highlighter carries; the rest are paired by eye. `docs/THEMES.md` has the
+  schema, the seven names, and what a theme PR needs.
+
+- **`<details>` and `<summary>` are rendered instead of being printed as
+  tags.** The block becomes a quote titled by its summary, always open: a
+  terminal page has no click, and hiding the body would lose content the
+  author shipped.
+
+  A blank line inside `<details>` ends the HTML block — CommonMark's rule, and
+  the form GitHub requires for markdown to render inside — so the open tag and
+  the body arrive separately and the body is not ours to wrap. In that case
+  the summary stands alone as a strong paragraph rather than as a gutter bar
+  around nothing, and the body follows as itself.
+
+- **Manifests for the AUR and nixpkgs**, in `packaging/aur/` and
+  `packaging/nix/`. Two AUR packages, one building from source and one
+  unpacking the release archive; a nixpkgs-style derivation written in the
+  shape `pkgs/by-name` wants. Neither is published yet, and
+  `packaging/README.md` says what each still needs.
+
+- **`docs/demo.tape`**, a VHS script for the README's animated demo. It
+  records the moving parts only — the contents pane tracking the scroll,
+  folding, search narrowing as you type, the theme picker previewing. Not
+  gated in CI: a GIF is a lossy re-encode, so a byte-comparison would be
+  flaky rather than protective.
+
+### Changed
+
+- **`$E = mc^2$` reads as a code span rather than as a formula wearing its
+  dollar signs.** `ENABLE_MATH` had never been in the parser's option set,
+  while the handler for the events it produces had been sitting there since
+  the beginning — so every `$` in a document reached the page literally,
+  through code that could not run. TeX is not typeset; there is no glyph
+  budget for that in a cell grid, and code styling marks the span as notation
+  without pretending otherwise.
+
+- **`themes` measures its own name column** rather than padding to a fixed
+  twelve, which the first bundled palette overran.
+
+### Fixed
+
+- **An overlay panel no longer leaves an unpainted cell beside it when its
+  edge cuts a double-width glyph in half.** The panel paints over the glyph's
+  first cell; the second is one column outside it and belongs to nobody, so it
+  stayed as the terminal left it — a one-cell hole showing the shell's
+  background, hard against the border.
+
+  Latent since the overlays were written, and reachable only when a panel's
+  width put its edge on a wide glyph. Shipping a few themes made the theme
+  picker wide enough to land on one, which is how it was found: by
+  `tests/frame.rs`, which is the only mechanical guard the painted page has.
+  `ui::clear_panel` now measures the edge before clearing — clearing is what
+  destroys the evidence — and repaints the orphan.
+
+### Internal
+
+- `Theme::from_toml` parses a theme from text already in hand;
+  `Theme::from_file` is now a thin wrapper over it, so there is still one
+  parser.
+- `render::highlight::has_syntax_theme` reports whether the highlighter knows
+  a syntax theme by name, which the bundled palettes are checked against.
+- `tests/docs.rs` gained
+  `every_pinned_package_manifest_points_at_a_real_release`, extending the
+  Homebrew staleness guard to the AUR PKGBUILDs and the nix derivation.
+- Two keyseq tests navigated the theme picker by counting `j` presses from
+  `slate` to `system`, which only worked while exactly three themes shipped.
+  They use `G` now, since `system` is the last row by construction. A picker
+  wheel test asserted `3.min(len - 1)` and passed for the wrong reason: the
+  clamp hid the fact that the picker opens on the theme in force, not at the
+  top.
+
 ## [0.6.1] - 2026-08-26
 
 ### Changed

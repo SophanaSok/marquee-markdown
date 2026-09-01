@@ -5,7 +5,7 @@
 
 use ratatui::Frame;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, BorderType, Clear, Paragraph};
+use ratatui::widgets::{Block, BorderType, Paragraph};
 
 use crate::app::state::App;
 use crate::render::measure;
@@ -73,7 +73,7 @@ pub fn draw(frame: &mut Frame, app: &App) {
         })
         .collect();
 
-    frame.render_widget(Clear, area);
+    super::clear_panel(frame, area, theme.page());
     frame.render_widget(block, area);
     frame.render_widget(
         Paragraph::new(lines)

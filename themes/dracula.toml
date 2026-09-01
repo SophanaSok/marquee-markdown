@@ -1,0 +1,20 @@
+# Dracula — https://github.com/dracula/dracula-theme
+name = "dracula"
+appearance = "dark"
+syntax = "base16-mocha.dark"
+
+[palette]
+bg = "#282a36"            # background
+surface = "#21222c"
+fg = "#f8f8f2"            # foreground
+muted = "#6272a4"         # comment
+accent = "#bd93f9"        # purple
+accent_soft = "#ff79c6"   # pink
+border = "#44475a"        # current line
+
+[palette.alerts]
+note = "#8be9fd"          # cyan
+tip = "#50fa7b"           # green
+important = "#bd93f9"     # purple
+warning = "#f1fa8c"       # yellow
+caution = "#ff5555"       # red

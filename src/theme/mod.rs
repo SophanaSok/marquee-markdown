@@ -8,6 +8,7 @@
 //! Every renderer reads styles from [`Theme`] rather than naming colors directly,
 //! so adding a palette never means touching layout code.
 
+pub mod bundled;
 pub mod palette;
 pub mod registry;
 pub mod system;
@@ -202,8 +203,23 @@ impl Theme {
         use anyhow::Context;
         let text = std::fs::read_to_string(path)
             .with_context(|| format!("cannot read theme {}", path.display()))?;
-        let file: ThemeFile = toml::from_str(&text)
-            .with_context(|| format!("cannot parse theme {}", path.display()))?;
+        Self::from_toml(&text, &path.display().to_string())
+    }
+
+    /// Parse a theme from TOML text already in hand.
+    ///
+    /// `source` names where the text came from, for the error message: a path
+    /// for a user theme, a bare name for a bundled one. The bundled palettes
+    /// come through here rather than being written as Rust constants, so a
+    /// shipped theme and a contributed one are parsed by the same code and a
+    /// schema change cannot pass one while breaking the other.
+    ///
+    /// # Errors
+    /// Returns an error when the text does not parse as a theme definition.
+    pub fn from_toml(text: &str, source: &str) -> anyhow::Result<Self> {
+        use anyhow::Context;
+        let file: ThemeFile =
+            toml::from_str(text).with_context(|| format!("cannot parse theme {source}"))?;
         Ok(Self::from(file))
     }
 

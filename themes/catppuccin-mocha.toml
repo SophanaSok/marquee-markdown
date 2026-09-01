@@ -1,0 +1,20 @@
+# Catppuccin Mocha — https://github.com/catppuccin/catppuccin
+name = "catppuccin-mocha"
+appearance = "dark"
+syntax = "base16-mocha.dark"
+
+[palette]
+bg = "#1e1e2e"            # base
+surface = "#181825"       # mantle
+fg = "#cdd6f4"            # text
+muted = "#7f849c"         # overlay1
+accent = "#cba6f7"        # mauve
+accent_soft = "#f5c2e7"   # pink
+border = "#45475a"        # surface1
+
+[palette.alerts]
+note = "#89b4fa"          # blue
+tip = "#a6e3a1"           # green
+important = "#cba6f7"     # mauve
+warning = "#f9e2af"       # yellow
+caution = "#f38ba8"       # red

@@ -40,7 +40,8 @@ pub fn parse_with(source: &str, options: ParseOptions) -> Vec<Block> {
         | Options::ENABLE_STRIKETHROUGH
         | Options::ENABLE_TASKLISTS
         | Options::ENABLE_GFM
-        | Options::ENABLE_SMART_PUNCTUATION;
+        | Options::ENABLE_SMART_PUNCTUATION
+        | Options::ENABLE_MATH;
 
     let mut builder = TreeBuilder {
         options,
@@ -259,6 +260,12 @@ impl TreeBuilder {
                 _ => self.finish_html(&html, span),
             },
             Event::InlineHtml(html) => self.inline_html(&html, span),
+            // TeX is not typeset — there is no glyph budget for it in a
+            // terminal cell grid. Code styling is the honest fallback: it
+            // marks the span as notation rather than prose, and the source
+            // is what the author would have to read anyway. Without
+            // `ENABLE_MATH` the delimiters and the formula both reach the
+            // page as literal text, which is strictly worse.
             Event::InlineMath(t) | Event::DisplayMath(t) => {
                 self.push_inline(Inline::Code(t.into_string()));
             }
@@ -1186,6 +1193,37 @@ mod tests {
                 .iter()
                 .any(|i| matches!(i, Inline::Image { dest, .. } if dest == "img.png"))
         );
+    }
+
+    #[test]
+    fn math_becomes_code_rather_than_literal_delimiters() {
+        let blocks = parse("Inline $E = mc^2$ here.\n");
+        let BlockKind::Paragraph(content) = &blocks[0].kind else {
+            panic!("expected paragraph");
+        };
+        // The delimiters must be consumed, not printed: the failure this
+        // guards is `$E = mc^2$` reaching the page verbatim, which is what
+        // happens the moment `ENABLE_MATH` is dropped from the option set.
+        assert!(
+            content
+                .iter()
+                .any(|i| matches!(i, Inline::Code(t) if t == "E = mc^2"))
+        );
+        assert!(
+            !Inline::plain_text(content).contains('$'),
+            "math delimiters reached the plain mirror"
+        );
+    }
+
+    #[test]
+    fn display_math_becomes_code_too() {
+        let blocks = parse("$$\n\\int_0^1 x^2 dx\n$$\n");
+        let BlockKind::Paragraph(content) = &blocks[0].kind else {
+            panic!("expected paragraph, got {:?}", blocks[0].kind);
+        };
+        let plain = Inline::plain_text(content);
+        assert!(plain.contains("\\int_0^1 x^2 dx"), "got {plain:?}");
+        assert!(!plain.contains('$'), "got {plain:?}");
     }
 
     fn parse_html(source: &str, html: HtmlMode) -> Vec<Block> {

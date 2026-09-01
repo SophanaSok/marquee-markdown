@@ -6,9 +6,31 @@ What is here, and what fills in the blanks.
 | --- | --- |
 | `homebrew/marquee-markdown.rb` | `brew bump-formula-pr`, from the tag's source tarball |
 | `scoop/marquee-markdown.template.json` | the release workflow, from `checksums.txt` |
+| `aur/marquee-markdown/PKGBUILD` | by hand after the tag, from the source tarball |
+| `aur/marquee-markdown-bin/PKGBUILD` | by hand after the tag, from `checksums.txt` |
+| `nix/default.nix` | by hand after the tag; nix prints both hashes |
 
-Neither a Homebrew tap nor a Scoop bucket exists yet; these are the manifests
-to put in one.
+**None of the four repositories these belong in exists yet** — no Homebrew tap,
+no Scoop bucket, no AUR packages, nothing submitted to nixpkgs. These are the
+manifests to put in them, kept correct in the meantime by the tests below.
+
+Publishing them is the one part of distribution that cannot be done from this
+repository, because each wants an account and a repository of its own:
+
+| Channel | What to create | Then |
+| --- | --- | --- |
+| Homebrew | a `homebrew-marquee` repo | `brew install SophanaSok/marquee/marquee-markdown` works. Submit to homebrew-core once the project clears its notability bar. |
+| Scoop | a `scoop-marquee` repo | take `marquee-markdown.json` from the latest release; its `autoupdate` block keeps the bucket current on its own |
+| AUR | `marquee-markdown` and `marquee-markdown-bin` | `git push` the PKGBUILD to `ssh://aur@aur.archlinux.org/<name>.git`, with a `.SRCINFO` from `makepkg --printsrcinfo` |
+| nixpkgs | a PR to nixpkgs | copy `nix/default.nix` to `pkgs/by-name/ma/marquee-markdown/package.nix` and fill in both hashes |
+
+The AUR pair is deliberately two packages: `marquee-markdown` builds from
+source and runs the test suite, `marquee-markdown-bin` unpacks the release
+archive for anyone who does not want a Rust toolchain to read a markdown file.
+They conflict, because both install the same two binaries.
+
+`nix/README.md` covers the two placeholder hashes and why they cannot be
+filled before the tag.
 
 The Scoop manifest is **not** kept here — only the template is. A manifest
 pins a hash, and a hash cannot exist before the archive it describes, so a
@@ -73,6 +95,28 @@ Check `python3 scripts/screenshot.py --self-test` after touching the
 escape-sequence parser — it asserts the 256-colour, truecolor, 16-colour and
 attribute cases both programs actually emit.
 
+## The demo GIF
+
+`docs/demo.tape` is a [VHS](https://github.com/charmbracelet/vhs) script, and
+`docs/demo.gif` is what it produces:
+
+```sh
+cargo build --release
+vhs docs/demo.tape
+```
+
+It records only the moving parts — the contents pane tracking the scroll,
+folding, search narrowing as you type, the theme picker previewing against the
+document behind it. Everything that photographs fine as a still belongs in a
+screenshot instead, where `--strict` can check it.
+
+**This is not gated in CI, deliberately.** A GIF is a lossy re-encode: two runs
+of the same tape do not produce identical bytes, so a byte-comparison would be
+flaky rather than protective, and a pixel comparison would need a tolerance
+nobody can justify. Re-record it by hand when the reader visibly changes, the
+same as the screenshots — the difference is that nothing will tell you, so it
+is worth checking when a release changes how the reader looks.
+
 ## Cutting a release
 
 1. Update `CHANGELOG.md`: turn `[Unreleased]` into the version and the date,
@@ -82,13 +126,28 @@ attribute cases both programs actually emit.
 2. Bump `version` in `Cargo.toml`, and run `cargo check` so `Cargo.lock`
    follows.
 3. Commit, tag `vX.Y.Z`, and push the tag.
-4. Once the tag is up, bump `homebrew/marquee-markdown.rb` with
-   `brew bump-formula-pr --version=X.Y.Z`. This one is last rather than part
-   of the release commit because it pins the hash of the tag's source tarball,
-   which does not exist until the tag is pushed. `tests/docs.rs` allows the
-   formula to be one release behind the newest dated heading in the changelog
-   — that gap is this step — and fails at two, so skipping it shows up as a red
-   test on the *next* release rather than as an install of the wrong version.
+4. Once the tag is up, bump the four manifests that pin a version and a hash:
+
+   - `homebrew/marquee-markdown.rb`, with `brew bump-formula-pr --version=X.Y.Z`
+   - `aur/marquee-markdown/PKGBUILD` — `pkgver`, and `sha256sums` from
+     `makepkg -g`
+   - `aur/marquee-markdown-bin/PKGBUILD` — `pkgver`, and `sha256sums_x86_64`
+     from the release's `checksums.txt`
+   - `nix/default.nix` — `version`, then let nix print `src.hash` and
+     `cargoHash` and paste them back
+
+   These are last rather than part of the release commit because each pins the
+   hash of the tag's source tarball, which does not exist until the tag is
+   pushed — a correct hash inside the release commit would be the hash of a
+   tree containing itself.
+
+   `tests/docs.rs` allows each to be one release behind the newest dated
+   heading in the changelog — that gap is this step — and fails at two, so
+   skipping one shows up as a red test on the *next* release rather than as an
+   install of the wrong version. `the_homebrew_formula_points_at_a_real_release`
+   covers the formula, which also has a hash to check;
+   `every_pinned_package_manifest_points_at_a_real_release` covers the other
+   three.
 
 Steps 1 to 3 are the whole of the release itself. The workflow does the
 rest, in an order that cannot leave the two sides disagreeing: it first
