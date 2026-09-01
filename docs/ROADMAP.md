@@ -50,7 +50,7 @@ status bar, a scrolling key reference rendered from the live keymap, the mouse
 wheel claimed from the terminal, light/dark switching, and a resize that keeps
 your place instead of teleporting you.
 
-759 tests and a doctest, plus five `#[ignore]`d live checks against the real
+772 tests and a doctest, plus five `#[ignore]`d live checks against the real
 forges; `cargo clippy --all-targets -- -D warnings` and `cargo doc --no-deps`
 clean.
 
