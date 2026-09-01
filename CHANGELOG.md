@@ -41,6 +41,13 @@ Until 1.0 both halves may change.
 - `toggle-hints`, bound to `H` in the document, browser and contents modes,
   and `[ui] hints` alongside `[ui] contents`.
 
+- `Panes::hints()` and `Panes::height()`. The hint row is derived from the gap
+  between the document and the status bar rather than stored — the rows below
+  the document are contiguous, so there is no second place for the two to
+  disagree, and the public shape of `Panes` is unchanged. `height()` is the
+  whole terminal, for the callers that were adding two of the three rows up
+  and coming out one short.
+
 ### Changed
 
 - **The status bar no longer ends in `? help` while the hint line is offering
@@ -48,11 +55,6 @@ Until 1.0 both halves may change.
   them a row apart read as a stutter. It asks rather than assumes — the hint
   line has to be on screen *and* wide enough to have kept that chip, which it
   is not below about 44 columns, so a narrow terminal still gets told once.
-
-- **`app::layout::Panes` gained a `hints` field and is now `non_exhaustive`.**
-  The rows below the document are the kind of thing that grows; adding the
-  next one should not be a breaking change. `Panes::height()` is the whole
-  terminal, for the callers that used to add the rows up themselves.
 
 ## [0.7.1] - 2026-09-01
 

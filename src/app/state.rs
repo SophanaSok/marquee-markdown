@@ -421,7 +421,7 @@ impl App {
     #[must_use]
     pub fn hint_names(&self, action: super::action::Action) -> bool {
         self.panes
-            .hints
+            .hints()
             .is_some_and(|row| super::hints::names(&self.keymap, self.mode(), row.width, action))
     }
 

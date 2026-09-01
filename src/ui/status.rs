@@ -339,7 +339,10 @@ mod tests {
     #[test]
     fn the_bar_does_not_repeat_the_help_the_hint_line_is_already_offering() {
         let app = app("# T\n", "doc.md");
-        assert!(app.panes.hints.is_some(), "the hint line is not on screen");
+        assert!(
+            app.panes.hints().is_some(),
+            "the hint line is not on screen"
+        );
         let text = text_of(&compose(&app, 60));
         assert!(!text.contains("? help"), "said twice: {text:?}");
         assert!(

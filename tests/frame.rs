@@ -232,7 +232,7 @@ fn the_status_bar_occupies_the_last_row_and_all_of_it() {
 fn the_hint_line_takes_the_row_above_the_status_bar_and_all_of_it() {
     let mut app = fixture();
     let buf = frame(&mut app, 80, 24);
-    let row = app.panes.hints.expect("a hint line on an 80x24 terminal");
+    let row = app.panes.hints().expect("a hint line on an 80x24 terminal");
     assert_eq!(row.y, 22);
     for x in 0..80 {
         assert_eq!(
@@ -252,7 +252,7 @@ fn the_hint_line_says_what_the_keymap_says() {
     for width in [40, 60, 80, 120, 200] {
         let mut app = fixture();
         let buf = frame(&mut app, width, 24);
-        let row = app.panes.hints.expect("a hint line");
+        let row = app.panes.hints().expect("a hint line");
         let text: String = (0..width).map(|x| buf[(x, row.y)].symbol()).collect();
         assert!(text.starts_with(" j/k scroll"), "at {width}: {text:?}");
         assert_eq!(
@@ -271,7 +271,7 @@ fn the_hint_line_gives_way_from_the_end_as_the_terminal_narrows() {
     for width in (4..=120u16).rev() {
         let mut app = fixture();
         let buf = frame(&mut app, width, 24);
-        let Some(row) = app.panes.hints else {
+        let Some(row) = app.panes.hints() else {
             // Once the line is gone it stays gone as the terminal narrows
             // further, and the document has every row but the status bar.
             assert_eq!(app.panes.body.height, 23, "at width {width}");
@@ -308,7 +308,7 @@ fn every_cell_is_painted_with_the_hint_line_on_and_off() {
 fn the_browser_gets_a_hint_line_of_its_own() {
     let mut app = browsing();
     let buf = frame(&mut app, 80, 24);
-    let row = app.panes.hints.expect("a hint line over the file list");
+    let row = app.panes.hints().expect("a hint line over the file list");
     let text: String = (0..80).map(|x| buf[(x, row.y)].symbol()).collect();
     assert!(text.contains("enter read"), "{text:?}");
     assert!(

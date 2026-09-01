@@ -10,21 +10,12 @@ use super::state::App;
 use crate::util::width;
 
 /// Where each part of the screen goes.
-///
-/// `non_exhaustive` because the reader grows rows: the hint line arrived after
-/// the status bar, and the next one should not be a breaking change for
-/// anything reading these rectangles.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-#[non_exhaustive]
 pub struct Panes {
     /// The document.
     pub body: Rect,
     /// The single-row status bar.
     pub status: Rect,
-    /// The single-row hint line above the status bar, when it is on show.
-    /// `None` rather than a zero-height rectangle, for the same reason
-    /// `sidebar` is: a widget cannot draw into a row that is not there.
-    pub hints: Option<Rect>,
     /// The contents pane, when it is on show. `None` rather than a zero-width
     /// rectangle, so a widget cannot draw into a pane that is not there.
     pub sidebar: Option<Rect>,
@@ -34,6 +25,28 @@ pub struct Panes {
 }
 
 impl Panes {
+    /// The single-row hint line above the status bar, when it is on show.
+    ///
+    /// Derived rather than stored, the way everything else in the reader that
+    /// can be is: the rows below the document are contiguous, so the gap
+    /// between where the document stops and where the status bar starts *is*
+    /// the hint line — there is no second place for the two to disagree. Like
+    /// `sidebar` it is `None` rather than a zero-height rectangle, so a widget
+    /// cannot draw into a row that is not there.
+    ///
+    /// It spans the whole terminal, status-bar width rather than body width,
+    /// so the line reads as a second row of the same chrome rather than as
+    /// something belonging to the document column.
+    #[must_use]
+    pub fn hints(&self) -> Option<Rect> {
+        let height = self.status.y.saturating_sub(self.body.bottom());
+        (height > 0).then(|| Rect {
+            y: self.body.bottom(),
+            height,
+            ..self.status
+        })
+    }
+
     /// Height of the terminal these panes were computed for.
     ///
     /// The rows below the document are easy to forget one of — the hint line
@@ -41,7 +54,7 @@ impl Panes {
     /// rather than adding two of the three up at the call site.
     #[must_use]
     pub fn height(&self) -> u16 {
-        self.body.height + self.hints.map_or(0, |row| row.height) + self.status.height
+        self.body.height + self.hints().map_or(0, |row| row.height) + self.status.height
     }
 }
 
@@ -63,16 +76,14 @@ const SIDEBAR_MAX: u16 = 32;
 pub fn compute(area: Rect, app: &App) -> Panes {
     let status_height = STATUS_HEIGHT.min(area.height);
     let below_status = area.height - status_height;
+    // The row the hint line takes, if it gets one. Left as a gap between the
+    // document and the status bar rather than recorded: `Panes::hints` reads
+    // it back off the geometry.
     let hints_height = u16::from(shows_hints(area.width, below_status, app));
     let full = Rect {
         height: below_status - hints_height,
         ..area
     };
-    let hints = (hints_height > 0).then(|| Rect {
-        y: area.y + full.height,
-        height: hints_height,
-        ..area
-    });
     let status = Rect {
         y: area.y + full.height + hints_height,
         height: status_height,
@@ -94,7 +105,6 @@ pub fn compute(area: Rect, app: &App) -> Panes {
     Panes {
         body,
         status,
-        hints,
         sidebar,
         // An explicit `-w` is honored exactly, even past the edge of the
         // screen; that is what makes horizontal scrolling meaningful.
@@ -178,7 +188,7 @@ mod tests {
     fn the_hint_line_sits_between_the_document_and_the_status_bar() {
         let panes = compute(Rect::new(0, 0, 80, 24), &app(Options::default()));
         assert_eq!(panes.body, Rect::new(0, 0, 80, 22));
-        assert_eq!(panes.hints, Some(Rect::new(0, 22, 80, 1)));
+        assert_eq!(panes.hints(), Some(Rect::new(0, 22, 80, 1)));
         assert_eq!(panes.status, Rect::new(0, 23, 80, 1));
         assert_eq!(panes.height(), 24);
     }
@@ -186,7 +196,7 @@ mod tests {
     #[test]
     fn turning_the_hints_off_gives_the_row_back_to_the_document() {
         let panes = compute(Rect::new(0, 0, 80, 24), &without_hints(Options::default()));
-        assert_eq!(panes.hints, None);
+        assert_eq!(panes.hints(), None);
         assert_eq!(panes.body.height, 23);
         assert_eq!(panes.height(), 24);
     }
@@ -196,10 +206,10 @@ mod tests {
         // Two rows: one is the status bar, and the hint line will not take the
         // only one left.
         let panes = compute(Rect::new(0, 0, 80, 2), &app(Options::default()));
-        assert_eq!(panes.hints, None);
+        assert_eq!(panes.hints(), None);
         assert_eq!(panes.body.height, 1);
         let panes = compute(Rect::new(0, 0, 80, 3), &app(Options::default()));
-        assert_eq!(panes.hints.map(|row| row.height), Some(1));
+        assert_eq!(panes.hints().map(|row| row.height), Some(1));
         assert_eq!(panes.body.height, 1);
     }
 
@@ -208,11 +218,15 @@ mod tests {
         let app = app(Options::default());
         for width in 0..=8 {
             let panes = compute(Rect::new(0, 0, width, 24), &app);
-            assert_eq!(panes.hints, None, "width {width}");
+            assert_eq!(panes.hints(), None, "width {width}");
         }
-        assert!(compute(Rect::new(0, 0, 80, 24), &app).hints.is_some());
+        assert!(compute(Rect::new(0, 0, 80, 24), &app).hints().is_some());
     }
 
+    /// The row is derived from the gap between the document and the status
+    /// bar, so what matters is that the three stay contiguous at every size —
+    /// a gap that is not the hint line, or a hint line that is not the gap,
+    /// would both show up here.
     #[test]
     fn the_hint_line_never_leaves_the_terminal_it_was_given() {
         let app = app(Options::default());
@@ -221,11 +235,37 @@ mod tests {
                 let area = Rect::new(0, 0, width, height);
                 let panes = compute(area, &app);
                 assert_eq!(panes.height(), height, "{width}x{height}");
-                if let Some(row) = panes.hints {
-                    assert_eq!(row.bottom(), panes.status.y, "{width}x{height}");
+                match panes.hints() {
+                    Some(row) => {
+                        assert_eq!(row.y, panes.body.bottom(), "{width}x{height}");
+                        assert_eq!(row.bottom(), panes.status.y, "{width}x{height}");
+                        assert_eq!(row.height, 1, "{width}x{height}");
+                        // The whole terminal, not the document column: the
+                        // line is chrome, and the contents pane is beside it.
+                        assert_eq!(row.x, panes.status.x, "{width}x{height}");
+                        assert_eq!(row.width, width, "{width}x{height}");
+                    }
+                    None => assert_eq!(
+                        panes.body.bottom(),
+                        panes.status.y,
+                        "a gap at {width}x{height} that is not the hint line"
+                    ),
                 }
             }
         }
+    }
+
+    /// The line spans the contents pane as well as the document, which is
+    /// what makes it read as a second row of the status bar.
+    #[test]
+    fn the_hint_line_runs_the_full_width_beside_a_contents_pane() {
+        let panes = compute(Rect::new(0, 0, 100, 30), &outlined());
+        let row = panes.hints().expect("a hint line");
+        let sidebar = panes.sidebar.expect("a sidebar");
+        assert_eq!(row.x, 0);
+        assert_eq!(row.width, 100);
+        assert!(row.x < sidebar.width, "the line starts after the sidebar");
+        assert_eq!(row.y, sidebar.bottom(), "the sidebar stops above it");
     }
 
     #[test]

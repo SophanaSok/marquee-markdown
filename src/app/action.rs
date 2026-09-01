@@ -19,8 +19,6 @@ pub enum Action {
     Escape,
     /// Show or hide the key reference.
     ToggleHelp,
-    /// Show or hide the hint line above the status bar.
-    ToggleHints,
     /// Switch between the light and dark palette.
     ToggleTheme,
     /// Scroll down one line.
@@ -122,6 +120,14 @@ pub enum Action {
     ThemeBottom,
     /// Keep the previewed theme, and remember it for next time.
     ThemeAccept,
+    // A new variant goes here, at the end, however well it would read
+    // elsewhere: a fieldless enum's discriminants are its declaration order,
+    // and inserting into the middle renumbers everything after it — which
+    // `cargo semver-checks` reports as breaking, because a downstream `as
+    // isize` would silently change meaning. `ALL` below is where the reading
+    // order lives, and it is free to put this wherever it belongs.
+    /// Show or hide the hint line above the status bar.
+    ToggleHints,
 }
 
 impl Action {

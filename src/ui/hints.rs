@@ -20,7 +20,7 @@ use crate::render::{measure, tui};
 
 /// Draw the hint line, if the terminal had a row to spare for it.
 pub fn draw(frame: &mut Frame, app: &App) {
-    let Some(area) = app.panes.hints else {
+    let Some(area) = app.panes.hints() else {
         return;
     };
     if area.is_empty() {

@@ -98,12 +98,12 @@ fn the_hint_line_is_on_to_start_with_and_h_turns_it_off() {
     let text = document();
     let on = run(&text, "");
     assert!(on.hints, "a first-time reader gets no hints");
-    assert!(on.panes.hints.is_some(), "the row was not laid out");
+    assert!(on.panes.hints().is_some(), "the row was not laid out");
     let body = on.panes.body.height;
 
     let off = run(&text, "H");
     assert!(!off.hints);
-    assert!(off.panes.hints.is_none());
+    assert!(off.panes.hints().is_none());
     assert_eq!(
         off.panes.body.height,
         body + 1,
@@ -122,7 +122,7 @@ fn the_hint_line_can_start_hidden() {
     options.hints = false;
     let app = run_with(&document(), "", options.clone());
     assert!(!app.hints, "`[ui] hints = false` was not honored");
-    assert!(app.panes.hints.is_none());
+    assert!(app.panes.hints().is_none());
     assert!(run_with(&document(), "H", options).hints);
 }
 
