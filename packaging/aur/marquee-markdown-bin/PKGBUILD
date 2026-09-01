@@ -10,7 +10,7 @@
 
 pkgname=marquee-markdown-bin
 _pkgname=marquee-markdown
-pkgver=0.6.1
+pkgver=0.7.0
 pkgrel=1
 pkgdesc="TUI markdown reader that renders documents like Claude artifacts (prebuilt binary)"
 arch=('x86_64')
