@@ -1,0 +1,22 @@
+# Solarized Light — https://ethanschoonover.com/solarized
+#
+# Pairs with syntect's own Solarized (light), so the code cards match the page.
+name = "solarized-light"
+appearance = "light"
+syntax = "Solarized (light)"
+
+[palette]
+bg = "#fdf6e3"            # base3
+surface = "#eee8d5"       # base2
+fg = "#586e75"            # base01
+muted = "#93a1a1"         # base1
+accent = "#268bd2"        # blue
+accent_soft = "#2aa198"   # cyan
+border = "#eee8d5"        # base2
+
+[palette.alerts]
+note = "#268bd2"          # blue
+tip = "#859900"           # green
+important = "#6c71c4"     # violet
+warning = "#b58900"       # yellow
+caution = "#dc322f"       # red

@@ -1,0 +1,20 @@
+# Tokyo Night — https://github.com/folke/tokyonight.nvim
+name = "tokyo-night"
+appearance = "dark"
+syntax = "base16-ocean.dark"
+
+[palette]
+bg = "#1a1b26"
+surface = "#16161e"
+fg = "#c0caf5"
+muted = "#565f89"
+accent = "#7aa2f7"        # blue
+accent_soft = "#bb9af7"   # purple
+border = "#292e42"
+
+[palette.alerts]
+note = "#7dcfff"          # cyan
+tip = "#9ece6a"           # green
+important = "#bb9af7"     # purple
+warning = "#e0af68"       # yellow
+caution = "#f7768e"       # red

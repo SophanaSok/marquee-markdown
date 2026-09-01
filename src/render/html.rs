@@ -505,6 +505,12 @@ enum Role {
     /// mode the promise is that no markup reaches the page; a reader who wants
     /// the markup has `html = "literal"` for exactly that.
     Transparent,
+    /// `<details>` — a collapsible aside. Rendered expanded, as a quote whose
+    /// first paragraph is the `<summary>`.
+    Details,
+    /// `<summary>` — the label of a `<details>`. Only meaningful inside one;
+    /// loose, it is an ordinary paragraph.
+    Summary,
     /// Understood well enough to know this renderer would make a mess of it.
     /// One of these anywhere sends the whole block back to be rendered as
     /// literal text, because the markup carries more than the flattened words
@@ -518,7 +524,12 @@ impl Role {
     fn is_block(self) -> bool {
         matches!(
             self,
-            Self::Heading(_) | Self::Paragraph | Self::Quote | Self::Rule
+            Self::Heading(_)
+                | Self::Paragraph
+                | Self::Quote
+                | Self::Rule
+                | Self::Details
+                | Self::Summary
         )
     }
 }
@@ -541,12 +552,14 @@ fn role(name: &str) -> Role {
         "i" | "em" | "cite" | "var" | "dfn" => Role::Emphasis,
         "s" | "del" | "strike" => Role::Strikethrough,
         "code" | "kbd" | "samp" | "tt" => Role::Code,
+        "details" => Role::Details,
+        "summary" => Role::Summary,
         // Structure this renderer has no emitter for. Literal is the honest
         // answer: the tags say more than the words would on their own.
         "table" | "thead" | "tbody" | "tfoot" | "tr" | "td" | "th" | "caption" | "colgroup"
-        | "col" | "ul" | "ol" | "li" | "dl" | "dt" | "dd" | "details" | "summary" | "pre"
-        | "script" | "style" | "textarea" | "iframe" | "object" | "embed" | "svg" | "math"
-        | "form" | "input" | "button" | "select" | "option" | "textpath" => Role::Opaque,
+        | "col" | "ul" | "ol" | "li" | "dl" | "dt" | "dd" | "pre" | "script" | "style"
+        | "textarea" | "iframe" | "object" | "embed" | "svg" | "math" | "form" | "input"
+        | "button" | "select" | "option" | "textpath" => Role::Opaque,
         _ => Role::Transparent,
     }
 }
@@ -664,6 +677,65 @@ fn blocks_from(
                 }
             }
             Role::Rule => produced.push(Block::at(BlockKind::Rule, span.clone())),
+            // Rendered expanded, because a terminal page has no click and
+            // hiding the body would lose content the author shipped. The
+            // quote's accent gutter is what marks the region as one thing;
+            // the `<summary>` becomes its title, in strong, at the top.
+            //
+            // No disclosure glyph is added. A marker synthesized here would
+            // land in the plain mirror and become searchable text, which the
+            // real markers (bullets, gutter bars) added at layout time never
+            // are.
+            Role::Details => {
+                let mut children_blocks = Vec::new();
+                let (summary, body): (Vec<&Node>, Vec<&Node>) =
+                    children.iter().partition(|node| {
+                        matches!(node, Node::Element { name, .. } if self::role(name) == Role::Summary)
+                    });
+                // Only the first `<summary>` is a title; HTML ignores the
+                // rest, and so does this.
+                if let Some(Node::Element { children, .. }) = summary.first().copied() {
+                    let mut content = Vec::new();
+                    inlines_from(children, &mut content);
+                    trim(&mut content);
+                    if !content.is_empty() {
+                        let content = vec![Inline::Strong(content)];
+                        children_blocks
+                            .push(Block::at(BlockKind::Paragraph(content), span.clone()));
+                    }
+                }
+                let summary_only = children_blocks.len();
+                let body: Vec<Node> = body.into_iter().cloned().collect();
+                blocks_from(&body, span, slug, &mut children_blocks);
+
+                // A blank line inside `<details>` ends the HTML block, which
+                // is CommonMark's rule and the form GitHub requires for
+                // markdown to render inside. The open tag and the body then
+                // reach us as separate blocks and the body is not ours to
+                // wrap. Quoting a title with nothing under it looks broken,
+                // so in that case the summary stands on its own as a strong
+                // paragraph and the body follows as itself.
+                if children_blocks.len() == summary_only {
+                    produced.append(&mut children_blocks);
+                } else if !children_blocks.is_empty() {
+                    produced.push(Block::at(
+                        BlockKind::BlockQuote {
+                            alert: None,
+                            children: children_blocks,
+                        },
+                        span.clone(),
+                    ));
+                }
+            }
+            // A `<summary>` that escaped its `<details>`.
+            Role::Summary => {
+                let mut content = Vec::new();
+                inlines_from(children, &mut content);
+                trim(&mut content);
+                if !content.is_empty() {
+                    produced.push(Block::at(BlockKind::Paragraph(content), span.clone()));
+                }
+            }
             // A `<div>` wrapping other blocks is a container; one wrapping
             // text is a paragraph. Deciding by content is what lets a centered
             // `<div>` around a heading keep the heading.
@@ -1154,7 +1226,6 @@ mod tests {
     fn opaque_elements_send_the_whole_block_back() {
         for raw in [
             "<table><tr><td>a</td></tr></table>",
-            "<details><summary>s</summary></details>",
             "<script>alert(1)</script>",
             "<style>body{}</style>",
             "<ul><li>one</li></ul>",
@@ -1185,6 +1256,54 @@ mod tests {
             panic!("a paragraph, got {:?}", blocks[0].kind);
         };
         assert_eq!(Inline::plain_text(content), "one two three");
+    }
+
+    #[test]
+    fn details_becomes_a_quote_titled_by_its_summary() {
+        let blocks = interpreted("<details><summary>Title</summary><p>Body text.</p></details>")
+            .expect("interpreted");
+        let BlockKind::BlockQuote { alert, children } = &blocks[0].kind else {
+            panic!("a quote, got {:?}", blocks[0].kind);
+        };
+        assert_eq!(*alert, None);
+        assert_eq!(children.len(), 2, "{children:#?}");
+
+        let BlockKind::Paragraph(title) = &children[0].kind else {
+            panic!("a paragraph, got {:?}", children[0].kind);
+        };
+        // The summary is the title, and it is strong so it reads as one.
+        assert!(
+            matches!(title.as_slice(), [Inline::Strong(_)]),
+            "{title:#?}"
+        );
+        assert_eq!(Inline::plain_text(title), "Title");
+        assert_eq!(
+            Inline::plain_text(match &children[1].kind {
+                BlockKind::Paragraph(c) => c,
+                other => panic!("a paragraph, got {other:?}"),
+            }),
+            "Body text."
+        );
+    }
+
+    #[test]
+    fn a_details_with_no_body_does_not_quote_a_lone_title() {
+        // The form GitHub requires for markdown inside: a blank line ends the
+        // HTML block, so the open tag arrives without its body. A gutter bar
+        // around nothing but a title reads as a rendering bug.
+        let blocks =
+            interpreted("<details><summary>Title</summary></details>").expect("interpreted");
+        let BlockKind::Paragraph(content) = &blocks[0].kind else {
+            panic!("a bare paragraph, got {:?}", blocks[0].kind);
+        };
+        assert_eq!(Inline::plain_text(content), "Title");
+    }
+
+    #[test]
+    fn details_no_longer_falls_back_to_literal_markup() {
+        // The regression this guards: `details`/`summary` back on the opaque
+        // list, which sends the whole block to the page as tags.
+        assert!(interpreted("<details><summary>S</summary><p>B</p></details>").is_some());
     }
 
     #[test]

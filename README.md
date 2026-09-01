@@ -35,10 +35,15 @@
   marks, code blocks become sealed cards, tables get box drawing, and GFM
   callouts get an icon and a hue.
 - **Reads the HTML in a README too.** A centered `<h1>` becomes a heading in
-  the contents pane, badge images become the links they advertise, and `<br>`
-  breaks a line — instead of the tags themselves reaching the page.
+  the contents pane, badge images become the links they advertise, `<br>`
+  breaks a line, and a `<details>` block is shown open with its `<summary>` as
+  the title — instead of the tags themselves reaching the page.
+- **Math is notation, not punctuation.** `$E = mc^2$` reads as a code span
+  rather than as a formula wearing its dollar signs. TeX is not typeset —
+  there is no glyph budget for that in a cell grid — but the delimiters go.
 - **A contents pane that tracks where you are**, with folding — the thing
   `glow` has no equivalent of, and the reason this exists.
+- **Ten themes**, or your own, or your terminal's own colors.
 - **Search inside a document** with `/`, `n` and `N`, highlighted in place.
 - **A file browser** that streams as it walks, with a fuzzy filter.
 - **Reads what you point it at**: a file, a directory, standard input, a URL,
@@ -115,9 +120,28 @@ the same command upgrades them later:
 cargo binstall marquee-markdown
 ```
 
-The Homebrew formula lives in [`packaging/`](packaging/); the Scoop manifest is
-built from the checksums and attached to each release. There is no tap or
-bucket yet.
+### Arch Linux
+
+```sh
+paru -S marquee-markdown-bin     # the prebuilt binary
+paru -S marquee-markdown         # or built from source
+```
+
+### Nix
+
+```sh
+nix-build packaging/nix -A marquee-markdown
+```
+
+### Not yet published
+
+The manifests for Homebrew, Scoop, the AUR and nixpkgs all live in
+[`packaging/`](packaging/) and are kept current by a test that fails when one
+falls two releases behind. **None of the repositories they belong in exists
+yet** — there is no tap, no bucket, no AUR package and nothing submitted to
+nixpkgs, so the two blocks above describe what those manifests will install
+rather than something you can run today.
+[`packaging/README.md`](packaging/README.md) has what each one needs.
 
 ### From source
 
@@ -431,10 +455,32 @@ keymap rather than written by hand.
 
 ## Themes
 
-Two palettes ship compiled in — `paper` (light) and `slate` (dark), and
+Two palettes are the reader's own — `paper` (light) and `slate` (dark), and
 `slate` is the default. `--style auto` is accepted too, because `glow` spells
 it that way and its flags carry over here; it is an alias for `slate` rather
 than an adaptive choice, despite the name.
+
+Eight ports of established colorschemes ship alongside them:
+
+```sh
+mmd -s catppuccin-mocha doc.md
+```
+
+| light | dark |
+| --- | --- |
+| `catppuccin-latte` | `catppuccin-mocha` |
+| `solarized-light` | `solarized-dark` |
+| | `dracula` |
+| | `gruvbox-dark` |
+| | `nord` |
+| | `tokyo-night` |
+
+These are TOML files in [`themes/`](themes), not Rust — the same kind of file
+you would write yourself, parsed by the same code. A theme of your own in
+`~/.config/marquee-markdown/themes/` with the same name wins, so retuning one
+for your terminal is a copy and an edit. [`docs/THEMES.md`](docs/THEMES.md)
+has the schema, the seven syntax themes a palette can pair with, and what a
+theme PR needs.
 
 The adaptive one is `--style system`, which builds the whole palette out of
 the colors your terminal is already using, so a document reads in your own
@@ -466,7 +512,7 @@ falls back to a shipped palette, and costs nothing to try:
 `terminal-query = false` stops it being asked at all, and nothing but
 `-s system` ever asked in the first place.
 
-A theme is also just a file, so adding one needs no Rust and no recompile:
+Adding one needs no Rust and no recompile:
 
 ```sh
 mkdir -p ~/.config/marquee-markdown/themes

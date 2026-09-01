@@ -55,6 +55,13 @@ pub fn list() -> Vec<Entry> {
             origin: Origin::BuiltIn,
         })
         .collect();
+    // Community palettes, after the two the reader's own design is built
+    // around and before `system`, so the defaults stay at the top of the
+    // picker.
+    out.extend(super::bundled::ALL.iter().map(|b| Entry {
+        name: b.name.to_owned(),
+        origin: Origin::BuiltIn,
+    }));
     out.push(Entry {
         name: SYSTEM.to_owned(),
         origin: Origin::Terminal,
@@ -123,12 +130,19 @@ pub fn resolve(style: &str, terminal: &TerminalColors) -> Result<Theme> {
             if let Ok(variant) = name.parse::<ThemeVariant>() {
                 return Ok(Theme::new(variant));
             }
+            // A user theme of the same name wins, so a reader can retune a
+            // shipped palette by dropping their own into the theme directory
+            // — the same way a shipped one is overridable by path.
+            let shipped = super::bundled::find(name);
             if let Some(Entry {
                 origin: Origin::User(path),
                 ..
             }) = list().into_iter().find(|e| e.name == name)
             {
                 return Theme::from_file(&path);
+            }
+            if let Some(bundled) = shipped {
+                return super::bundled::load(bundled);
             }
             let available: Vec<String> = list().into_iter().map(|e| e.name).collect();
             bail!(
@@ -272,10 +286,24 @@ mod tests {
 
     #[test]
     fn an_unknown_name_lists_what_is_available() {
-        let err = resolve("dracula", &silent()).unwrap_err().to_string();
+        // Deliberately not the name of a real colorscheme: this test used to
+        // say `dracula`, which stopped being unknown the moment it shipped.
+        let err = resolve("no-such-theme", &silent()).unwrap_err().to_string();
         assert!(err.contains("paper"), "{err}");
         assert!(err.contains("slate"), "{err}");
         assert!(err.contains("system"), "{err}");
+        // The bundled palettes are selectable, so they belong in the list a
+        // reader is shown after getting a name wrong.
+        assert!(err.contains("gruvbox-dark"), "{err}");
+    }
+
+    #[test]
+    fn every_bundled_palette_resolves_by_name() {
+        for bundled in crate::theme::bundled::ALL {
+            let theme = resolve(bundled.name, &silent())
+                .unwrap_or_else(|e| panic!("{}: {e:#}", bundled.name));
+            assert_eq!(theme.name, bundled.name);
+        }
     }
 
     #[test]

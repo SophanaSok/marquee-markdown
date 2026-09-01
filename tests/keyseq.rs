@@ -132,8 +132,10 @@ fn the_picker_offers_the_terminals_own_colors() {
         bg: Some(Rgb(0x18, 0x18, 0x18)),
         ..TerminalColors::UNKNOWN
     };
-    // `system` sorts after the built-ins, so `j` from `slate` lands on it.
-    let app = run_with(&document(), "sj", options);
+    // `system` is the last row in the picker, so `G` lands on it however many
+    // palettes ship. Written as a single `j` this depended on exactly three
+    // themes existing, and the first bundled palette broke it.
+    let app = run_with(&document(), "sG", options);
     assert_eq!(
         app.summary(),
         "mode=themes top=0 left=0 section=heading-1 toc=heading-1 search=- theme=system quit=false"
@@ -146,7 +148,9 @@ fn the_picker_still_offers_system_when_the_terminal_would_not_answer() {
     // The row is always there, so the list says the same thing down a pipe as
     // on a screen. Landing on it with nothing to build from is the fallback,
     // not an unreadable row and not a reader that will not open.
-    let app = run(&document(), "sj");
+    let app = run(&document(), "sG");
+    // A terminal that said nothing leaves `system` resolving to the shipped
+    // dark palette, so the preview is `slate` — a fallback, not an error.
     assert_eq!(
         app.summary(),
         "mode=themes top=0 left=0 section=heading-1 toc=heading-1 search=- theme=slate quit=false"

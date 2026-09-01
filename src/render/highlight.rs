@@ -25,6 +25,16 @@ fn theme_set() -> &'static ThemeSet {
     SET.get_or_init(ThemeSet::load_defaults)
 }
 
+/// Whether the highlighter knows a syntax theme by this name.
+///
+/// A theme file naming one it does not know indexes past the end at the first
+/// code block, which is a long way from the typo that caused it. The bundled
+/// palettes are checked against this in their own tests.
+#[must_use]
+pub fn has_syntax_theme(name: &str) -> bool {
+    theme_set().themes.contains_key(name)
+}
+
 /// Per-source-line styled pieces, as [`highlight`] returns them.
 pub type Highlighted = Vec<Vec<(Style, String)>>;
 

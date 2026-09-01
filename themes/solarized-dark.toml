@@ -1,0 +1,27 @@
+# Solarized Dark — https://ethanschoonover.com/solarized
+#
+# The one pairing that is exact: syntect ships Solarized, so the code cards
+# are the same palette as the page rather than an approximation.
+#
+# `surface` is lighter than `bg` here, unlike the other shipped themes.
+# That is Solarized's own design — base02 is its highlight background — and
+# porting it faithfully matters more than matching a house convention.
+name = "solarized-dark"
+appearance = "dark"
+syntax = "Solarized (dark)"
+
+[palette]
+bg = "#002b36"            # base03
+surface = "#073642"       # base02
+fg = "#93a1a1"            # base1
+muted = "#657b83"         # base00
+accent = "#268bd2"        # blue
+accent_soft = "#2aa198"   # cyan
+border = "#073642"        # base02
+
+[palette.alerts]
+note = "#268bd2"          # blue
+tip = "#859900"           # green
+important = "#6c71c4"     # violet
+warning = "#b58900"       # yellow
+caution = "#dc322f"       # red

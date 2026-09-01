@@ -222,17 +222,30 @@ fn run_command(command: &Command, cli: &Cli) -> Result<()> {
             let config = load_config(cli)?;
             crate::config::keys::reference(&config.keymap)
         }
-        Command::Themes => registry::list()
-            .into_iter()
-            .map(|entry| {
-                let origin = match &entry.origin {
-                    registry::Origin::BuiltIn => "built-in".to_owned(),
-                    registry::Origin::User(path) => path.display().to_string(),
-                    registry::Origin::Terminal => "your terminal".to_owned(),
-                };
-                format!("{:<12} {origin}\n", entry.name)
-            })
-            .collect(),
+        Command::Themes => {
+            let entries = registry::list();
+            // Measured rather than fixed: a bundled name like
+            // `catppuccin-latte` is wider than the 12 columns the two
+            // original built-ins needed, and a hardcoded width silently
+            // ragged the second column the moment one was added.
+            let width = entries
+                .iter()
+                .map(|e| crate::render::measure::width(&e.name))
+                .max()
+                .unwrap_or(0);
+            entries
+                .into_iter()
+                .map(|entry| {
+                    let origin = match &entry.origin {
+                        registry::Origin::BuiltIn => "built-in".to_owned(),
+                        registry::Origin::User(path) => path.display().to_string(),
+                        registry::Origin::Terminal => "your terminal".to_owned(),
+                    };
+                    let pad = width - crate::render::measure::width(&entry.name);
+                    format!("{}{} {origin}\n", entry.name, " ".repeat(pad))
+                })
+                .collect()
+        }
         Command::Man => {
             let mut rendered = Vec::new();
             clap_mangen::Man::new(invoked_command()).render(&mut rendered)?;

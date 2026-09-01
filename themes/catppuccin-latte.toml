@@ -1,0 +1,20 @@
+# Catppuccin Latte — https://github.com/catppuccin/catppuccin
+name = "catppuccin-latte"
+appearance = "light"
+syntax = "InspiredGitHub"
+
+[palette]
+bg = "#eff1f5"            # base
+surface = "#e6e9ef"       # mantle
+fg = "#4c4f69"            # text
+muted = "#8c8fa1"         # overlay1
+accent = "#8839ef"        # mauve
+accent_soft = "#ea76cb"   # pink
+border = "#ccd0da"        # surface0
+
+[palette.alerts]
+note = "#1e66f5"          # blue
+tip = "#40a02b"           # green
+important = "#8839ef"     # mauve
+warning = "#df8e1d"       # yellow
+caution = "#d20f39"       # red

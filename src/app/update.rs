@@ -1166,8 +1166,22 @@ mod tests {
         press(&mut app, KeyCode::Char('s'));
         wheel(&mut app, MouseEventKind::ScrollDown);
         let picker = app.picker.as_ref().expect("the picker closed");
-        // Clamped to the last theme, in case fewer than four ship.
-        assert_eq!(picker.cursor, 3.min(picker.entries.len() - 1));
+        // The picker opens on the theme in force, not at the top, so one tick
+        // lands `WHEEL_STEP` below *that* — clamped to the last row.
+        //
+        // Written as `3.min(len - 1)` this passed for the wrong reason while
+        // only three themes shipped: the clamp hid the opening offset, and
+        // the first bundled palettes turned a green test red.
+        // `restore` is the theme the picker opened with, by definition.
+        let opened_at = picker
+            .entries
+            .iter()
+            .position(|e| e.name == picker.restore.name)
+            .unwrap_or(0);
+        assert_eq!(
+            picker.cursor,
+            (opened_at + WHEEL_STEP).min(picker.entries.len() - 1)
+        );
         assert_eq!(app.view.top, 0);
     }
 
