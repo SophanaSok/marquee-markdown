@@ -109,8 +109,24 @@ mod tests {
     /// macOS. For a test it is the difference between asserting on the change
     /// and asserting on the setup, in both directions: a positive test can
     /// pass on the leaked event without the watch working at all.
+    ///
+    /// Drains until the watcher goes quiet rather than for a fixed span. A
+    /// sleep-then-reset is the same race with a longer fuse: the event it
+    /// discards has no deadline, so a machine loaded enough to delay it past
+    /// the sleep puts it back on the other side of the reset — which is the
+    /// failure being fixed, only rarer and harder to place. Waiting for
+    /// quiet instead extends itself exactly as far as the machine is slow.
     fn discard_setup_events(hits: &AtomicUsize) {
-        std::thread::sleep(SETTLE * 3);
+        let mut seen = hits.load(Ordering::SeqCst);
+        let mut since = std::time::Instant::now();
+        while since.elapsed() < SETTLE * 2 {
+            std::thread::sleep(Duration::from_millis(25));
+            let now = hits.load(Ordering::SeqCst);
+            if now != seen {
+                seen = now;
+                since = std::time::Instant::now();
+            }
+        }
         hits.store(0, Ordering::SeqCst);
     }
 
