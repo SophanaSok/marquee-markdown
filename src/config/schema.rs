@@ -86,6 +86,8 @@ pub struct Render {
 pub struct Ui {
     /// Start with the contents pane showing.
     pub contents: Option<bool>,
+    /// Start with the hint line showing above the status bar.
+    pub hints: Option<bool>,
 }
 
 /// Every key this version understands, by section.
@@ -107,7 +109,7 @@ const KNOWN: &[(&str, &[&str])] = &[
         ],
     ),
     ("render", &["html"]),
-    ("ui", &["contents"]),
+    ("ui", &["contents", "hints"]),
 ];
 
 /// Parse a configuration file, along with anything in it we did not recognize.
@@ -194,6 +196,7 @@ mod tests {
 
             [ui]
             contents = false
+            hints = false
             "#,
         )
         .expect("parse");
@@ -203,6 +206,7 @@ mod tests {
         assert_eq!(file.general.preserve_new_lines, Some(true));
         assert_eq!(file.general.update_check, Some(false));
         assert_eq!(file.ui.contents, Some(false));
+        assert_eq!(file.ui.hints, Some(false));
         assert!(warnings.is_empty(), "{warnings:?}");
     }
 

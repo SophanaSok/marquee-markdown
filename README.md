@@ -243,6 +243,19 @@ mouse needs `shift` held while the reader is open, as it does in `less
 --mouse`; `--no-mouse`, or `mouse = false` in the configuration file, hands the
 wheel back.
 
+A hint line above the status bar names the handful of keys worth knowing —
+scroll, search, contents, help, quit — so the reader is learnable without
+having to guess that `?` exists. It is rendered from the keymap in force, like
+the reference itself, so it never advertises a key you rebound, and it says
+what the pane you are in can do: the contents pane offers folding, a prompt
+offers the way out of it. As the terminal narrows it drops hints from the end
+rather than wrapping, and a terminal too narrow for even the first one spends
+the row on the document instead.
+
+It is on by default, because the keys are the part of a full-screen reader that
+nothing else announces, and the row it costs is one row. `H` takes it back for
+the session; `hints = false` under `[ui]` takes it back for good.
+
 Keys are written here the way a configuration file will spell them.
 
 | Key | |
@@ -265,6 +278,7 @@ Keys are written here the way a configuration file will spell them.
 | `T` | switch light / dark |
 | `s` | choose a theme |
 | `?` | key reference |
+| `H` | show / hide the hint line |
 | `ctrl+z` | suspend to the shell (unix) |
 | `esc` | close what is open |
 | `q` · `ctrl+c` | quit |
@@ -280,6 +294,7 @@ they still scroll sideways.
 | `h` `l` · `left` `right` | fold, unfold |
 | `enter` | go to the entry |
 | `tab` · `esc` | back to the document |
+| `H` | show / hide the hint line |
 
 The pane highlights two different things and they are deliberately not the
 same: the **active** entry is the section the document is scrolled to, and it
@@ -312,6 +327,7 @@ first screenful is there immediately and a large tree fills in behind it.
 | `r` | rescan the directory |
 | `.` | show / hide hidden and ignored files |
 | `T` `s` | switch light / dark, choose a theme |
+| `H` | show / hide the hint line |
 | `esc` | clear the filter |
 | `q` · `ctrl+c` | quit |
 
@@ -419,6 +435,7 @@ html = "render"            # render | hide | literal
 
 [ui]
 contents = true            # start with the contents pane showing
+hints = true               # start with the hint line above the status bar
 
 [keys.document]
 "ctrl+n" = "line-down"     # rebind
@@ -433,8 +450,8 @@ then file, then defaults**. A flag that was not given contributes nothing, so
 Environment variables are the setting name in `MARQUEE_` form, with
 `[general]` left out: `MARQUEE_STYLE`, `MARQUEE_WIDTH`, `MARQUEE_LINE_NUMBERS`,
 `MARQUEE_MOUSE`, `MARQUEE_ALL`, `MARQUEE_PRESERVE_NEW_LINES`,
-`MARQUEE_UPDATE_CHECK`, `MARQUEE_TERMINAL_QUERY`, `MARQUEE_RENDER_HTML`, and
-`MARQUEE_UI_CONTENTS`.
+`MARQUEE_UPDATE_CHECK`, `MARQUEE_TERMINAL_QUERY`, `MARQUEE_RENDER_HTML`,
+`MARQUEE_UI_CONTENTS`, and `MARQUEE_UI_HINTS`.
 
 A setting this version does not recognize is reported and ignored rather than
 refused, so a file written for a newer version still works with an older

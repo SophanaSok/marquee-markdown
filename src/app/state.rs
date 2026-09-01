@@ -45,6 +45,8 @@ pub struct Options {
     pub preserve_new_lines: bool,
     /// Start with the contents pane showing.
     pub contents: bool,
+    /// Start with the hint line showing above the status bar.
+    pub hints: bool,
     /// What to do with raw HTML.
     pub html: HtmlMode,
     /// The configuration file in force, if one was found. Where the theme
@@ -75,6 +77,7 @@ impl Default for Options {
             preserve_new_lines: false,
             html: HtmlMode::default(),
             contents: true,
+            hints: true,
             config_path: None,
             style_overridden: false,
             terminal: TerminalColors::UNKNOWN,
@@ -238,6 +241,13 @@ pub struct App {
     /// Whether the reader has asked for the contents pane. It can still be
     /// hidden by a narrow terminal or a document with no headings.
     pub toc_visible: bool,
+    /// Whether the reader has asked for the hint line. It can still be hidden
+    /// by a terminal with no row to spare or none to spare wide enough.
+    ///
+    /// Session state, like `toc_visible`: `H` is a change of mind for now, and
+    /// `[ui] hints` in the configuration file is one for good. Nothing writes
+    /// the file behind the reader's back on a keystroke.
+    pub hints: bool,
     /// The contents pane.
     pub toc: Toc,
     /// The in-document search.
@@ -287,6 +297,7 @@ impl App {
             browser: None,
             focus: Focus::Document,
             toc_visible: options.contents,
+            hints: options.hints,
             toc: Toc::default(),
             search: Search::default(),
             links: Links::default(),
@@ -399,6 +410,19 @@ impl App {
             (Screen::Document, Focus::Document) => Mode::Document,
             (Screen::Document, Focus::Toc) => Mode::Toc,
         }
+    }
+
+    /// Whether the hint line is on screen and already naming `action`.
+    ///
+    /// Asked by the status bar, which carries its own `? help` and should not
+    /// say a second time what the row above it is already saying. Both halves
+    /// of the question matter: the line has to be there, and it has to be wide
+    /// enough to have kept that particular hint.
+    #[must_use]
+    pub fn hint_names(&self, action: super::action::Action) -> bool {
+        self.panes
+            .hints
+            .is_some_and(|row| super::hints::names(&self.keymap, self.mode(), row.width, action))
     }
 
     /// The outline row the cursor is on.

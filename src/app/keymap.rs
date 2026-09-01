@@ -286,6 +286,9 @@ const DEFAULTS: &[(Mode, &str, Action)] = &[
     (Mode::Document, "T", Action::ToggleTheme),
     (Mode::Document, "s", Action::ThemePicker),
     (Mode::Document, "?", Action::ToggleHelp),
+    // The hint line advertises this key, so a reader who wants the row back
+    // never has to go looking for it in the reference.
+    (Mode::Document, "H", Action::ToggleHints),
     (Mode::Document, "esc", Action::Escape),
     (Mode::Document, "q", Action::Quit),
     (Mode::Document, "ctrl+c", Action::Quit),
@@ -321,6 +324,7 @@ const DEFAULTS: &[(Mode, &str, Action)] = &[
     (Mode::Browser, "T", Action::ToggleTheme),
     (Mode::Browser, "s", Action::ThemePicker),
     (Mode::Browser, "?", Action::ToggleHelp),
+    (Mode::Browser, "H", Action::ToggleHints),
     (Mode::Browser, "esc", Action::Escape),
     (Mode::Browser, "q", Action::Quit),
     (Mode::Browser, "ctrl+c", Action::Quit),
@@ -346,6 +350,7 @@ const DEFAULTS: &[(Mode, &str, Action)] = &[
     (Mode::Toc, "T", Action::ToggleTheme),
     (Mode::Toc, "s", Action::ThemePicker),
     (Mode::Toc, "?", Action::ToggleHelp),
+    (Mode::Toc, "H", Action::ToggleHints),
     (Mode::Toc, "esc", Action::Escape),
     (Mode::Toc, "q", Action::Quit),
     (Mode::Toc, "ctrl+c", Action::Quit),

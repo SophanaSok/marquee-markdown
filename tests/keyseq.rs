@@ -94,6 +94,63 @@ fn scrolling_down_and_back_returns_to_the_start() {
 }
 
 #[test]
+fn the_hint_line_is_on_to_start_with_and_h_turns_it_off() {
+    let text = document();
+    let on = run(&text, "");
+    assert!(on.hints, "a first-time reader gets no hints");
+    assert!(on.panes.hints.is_some(), "the row was not laid out");
+    let body = on.panes.body.height;
+
+    let off = run(&text, "H");
+    assert!(!off.hints);
+    assert!(off.panes.hints.is_none());
+    assert_eq!(
+        off.panes.body.height,
+        body + 1,
+        "the row was not given back to the document"
+    );
+    // And back again, so the reader who hid it can find it.
+    assert!(run(&text, "HH").hints);
+}
+
+#[test]
+fn the_hint_line_can_start_hidden() {
+    // Built by assignment rather than as a literal: `Options` is
+    // `non_exhaustive`, which is what keeps the next setting from being a
+    // breaking change for anyone outside the crate.
+    let mut options = Options::default();
+    options.hints = false;
+    let app = run_with(&document(), "", options.clone());
+    assert!(!app.hints, "`[ui] hints = false` was not honored");
+    assert!(app.panes.hints.is_none());
+    assert!(run_with(&document(), "H", options).hints);
+}
+
+#[test]
+fn typing_h_at_a_prompt_types_a_letter_rather_than_hiding_the_hints() {
+    // The same modal bug as `q` quitting from a search box: every printable
+    // key has to reach the text being typed.
+    let app = run(&document(), "/H");
+    assert!(app.hints, "the prompt swallowed the letter");
+    assert!(app.summary().contains("search=/H|"), "{}", app.summary());
+}
+
+#[test]
+fn the_hint_line_toggles_from_the_contents_pane_and_the_browser() {
+    let from_toc = run(&nested(), "\tH");
+    assert!(!from_toc.hints, "{}", from_toc.summary());
+    assert!(
+        from_toc.summary().contains("mode=toc"),
+        "toggling moved focus: {}",
+        from_toc.summary()
+    );
+
+    let (_dir, browsing) = browsing(FILES, "H");
+    assert!(!browsing.hints, "{}", browsing.summary());
+    assert!(!browsing.should_quit);
+}
+
+#[test]
 fn typing_q_in_the_theme_picker_closes_it_instead_of_quitting() {
     // The same modal bug as the help overlay, and the reason a new mode has to
     // arrive here: `q` is quit everywhere else.
@@ -248,7 +305,9 @@ fn the_key_reference_scrolls_when_it_does_not_fit() {
 fn the_key_reference_stops_at_its_last_row() {
     let app = run_short("?G");
     let rows = app.keymap.help_rows(app.pane_mode()).len();
-    let visible = usize::from(app.panes.body.height + app.panes.status.height) - 2;
+    // The whole terminal, not just the document: the hint line is a row of it
+    // too, and the panel is drawn over all of them.
+    let visible = usize::from(app.panes.height()) - 2;
     assert_eq!(usize::from(app.help_scroll), rows - visible.min(rows));
     // Scrolling past the end holds there rather than wrapping.
     assert_eq!(run_short("?Gj").help_scroll, app.help_scroll);
@@ -695,13 +754,19 @@ fn paging_moves_a_whole_screen_in_the_browser() {
     let files: Vec<&str> = names.iter().map(String::as_str).collect();
     let (_dir, one) = browsing(&files, "f");
     let (_dir2, two) = browsing(&files, "ff");
+    // A screen of the list, whatever the chrome around it leaves room for —
+    // spelling the row out here would make this test fail every time a row is
+    // added to or taken from the bottom of the screen.
+    let screen = usize::from(one.panes.body.height);
     assert!(
-        one.summary().contains("cursor=file-23.md"),
+        one.summary()
+            .contains(&format!("cursor=file-{screen:02}.md")),
         "{}",
         one.summary()
     );
     assert!(
-        two.summary().contains("cursor=file-46.md"),
+        two.summary()
+            .contains(&format!("cursor=file-{:02}.md", screen * 2)),
         "{}",
         two.summary()
     );

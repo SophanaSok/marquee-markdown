@@ -120,6 +120,9 @@ app/         The reader: state, input, and the loop.
   keymap.rs    Chords, modes, and the one table of default bindings.
   state.rs     App. Mode is DERIVED from what is open, never stored.
   event.rs     The loop's own Event enum, plus a scripted source for tests.
+  hints.rs     The hint line's chips, resolved against the live keymap. Pure,
+               and asked by layout before drawing, so the row is never
+               reserved for hints that will not fit in it.
   update.rs    The only mutation site.
   layout.rs    Pure: terminal size + state -> Panes.
   derived.rs   Recomputed once per iteration: clamping, active section.
@@ -156,6 +159,13 @@ Two rules in the reader that are easy to undo by accident:
   event thread has already swallowed, and fails after a timeout. To force a
   full redraw after an external program, reset both ratatui buffers with two
   `swap_buffers` calls instead.
+- **The hint line is chrome, not a document line.** It is composed to exactly
+  the width of its row the way the status bar is, rather than through
+  `LineSink`, and it is dropped chip by chip from the end — never wrapped and
+  never truncated mid-chord, because half a key name is a wrong key name.
+  `app::hints::fitting` is the one answer to what fits, asked by both pane
+  geometry and the widget, so the row cannot be reserved and then left blank.
+
 - **Reordering a list invalidates every index into it.** `Browser::extend` only
   appends; sorting happens in `refresh`, which rebuilds the match indices and
   re-finds the selected file by path in the same breath. Sorting anywhere else

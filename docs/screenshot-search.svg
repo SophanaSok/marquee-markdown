@@ -10,6 +10,7 @@
 <rect x="226.8" y="342.0" width="596.4" height="18.0" fill="#1f1e1d"/>
 <rect x="218.4" y="468.0" width="92.4" height="18.0" fill="#1f1e1d"/>
 <rect x="319.2" y="468.0" width="252.0" height="18.0" fill="#1f1e1d"/>
+<rect x="0.0" y="504.0" width="840.0" height="18.0" fill="#1f1e1d"/>
 <rect x="0.0" y="522.0" width="840.0" height="18.0" fill="#1f1e1d"/>
 <text x="0.0" y="13.5" fill="#f5f4ef" textLength="84.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> ▾ Marquee</text>
 <text x="201.6" y="13.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
@@ -91,11 +92,20 @@
 <text x="319.2" y="481.5" fill="#f5f4ef" font-weight="bold" textLength="100.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Rendered as</text>
 <text x="571.2" y="481.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
 <text x="201.6" y="499.5" fill="#3d3d3a" textLength="378.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│├───────────┼──────────────────────────────┤</text>
-<text x="201.6" y="517.5" fill="#3d3d3a" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve">││</text>
-<text x="218.4" y="517.5" fill="#f5f4ef" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> Heading</text>
-<text x="310.8" y="517.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
-<text x="319.2" y="517.5" fill="#f5f4ef" textLength="193.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> weight, colour, rhythm</text>
-<text x="571.2" y="517.5" fill="#3d3d3a" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">│</text>
+<text x="8.4" y="517.5" fill="#d97757" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">j/k</text>
+<text x="33.6" y="517.5" fill="#87867f" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> scroll ·</text>
+<text x="117.6" y="517.5" fill="#d97757" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">/</text>
+<text x="126.0" y="517.5" fill="#87867f" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> search ·</text>
+<text x="210.0" y="517.5" fill="#d97757" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">t</text>
+<text x="218.4" y="517.5" fill="#87867f" textLength="92.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> contents ·</text>
+<text x="319.2" y="517.5" fill="#d97757" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">?</text>
+<text x="327.6" y="517.5" fill="#87867f" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> help ·</text>
+<text x="394.8" y="517.5" fill="#d97757" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">q</text>
+<text x="403.2" y="517.5" fill="#87867f" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> quit ·</text>
+<text x="470.4" y="517.5" fill="#d97757" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">s</text>
+<text x="478.8" y="517.5" fill="#87867f" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> theme ·</text>
+<text x="554.4" y="517.5" fill="#d97757" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">H</text>
+<text x="562.8" y="517.5" fill="#87867f" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> hints</text>
 <text x="0.0" y="535.5" fill="#f5f4ef" font-weight="bold" textLength="67.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> demo.md</text>
 <text x="75.6" y="535.5" fill="#87867f" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">› Marquee</text>
 <text x="756.0" y="535.5" fill="#d97757" textLength="75.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> /the 1/7</text>
