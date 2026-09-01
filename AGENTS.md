@@ -268,8 +268,14 @@ binary rather than the repository.
       ./target/debug/marquee-markdown -t README.md" /dev/null
   ```
 
-  Three things to know before writing one of these:
+  What to know before writing one of these:
 
+  - **The `stty` is not decoration.** `script` opens the pty at 0x0, and the
+    reader asks the terminal its size before deciding what fits — so without
+    it the run enters the alternate screen, paints nothing, tears down cleanly
+    and exits 0. That reads as a broken binary and is the size query working:
+    the tell is an output of a few hundred bytes that is all mode-setting and
+    no cells.
   - `q` closes an open overlay rather than quitting, so a script ending in `?q`
     hangs waiting for input rather than exiting.
   - Enter is `\r`. In raw mode `\n` is Ctrl+J, which crossterm correctly
