@@ -15,6 +15,46 @@ Until 1.0 both halves may change.
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-09-01
+
+Nothing in the reader changed. This is a test that could fail on a busy
+machine and a packaging manifest that had never been run, both found by
+building the nix derivation for the first time.
+
+### Fixed
+
+- **Three watch tests no longer assert on their own setup.** Creating the
+  document is a write like any other, and arming the watch immediately
+  afterwards does not reliably exclude it — the close can be reported once the
+  watch is up. The negative test counted that as the failure it was looking
+  for; worse, the two positive tests could pass on it, reporting a working
+  watch without one. They now drain until the watcher goes quiet before
+  asserting.
+
+  It takes contention to see: 3 rounds in 20 of the suite inside the nix
+  sandbox, 1 in 40 locally with four suites at once, and never on an idle
+  machine — which is why three CI platforms called it green. `concerns` was
+  never at fault, and no reader behaviour changes: the cost was always one
+  redundant re-read of a document just opened, the bargain the sibling case
+  already accepts on macOS.
+
+- **`installManPage` in the nix derivation was handed a named pipe.** Process
+  substitution is `/dev/fd/63` — no name, no section suffix, and the hook
+  declines to guess, so the install phase failed. The completions were
+  unaffected because `--cmd` already names those.
+
+- **`packaging/nix/README.md` documented a command that could not work.**
+  `default.nix` takes `lib` and `rustPlatform` as arguments, so it needs
+  `callPackage`, and a pinned nixpkgs rather than `<nixpkgs>`, which is a
+  search-path error on an install with no channels.
+
+### Changed
+
+- **The nix derivation carries real hashes**, and `AGENTS.md` records what a
+  pty with no size looks like when the reader meets it: alternate screen
+  entered, nothing painted, clean exit 0 — the size query working, not a
+  broken binary.
+
 ## [0.7.0] - 2026-09-01
 
 ### Added
@@ -873,7 +913,8 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
 - Resizing re-lays out on every event; a large document dragged by a window
   edge will work harder than it needs to until a debounce lands.
 
-[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.7.1...HEAD
+[0.7.1]: https://github.com/SophanaSok/marquee-markdown/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/SophanaSok/marquee-markdown/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.5.1...v0.6.0
