@@ -156,14 +156,17 @@ pub fn editor() -> (OsString, Vec<OsString>) {
 /// Split an editor setting into a program and its arguments.
 ///
 /// `EDITOR="emacsclient -nw"` and `EDITOR="code -w"` are ordinary settings, so
-/// the whole string cannot be treated as a program name. Pure, so the
-/// fallbacks are testable without setting environment variables.
+/// the whole string cannot be treated as a program name; quoting protects a
+/// program whose path has spaces in it. Pure, so the fallbacks are testable
+/// without setting environment variables.
 #[must_use]
 pub fn editor_from(setting: Option<&std::ffi::OsStr>) -> (OsString, Vec<OsString>) {
     let Some(setting) = setting.map(|value| value.to_string_lossy().into_owned()) else {
         return (default_editor(), Vec::new());
     };
-    let mut parts = setting.split_whitespace().map(OsString::from);
+    let mut parts = crate::util::cmdline::split(&setting)
+        .into_iter()
+        .map(OsString::from);
     match parts.next() {
         Some(program) => (program, parts.collect()),
         None => (default_editor(), Vec::new()),
@@ -263,6 +266,14 @@ mod tests {
         let (program, arguments) = editor_from(Some(OsStr::new("emacsclient -nw")));
         assert_eq!(program, OsString::from("emacsclient"));
         assert_eq!(arguments, vec![OsString::from("-nw")]);
+    }
+
+    #[test]
+    fn a_quoted_editor_path_with_spaces_stays_one_program() {
+        let (program, arguments) =
+            editor_from(Some(OsStr::new(r#""C:\Program Files\Editor\edit.exe" -w"#)));
+        assert_eq!(program, OsString::from(r"C:\Program Files\Editor\edit.exe"));
+        assert_eq!(arguments, vec![OsString::from("-w")]);
     }
 
     #[test]

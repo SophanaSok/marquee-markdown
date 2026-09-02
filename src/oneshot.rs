@@ -176,19 +176,20 @@ pub fn pager() -> (String, Vec<String>) {
 /// Work out the pager from a `PAGER` setting.
 ///
 /// Pure, so the fallbacks are testable without a library that forbids unsafe
-/// code having to reach for the unsafe environment-setting functions.
+/// code having to reach for the unsafe environment-setting functions. Quoting
+/// protects a pager whose path has spaces in it.
 ///
 /// `less` needs `-R` or it prints escape sequences as text, which is worse
 /// than no color at all.
 #[must_use]
 pub fn pager_from(setting: Option<&str>) -> (String, Vec<String>) {
-    match setting {
-        Some(value) if !value.trim().is_empty() => {
-            let mut parts = value.split_whitespace().map(str::to_owned);
-            let program = parts.next().unwrap_or_else(|| "less".to_owned());
-            (program, parts.collect())
-        }
-        _ => ("less".to_owned(), vec!["-R".to_owned()]),
+    let mut parts = setting
+        .map(crate::util::cmdline::split)
+        .unwrap_or_default()
+        .into_iter();
+    match parts.next() {
+        Some(program) => (program, parts.collect()),
+        None => ("less".to_owned(), vec!["-R".to_owned()]),
     }
 }
 
@@ -302,6 +303,14 @@ mod tests {
         assert_eq!(
             pager_from(Some("less -F -X")),
             ("less".to_owned(), vec!["-F".to_owned(), "-X".to_owned()])
+        );
+    }
+
+    #[test]
+    fn a_quoted_pager_path_with_spaces_stays_one_program() {
+        assert_eq!(
+            pager_from(Some("'/opt/my pager/bin/page' -R")),
+            ("/opt/my pager/bin/page".to_owned(), vec!["-R".to_owned()])
         );
     }
 

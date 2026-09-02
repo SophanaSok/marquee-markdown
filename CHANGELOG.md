@@ -31,6 +31,9 @@ Until 1.0 both halves may change.
   replacement characters. Actual binary data — an image opened by mistake —
   gets "is not a text file" rather than either a decoder error or a screenful
   of mojibake, from a file, a URL, or standard input alike.
+- **`EDITOR`, `VISUAL`, and `PAGER` settings may quote a path with spaces.**
+  `EDITOR='"C:\Program Files\Editor\edit.exe" -w'` used to try to run a
+  program called `C:\Program`.
 - **A document with no links no longer pays a full metadata scan every
   frame.** The link collector's memo tested its entries for emptiness to
   decide whether it had run, and a link-free document is also empty, so it
