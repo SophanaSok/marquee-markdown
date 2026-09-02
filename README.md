@@ -17,12 +17,13 @@
 </p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/SophanaSok/marquee-markdown/main/docs/screenshot.svg" alt="marquee-markdown reading a document, with the contents pane on the left" width="100%">
+  <img src="https://raw.githubusercontent.com/SophanaSok/marquee-markdown/main/docs/demo.gif" alt="The reader in motion: the contents pane tracking the scroll, a section folding and unfolding, a search narrowing as it is typed, and the theme picker previewing against the document behind it" width="100%">
 </p>
 
 <p align="center"><sub>
-  Real output, not a mock-up — regenerate it with
-  <code>python3 scripts/screenshot.py</code>.
+  A real terminal, not a mock-up: the contents pane tracking the scroll,
+  folding, search, and the theme picker previewing against the document behind
+  it. Recorded with <code>vhs docs/demo.tape</code>.
 </sub></p>
 
 > **Released and in use.** Everything documented here works today; the badge
@@ -52,6 +53,15 @@
 - **Everything is configurable and every key is rebindable**, from one TOML
   file.
 - **Themes are data**, so a new palette needs no Rust and no recompile.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/SophanaSok/marquee-markdown/main/docs/screenshot.svg" alt="marquee-markdown reading a document, with the contents pane on the left" width="100%">
+</p>
+
+<p align="center"><sub>
+  The same reader held still, where the type is sharp enough to read —
+  regenerate it with <code>python3 scripts/screenshot.py</code>.
+</sub></p>
 
 ## Why not glow
 
@@ -308,16 +318,6 @@ a quarter of the screen to say nothing.
 </p>
 
 <p align="center"><sub><code>/</code> narrows as you type; <code>n</code> and <code>N</code> walk the matches.</sub></p>
-
-<p align="center">
-  <img src="https://raw.githubusercontent.com/SophanaSok/marquee-markdown/main/docs/demo.gif" alt="The reader in motion: the contents pane tracking the scroll, a section folding and unfolding, a search narrowing as it is typed, and the theme picker previewing against the document behind it" width="100%">
-</p>
-
-<p align="center"><sub>
-  The parts a still cannot show: the pane tracking the scroll, folding,
-  search, and the picker previewing against your own document. Recorded with
-  <code>vhs docs/demo.tape</code>.
-</sub></p>
 
 ## Browsing
 

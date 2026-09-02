@@ -69,7 +69,7 @@ python3 scripts/screenshot.py --all --strict
 
 | Image | What it is |
 | --- | --- |
-| `docs/screenshot.svg` | the reader, `slate`, with the contents pane |
+| `docs/screenshot.svg` | the reader, `slate`, with the contents pane — under "What it does", since the GIF took the top |
 | `docs/screenshot-paper.svg` | the same document in `paper` |
 | `docs/screenshot-search.svg` | the same document with `/the` typed |
 | `docs/screenshot-browser.svg` | the file browser over the repository root |
@@ -117,7 +117,7 @@ nobody can justify. Re-record it by hand when the reader visibly changes, the
 same as the screenshots — the difference is that nothing will tell you, so it
 is worth checking when a release changes how the reader looks.
 
-The GIF is tracked, and shown in the README at the end of "Reading". Two
+The GIF is tracked, and it is the README's hero image. Two
 consequences: a stale one is on the front page rather than on somebody's
 laptop, and every re-recording is a new megabyte in history rather than a diff.
 It is excluded from the published crate in `Cargo.toml` — `docs/` otherwise
