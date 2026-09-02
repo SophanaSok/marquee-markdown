@@ -632,25 +632,23 @@ fn an_html_table_is_framed_when_it_fits_and_labelled_cards_when_it_does_not() {
     // the column solver, the frame, and the narrow-width card fallback for
     // free, and nothing downstream can tell which source the cells came from.
     let theme = Theme::new(ThemeVariant::Slate);
-    // The three-column HTML table in the fixture, picked out by source offset:
-    // the markdown tables are above it and the two-column one is below, and
-    // that one is narrow enough to keep its frame even at 20.
-    let html_at = FIXTURE
-        .find("<div align=\"center\">\n<table>")
+    // The three-column HTML table in the fixture, picked out as the block
+    // whose source range covers its header — the markdown tables are above it
+    // and the two-column one below, and that one is narrow enough to keep its
+    // frame even at 20. A marker inside one line rather than a span of two:
+    // Windows checks the fixture out with CRLF, so a pattern containing a
+    // newline finds nothing there.
+    let marker = FIXTURE
+        .find("<th>Construct</th>")
         .expect("the fixture has an HTML table");
-    let next_at = FIXTURE
-        .find("<table>\n<caption>")
-        .expect("and a second one after it");
+    let is_that_table = move |m: &marquee_markdown::render::LineMeta| {
+        m.kind == LineKind::Table && m.source.as_ref().is_some_and(|s| s.contains(&marker))
+    };
     let html_table_lines = move |doc: &RenderedDoc| -> Vec<(usize, String)> {
         doc.meta
             .iter()
             .enumerate()
-            .filter(|(_, m)| {
-                m.kind == LineKind::Table
-                    && m.source
-                        .as_ref()
-                        .is_some_and(|s| (html_at..next_at).contains(&s.start))
-            })
+            .filter(|(_, m)| is_that_table(m))
             .map(|(i, m)| (i, doc.plain[m.plain.clone()].to_owned()))
             .collect()
     };
@@ -703,12 +701,7 @@ fn an_html_table_is_framed_when_it_fits_and_labelled_cards_when_it_does_not() {
     let links = |doc: &RenderedDoc| -> usize {
         doc.meta
             .iter()
-            .filter(|m| {
-                m.kind == LineKind::Table
-                    && m.source
-                        .as_ref()
-                        .is_some_and(|s| (html_at..next_at).contains(&s.start))
-            })
+            .filter(|m| is_that_table(m))
             .map(|m| m.links.len())
             .sum()
     };
