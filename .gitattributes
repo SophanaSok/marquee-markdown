@@ -1,0 +1,22 @@
+# Line endings are part of the test fixtures.
+#
+# `tests/fixtures/kitchen-sink.md` is compiled into the test binaries with
+# `include_str!`, so its bytes *are* the input: tests index into it, search it
+# for markers, and compare byte offsets against the source ranges the renderer
+# reports. A checkout that turns its newlines into CRLF changes every offset
+# past the first line and makes a pattern spanning two lines match nothing —
+# which is exactly how a green suite failed on the Windows runner alone.
+#
+# The same applies to every other file read verbatim at compile time: the
+# README and `docs/KEYBINDINGS.md` (`tests/docs.rs` matches text in both),
+# `Cargo.toml`, and the bundled themes.
+#
+# Nothing here wants CRLF — there are no batch or PowerShell files, and the
+# shell scripts, PKGBUILDs and nix derivation would break with it — so the
+# rule is simply LF everywhere, in the repository and in the working tree on
+# every platform. Git decides what is text by content; the exceptions below
+# name the binaries it should not inspect at all.
+* text=auto eol=lf
+
+*.gif binary
+*.png binary
