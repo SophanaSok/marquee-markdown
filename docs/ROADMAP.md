@@ -32,6 +32,14 @@ scroll-tracking table-of-contents sidebar and in-document search.
   hook ever restoring the terminal. Two cells of lead per level fills an
   80-column line by about level 40, so nothing showable is lost.
 
+- **Right-to-left text is not reordered.** Hebrew and Arabic pass through in
+  logical order and the width invariant holds for them — every line is still
+  exactly the content width — but no BiDi reordering is applied, so how an RTL
+  paragraph *reads* is left to the terminal, and terminals disagree. Proper
+  support means the Unicode BiDi algorithm in the layout pass, and deciding
+  what a column range even means on a reordered line for search highlights and
+  link selection.
+
 - **`--style system` does not ask on Windows.** The `OSC` replies arrive there
   through the console input API rather than as bytes on a device, which is a
   different mechanism from the `/dev/tty` exchange in `src/util/osc.rs` rather
@@ -72,7 +80,7 @@ your place instead of teleporting you.
 change the colorscheme, or the desktop theme behind it, and the page is
 repainted without a keystroke.
 
-826 tests and a doctest, plus five `#[ignore]`d live checks against the real
+851 tests and a doctest, plus five `#[ignore]`d live checks against the real
 forges; `cargo clippy --all-targets -- -D warnings` and `cargo doc --no-deps`
 clean. Three pty checks under `scripts/` cover what a unit test cannot reach —
 handing an editor the terminal, claiming the wheel, and following a retint

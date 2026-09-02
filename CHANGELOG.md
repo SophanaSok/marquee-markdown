@@ -62,6 +62,15 @@ Until 1.0 both halves may change.
   under the second. Unreachable with today's callers, but that was a fact
   about the callers, not a guarantee; it is a count now.
 
+### Documentation
+
+- `SECURITY.md` no longer claims remote documents are HTTPS-only (plain
+  `http://` is fetched as given) or that raw HTML is always shown literally
+  (the default mode renders a recognized subset as styled text); it now also
+  records the link-scheme allowlist. `docs/ROADMAP.md` records the absence of
+  BiDi reordering as a known gap. `AGENTS.md` names syntect's actual feature
+  set.
+
 ## [0.9.0] - 2026-09-01
 
 `--style system` stops being a snapshot. It asked the terminal what colors it

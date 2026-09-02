@@ -13,7 +13,8 @@ Requires Rust 1.88 (let-chains). `rust-version` in `Cargo.toml` is the single
 statement of that, and CI reads it from there rather than repeating it.
 
 No C toolchain is required: `syntect` uses the pure-Rust `fancy-regex` backend
-(`default-features = false, features = ["default-fancy"]`, with `two-face` on
+(`default-features = false` with `parsing`, `default-themes` and
+`regex-fancy`, and `two-face` on
 `syntect-fancy` to match). Do not switch to the default `onig` backend — it
 would make Windows builds need MSVC and slow every contributor's cold build.
 The ~2x highlighting cost is irrelevant because highlighting is per code block.
