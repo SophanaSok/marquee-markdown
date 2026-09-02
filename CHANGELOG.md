@@ -15,6 +15,17 @@ Until 1.0 both halves may change.
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-02
+
+A hardening release. The two changes a reader can meet are refusals: `-w`
+stops at 1000 columns, because every rendered line is padded to the content
+width and `-w 65535` turned a 33 KB document into 48 MB of spaces; and only
+`http:`, `https:`, `mailto:` and local paths reach the system opener, because
+a link's scheme picks which program runs and a document does not get to pick
+programs. Around them, `CLICOLOR_FORCE` keeps color in a pipe, a file in the
+wrong encoding renders instead of erroring, and every release archive and
+package now carries the man pages and completions.
+
 ### Added
 
 - **`CLICOLOR_FORCE=1` (or `FORCE_COLOR=1`) forces color into a pipe**, so
@@ -1107,7 +1118,8 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
 - Resizing re-lays out on every event; a large document dragged by a window
   edge will work harder than it needs to until a debounce lands.
 
-[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/SophanaSok/marquee-markdown/compare/v0.7.0...v0.7.1
