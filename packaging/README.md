@@ -10,9 +10,17 @@ What is here, and what fills in the blanks.
 | `aur/marquee-markdown-bin/PKGBUILD` | by hand after the tag, from `checksums.txt` |
 | `nix/default.nix` | by hand after the tag; nix prints both hashes |
 
-**None of the four repositories these belong in exists yet** — no Homebrew tap,
-no Scoop bucket, no AUR packages, nothing submitted to nixpkgs. These are the
-manifests to put in them, kept correct in the meantime by the tests below.
+Two of the four are now published, at 0.9.0:
+
+| Channel | Where |
+| --- | --- |
+| Homebrew | [SophanaSok/homebrew-marquee](https://github.com/SophanaSok/homebrew-marquee) |
+| Scoop | [SophanaSok/scoop-marquee](https://github.com/SophanaSok/scoop-marquee) |
+
+**The AUR packages and the nixpkgs submission do not exist yet.** The AUR pair
+needs an account with an SSH key registered; the nixpkgs derivation needs a
+pull request that also adds its maintainer entry. Both build and lint clean —
+`makepkg` and `namcap` on the PKGBUILDs, `nix-build` on the derivation.
 
 Publishing them is the one part of distribution that cannot be done from this
 repository, because each wants an account and a repository of its own:

@@ -130,28 +130,32 @@ the same command upgrades them later:
 cargo binstall marquee-markdown
 ```
 
-### Arch Linux
+### Homebrew
 
 ```sh
-paru -S marquee-markdown-bin     # the prebuilt binary
-paru -S marquee-markdown         # or built from source
+brew install SophanaSok/marquee/marquee-markdown
 ```
 
-### Nix
+### Scoop
 
-```sh
-nix-build packaging/nix -A marquee-markdown
+```powershell
+scoop bucket add marquee https://github.com/SophanaSok/scoop-marquee
+scoop install marquee-markdown
 ```
 
 ### Not yet published
 
-The manifests for Homebrew, Scoop, the AUR and nixpkgs all live in
-[`packaging/`](packaging/) and are kept current by a test that fails when one
-falls two releases behind. **None of the repositories they belong in exists
-yet** — there is no tap, no bucket, no AUR package and nothing submitted to
-nixpkgs, so the two blocks above describe what those manifests will install
-rather than something you can run today.
+The AUR PKGBUILDs and the nixpkgs derivation live in
+[`packaging/`](packaging/), build and lint clean, and are kept current by a
+test that fails when one falls two releases behind — but neither has been
+submitted yet, so neither is something you can install today.
 [`packaging/README.md`](packaging/README.md) has what each one needs.
+
+Nix can build it from a checkout in the meantime:
+
+```sh
+nix-build -E 'with import <nixpkgs> {}; callPackage ./packaging/nix/default.nix {}'
+```
 
 ### From source
 
