@@ -15,6 +15,34 @@ Until 1.0 both halves may change.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-02
+
+HTML in a README stops being a second-class document. A `<table>` and a
+`<ul>` now walk to the same block their markdown spelling produces, so the
+column solver and the list emitter draw them without ever learning there was
+a second source of cells or items — spans, sections, captions and alignment
+on one side; markers, indent, ordered numbering and nesting on the other.
+What happened before was all-or-nothing: one `<table>` anywhere, or one
+`<ul>` inside a `<details>`, sent its whole block to the page as raw tags.
+
+Both come with the tag-omission rules the markup they meet actually has.
+`<tr><td>a<td>b` is two cells and `<li>a<li>b` is two items, rather than
+each one nested inside the one before it; and a table or a list split by a
+blank line — which ends the HTML block, and is the form GitHub requires for
+markdown to render inside — is gathered back into one.
+
+Three fixes to markdown tables fell out of the table work: a header with no
+rows under it drew a doubled bottom edge, a cell containing a line break
+claimed the width of all its lines at once, and card layout centred each
+value behind its label. Links inside a framed cell are now interned, so `]`
+walks a contributor grid.
+
+A minor rather than a patch because it renders markup 0.10.0 declined.
+`cargo semver-checks` against v0.10.0 reports nothing: the stable half of the
+library API, `render` and `theme`, is untouched.
+
+891 tests and a doctest, up from 853.
+
 ### Added
 
 - **HTML `<ul>`, `<ol>` and `<li>` are rendered as a list**, not as tags. A
@@ -1182,7 +1210,8 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
 - Resizing re-lays out on every event; a large document dragged by a window
   edge will work harder than it needs to until a debounce lands.
 
-[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.7.1...v0.8.0

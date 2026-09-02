@@ -80,7 +80,7 @@ your place instead of teleporting you.
 change the colorscheme, or the desktop theme behind it, and the page is
 repainted without a keystroke.
 
-892 tests and a doctest, plus five `#[ignore]`d live checks against the real
+891 tests and a doctest, plus five `#[ignore]`d live checks against the real
 forges; `cargo clippy --all-targets -- -D warnings` and `cargo doc --no-deps`
 clean. Three pty checks under `scripts/` cover what a unit test cannot reach —
 handing an editor the terminal, claiming the wheel, and following a retint
