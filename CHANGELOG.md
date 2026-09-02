@@ -15,6 +15,14 @@ Until 1.0 both halves may change.
 
 ## [Unreleased]
 
+### Changed
+
+- **`-w` is capped at 1000 columns**, and `-w 0` ("do not wrap") renders at
+  that cap rather than at 16,383 columns. Every rendered line is padded to
+  exactly the content width, so the width bounds the output size directly:
+  `-w 65535` turned a 33 KB document into 48 MB of mostly spaces. The flag
+  refuses larger values; a config file's `width` is clamped.
+
 ### Fixed
 
 - **A document with no links no longer pays a full metadata scan every

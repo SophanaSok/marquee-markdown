@@ -63,8 +63,12 @@ pub struct Cli {
     #[arg(short, long)]
     pub tui: bool,
 
-    /// Word-wrap width; 0 disables wrapping.
-    #[arg(short, long)]
+    /// Word-wrap width, up to 1000; 0 disables wrapping.
+    // The cap matches `util::width::MAX`. Output is padded to the content
+    // width line by line, so an unbounded width is an output-size amplifier
+    // rather than a preference — the flag refuses what `resolve` would only
+    // silently clamp.
+    #[arg(short, long, value_parser = clap::value_parser!(u16).range(..=1000))]
     pub width: Option<u16>,
 
     /// Path to a configuration file.
@@ -221,6 +225,14 @@ mod tests {
         assert_eq!(layer.line_numbers, Some(true));
         assert_eq!(layer.all, Some(true));
         assert_eq!(layer.preserve_new_lines, Some(true));
+    }
+
+    #[test]
+    fn a_width_beyond_the_cap_is_refused_at_the_flag() {
+        let result = Cli::try_parse_from(["marquee-markdown", "-w", "5000", "x.md"]);
+        assert!(result.is_err(), "-w 5000 was accepted");
+        assert!(cli_of(&["-w", "1000", "x.md"]).width == Some(1000));
+        assert!(cli_of(&["-w", "0", "x.md"]).width == Some(0));
     }
 
     #[test]

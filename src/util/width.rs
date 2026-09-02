@@ -10,17 +10,24 @@ pub const AUTO_MAX: u16 = 120;
 pub const NON_TTY_DEFAULT: u16 = 80;
 /// Narrowest column we will lay out at.
 pub const MIN: u16 = 10;
+/// Widest column we will lay out at, and the column "do not wrap" renders at.
+///
+/// Every rendered line is padded to exactly the content width, so the width
+/// bounds the output size directly: an uncapped `-w 65535` turns a 33 KB
+/// document into 48 MB of mostly spaces. A thousand columns is wider than any
+/// prose line while keeping the padding proportionate.
+pub const MAX: u16 = 1000;
 
 /// Resolve the content width.
 ///
-/// `requested` is the `-w` flag: `Some(0)` disables wrapping (rendering at a
-/// very wide column), `Some(n)` pins the width, `None` derives it.
+/// `requested` is the `-w` flag: `Some(0)` disables wrapping (rendering at the
+/// widest column allowed), `Some(n)` pins the width, `None` derives it.
 #[must_use]
 pub fn resolve(requested: Option<u16>, terminal: Option<u16>) -> u16 {
     match requested {
-        // 0 means "do not wrap"; approximate with a very wide column.
-        Some(0) => u16::MAX / 4,
-        Some(n) => n.max(MIN),
+        // 0 means "do not wrap"; approximate with the widest column allowed.
+        Some(0) => MAX,
+        Some(n) => n.clamp(MIN, MAX),
         None => match terminal {
             Some(cols) => cols.clamp(MIN, AUTO_MAX),
             None => NON_TTY_DEFAULT,
@@ -45,6 +52,15 @@ mod tests {
     #[test]
     fn zero_disables_wrapping() {
         assert!(resolve(Some(0), Some(80)) > AUTO_MAX);
+    }
+
+    #[test]
+    fn an_absurd_explicit_width_is_capped() {
+        // Output scales with the width — every line is padded to it — so a
+        // width nothing displays must not multiply the document by a
+        // thousand.
+        assert_eq!(resolve(Some(u16::MAX), None), MAX);
+        assert_eq!(resolve(Some(u16::MAX), Some(80)), MAX);
     }
 
     #[test]
