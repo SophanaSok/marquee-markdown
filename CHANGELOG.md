@@ -35,6 +35,22 @@ Until 1.0 both halves may change.
   handler some application registered — is refused with a message: a scheme
   picks which program runs, and a document does not get to pick programs,
   however deliberate the keypress that followed it.
+- **The Debian and RPM packages ship man pages and shell completions** for
+  both binaries, in the paths the distributions document, and every release
+  archive now carries them too — including the cross-compiled macOS build and
+  the Windows zip, which used to go without. The `.deb` gains a real extended
+  description in place of the raw README and drops its duplicate `LICENSE`
+  (the generated `copyright` file already carries it); the RPM marks the
+  README as documentation.
+- **The crate description keeps to the strictest packaging rules any channel
+  applies** — under 80 characters, no leading article — because it is also
+  the Debian synopsis, the RPM summary, the Homebrew `desc`, and the Scoop
+  `description`. It was 98 characters with a leading "A ", which lintian
+  rejects outright.
+- **The release workflow's token is read-only except where the release is
+  published**, third-party actions included; the checkout action is on the
+  same major as CI's, and the changelog-notes heredoc uses a random delimiter
+  so no changelog line can truncate it.
 
 ### Fixed
 

@@ -4,8 +4,11 @@ on:
   push:
     tags: ["v*"]
 
+# Read-only by default; the one job that publishes the release asks for write
+# itself. The build jobs run third-party actions, and those must not hold a
+# token that could edit the repository.
 permissions:
-  contents: write
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -20,7 +23,7 @@ jobs:
     name: The tag matches the crate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: The tag and Cargo.toml name the same version
         run: |
           version=$(grep -m1 '^version' Cargo.toml | cut -d'"' -f2)
@@ -65,7 +68,7 @@ jobs:
             name: x86_64-windows
             target: x86_64-pc-windows-msvc
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -77,14 +80,18 @@ jobs:
       # Generated under both names: completions registered for a name the
       # reader does not type simply never fire.
       #
-      # Skipped where the binary was cross-compiled, since it cannot be run on
-      # the machine that built it. Those archives carry the binary alone; the
-      # man page and completions can be produced by the installed program.
+      # A cross-compiled binary cannot run on the machine that built it, but
+      # its man page and completions are target-independent — so that one
+      # archive generates them from a native build instead of shipping bare,
+      # which is what it used to do.
       - name: Generate man pages and completions
-        if: matrix.name != 'x86_64-macos'
         shell: bash
         run: |
           dir="target/${{ matrix.target }}/release"
+          if [ "${{ matrix.name }}" = "x86_64-macos" ]; then
+            cargo build --release --locked
+            dir="target/release"
+          fi
           mkdir -p dist/man dist/completions
           for name in marquee-markdown mmd; do
             bin="$dir/$name"
@@ -104,11 +111,7 @@ jobs:
           cp "target/${{ matrix.target }}/release/marquee-markdown" "$name/"
           cp "target/${{ matrix.target }}/release/mmd" "$name/"
           cp README.md LICENSE CHANGELOG.md "$name/"
-          # An `&&` list would be the last command in the script, and a false
-          # test would fail the step under `bash -e`.
-          if [ -d dist/man ]; then
-            cp -r dist/man dist/completions "$name/"
-          fi
+          cp -r dist/man dist/completions "$name/"
           tar czf "$name.tar.gz" "$name"
 
       - name: Package (windows)
@@ -120,7 +123,7 @@ jobs:
           cp "target/${{ matrix.target }}/release/marquee-markdown.exe" "$name/"
           cp "target/${{ matrix.target }}/release/mmd.exe" "$name/"
           cp README.md LICENSE CHANGELOG.md "$name/"
-          cp -r dist/completions "$name/"
+          cp -r dist/man dist/completions "$name/"
           7z a "$name.zip" "$name"
 
       - uses: actions/upload-artifact@v4
@@ -135,11 +138,27 @@ jobs:
     needs: preflight
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo install cargo-deb cargo-generate-rpm --locked
       - run: cargo build --release --locked
+      # The asset lists in `[package.metadata.deb]` and
+      # `[package.metadata.generate-rpm]` point into `dist/`; Debian policy
+      # counts a binary without a man page as a bug, so the packages carry
+      # what the archives carry. `gzip -n` for reproducibility — without it
+      # the archive embeds its own mtime.
+      - name: Generate man pages and completions
+        run: |
+          mkdir -p dist/man dist/completions
+          for name in marquee-markdown mmd; do
+            bin="target/release/$name"
+            "$bin" man > "dist/man/$name.1"
+            for shell in bash zsh fish; do
+              "$bin" completion "$shell" > "dist/completions/$name.$shell"
+            done
+          done
+          gzip -9n dist/man/*.1
       - run: cargo deb --no-build
       - run: cargo generate-rpm
       - uses: actions/upload-artifact@v4
@@ -162,7 +181,7 @@ jobs:
       id-token: write # OIDC, exchanged for a temporary crates.io token
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - uses: rust-lang/crates-io-auth-action@v1
@@ -175,8 +194,10 @@ jobs:
     name: Publish the release
     needs: [build, linux-packages, publish-crate]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # creates the GitHub release
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
@@ -224,9 +245,12 @@ jobs:
             /^## / { if (found) exit; if (index($0, ver)) found = 1; next }
             found { print }
           ' CHANGELOG.md > notes.md
-          echo "body<<NOTES_EOF" >> "$GITHUB_OUTPUT"
+          # A random delimiter, so no changelog line can ever equal it and
+          # truncate the output early.
+          delim="NOTES_$(od -An -N8 -tx1 /dev/urandom | tr -d ' \n')"
+          echo "body<<$delim" >> "$GITHUB_OUTPUT"
           cat notes.md >> "$GITHUB_OUTPUT"
-          echo "NOTES_EOF" >> "$GITHUB_OUTPUT"
+          echo "$delim" >> "$GITHUB_OUTPUT"
       - uses: softprops/action-gh-release@v2
         with:
           body: ${{ steps.notes.outputs.body }}
