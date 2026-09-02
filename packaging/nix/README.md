@@ -45,6 +45,29 @@ not the `sha256` the Homebrew formula and the AUR PKGBUILD carry for the same
 tag — those three values are all different and none can be copied from
 another.
 
+## The maintainer entry
+
+`meta.maintainers` names `sophanasok`, which does not exist in nixpkgs until
+the submission adds it. So this evaluates only once that entry is in the same
+tree:
+
+```sh
+# fails today, with "undefined variable 'sophanasok'"
+nix-instantiate --eval --strict -E '...(callPackage ./default.nix {}).meta.maintainers'
+```
+
+`nix-build` is unaffected — `meta` is lazy and a build never forces it — so the
+flow above still works from a checkout. The pull request carries both halves:
+
+```nix
+# maintainers/maintainer-list.nix
+sophanasok = {
+  name = "Sophana Sok";
+  github = "SophanaSok";
+  githubId = 5224183;
+};
+```
+
 ## Submitting to nixpkgs
 
 The derivation is deliberately free of anything checkout-specific: it fetches

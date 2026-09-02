@@ -75,6 +75,21 @@ rustPlatform.buildRustPackage (finalAttrs: {
     homepage = "https://github.com/SophanaSok/marquee-markdown";
     changelog = "https://github.com/SophanaSok/marquee-markdown/blob/v${finalAttrs.version}/CHANGELOG.md";
     license = lib.licenses.mit;
+    # Required for a new package, and deliberately unresolvable until the
+    # submission lands: `lib.maintainers.sophanasok` does not exist in nixpkgs
+    # yet, so forcing this attribute — `nix-instantiate --eval --strict ...
+    # .meta.maintainers` — fails with an undefined variable. `nix-build` is
+    # unaffected, because `meta` is lazy and never forced by a build, which is
+    # why the flow in README.md still works.
+    #
+    # The entry it refers to goes in `maintainers/maintainer-list.nix` in the
+    # same pull request, which is what makes it resolve:
+    #   sophanasok = {
+    #     name = "Sophana Sok";
+    #     github = "SophanaSok";
+    #     githubId = 5224183;
+    #   };
+    maintainers = with lib.maintainers; [ sophanasok ];
     mainProgram = "mmd";
     platforms = lib.platforms.unix ++ lib.platforms.windows;
   };
