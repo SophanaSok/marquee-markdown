@@ -179,8 +179,8 @@ jobs:
 
   handoff:
     # The smoke job above covers what can be checked without a terminal. This
-    # is the other half: everything that needs a real pty, which is two scripts
-    # now rather than the one this job is named after.
+    # is the other half: everything that needs a real pty, which is three
+    # scripts now rather than the one this job is named after.
     #
     # It exists because the bug it protects against was invisible to five
     # hundred passing tests: the reader thread went on reading standard input
@@ -188,7 +188,11 @@ jobs:
     # keystrokes between them and the editor lost words. Reproducing it needs
     # two processes and a real pty, which is what the script builds. The wheel
     # check is here for the same reason in a different shape — what the process
-    # puts on a terminal on the way up is not what a unit test can see.
+    # puts on a terminal on the way up is not what a unit test can see. The
+    # recolor check is the third: `--style system` asks the terminal about its
+    # colours while the reader is running, and the thing that must not happen —
+    # a reply reaching crossterm and being parsed as a handful of bindings —
+    # needs a terminal that answers on cue to provoke at all.
     #
     # Linux only. Windows has no pty to hand over and no `$EDITOR` convention,
     # and macOS hung on this script rather than running it — the build
@@ -213,6 +217,7 @@ jobs:
       # not throughput.
       - run: python3 scripts/handoff-check.py target/debug/marquee-markdown
       - run: python3 scripts/wheel-check.py target/debug/marquee-markdown
+      - run: python3 scripts/recolor-check.py target/debug/marquee-markdown
 
   msrv:
     name: MSRV
