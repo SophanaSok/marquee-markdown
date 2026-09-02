@@ -12,13 +12,15 @@
 //!
 //! This is deliberately not an HTML parser. It does not build a DOM to spec,
 //! and it never will — anything needing that is opaque to it and goes back to
-//! the caller untouched. The one tag-omission rule it knows is the one tables
-//! lean on (`<tr><td>a<td>b`), and `Walk` applies it inside a table only.
+//! the caller untouched. The two tag-omission rules it knows are the ones
+//! tables and lists lean on — `<tr><td>a<td>b` and `<li>a<li>b` — and each is
+//! applied by the walk that needs it, `Walk` and `lift_items`, rather than by
+//! the tree.
 
 use std::ops::Range;
 use std::str::FromStr;
 
-use super::block::{Alignment, Block, BlockKind, Inline, MAX_NESTING};
+use super::block::{Alignment, Block, BlockKind, Inline, ListItem, MAX_NESTING};
 use super::parse::InlineKind;
 
 /// What to do with raw HTML in a document.
@@ -512,6 +514,13 @@ enum Role {
     /// `<summary>` — the label of a `<details>`. Only meaningful inside one;
     /// loose, it is an ordinary paragraph.
     Summary,
+    /// `<ul>` or `<ol>` — becomes the same block a markdown list does, and is
+    /// drawn by the same emitter. See [`list_block`].
+    List,
+    /// `<li>` — one item of a list. Only meaningful inside one; a run of them
+    /// met loose is gathered back into a list, which is what a blank line
+    /// inside a `<ul>` leaves behind.
+    ListItem,
     /// `<table>` — becomes the same block a markdown pipe table does, and is
     /// drawn by the same emitter. See [`table_blocks`].
     Table,
@@ -540,6 +549,8 @@ impl Role {
                 | Self::Rule
                 | Self::Details
                 | Self::Summary
+                | Self::List
+                | Self::ListItem
                 | Self::Table
                 | Self::TableFragment
         )
@@ -570,15 +581,17 @@ fn role(name: &str) -> Role {
         "code" | "kbd" | "samp" | "tt" => Role::Code,
         "details" => Role::Details,
         "summary" => Role::Summary,
+        "ul" | "ol" => Role::List,
+        "li" => Role::ListItem,
         "table" => Role::Table,
         "thead" | "tbody" | "tfoot" | "tr" => Role::TableFragment,
         // The rest of a table's vocabulary means something only inside the
         // table walk, which matches on the name; loose, a cell is its words.
         // Structure this renderer has no emitter for. Literal is the honest
         // answer: the tags say more than the words would on their own.
-        "ul" | "ol" | "li" | "dl" | "dt" | "dd" | "pre" | "script" | "style" | "textarea"
-        | "iframe" | "object" | "embed" | "svg" | "math" | "form" | "input" | "button"
-        | "select" | "option" | "textpath" => Role::Opaque,
+        "dl" | "dt" | "dd" | "pre" | "script" | "style" | "textarea" | "iframe" | "object"
+        | "embed" | "svg" | "math" | "form" | "input" | "button" | "select" | "option"
+        | "textpath" => Role::Opaque,
         _ => Role::Transparent,
     }
 }
@@ -784,6 +797,17 @@ fn blocks_from(
                     produced.push(Block::at(BlockKind::Paragraph(content), span.clone()));
                 }
             }
+            Role::List => list_block(name, attrs, children, span, slug, &mut produced),
+            // A blank line ends a `CommonMark` HTML block, and writing one
+            // inside `<ul>` is how GitHub asks for markdown to render in an
+            // item — so the items arrive at the root of a later block with
+            // their list left behind. Gather the run and give it one back.
+            // Which list is lost with the tag, so the run is bulleted; an
+            // `<ol>` split this way loses its numbers.
+            Role::ListItem => {
+                let run = gather(nodes, node, &mut index, Role::ListItem);
+                list_block("ul", &[], &run, span, slug, &mut produced);
+            }
             Role::Table => table_blocks(children, span, &mut produced),
             // A blank line ends a `CommonMark` HTML block, so a table written
             // with one inside it arrives in pieces: `<table>` alone, then its
@@ -791,19 +815,7 @@ fn blocks_from(
             // them and lay it out as a table of its own, which is the shape
             // the author wrote even if the frame is drawn once per piece.
             Role::TableFragment => {
-                let mut run = vec![node.clone()];
-                while let Some(next) = nodes.get(index) {
-                    match next {
-                        Node::Element { name, .. } if self::role(name) == Role::TableFragment => {
-                            run.push(next.clone());
-                        }
-                        // The whitespace between two tags is not a row, and it
-                        // is not content either.
-                        Node::Text(text) if collapse(text).trim().is_empty() => {}
-                        _ => break,
-                    }
-                    index += 1;
-                }
+                let run = gather(nodes, node, &mut index, Role::TableFragment);
                 table_blocks(&run, span, &mut produced);
             }
             // A `<div>` wrapping other blocks is a container; one wrapping
@@ -834,6 +846,157 @@ fn blocks_from(
     }
 
     flush(&mut pending, span, out);
+}
+
+/// Collect the run of same-role siblings starting at `node`, advancing `index`
+/// past the ones it takes.
+///
+/// A `CommonMark` HTML block ends at a blank line, so a list or a table
+/// written with one inside it arrives in pieces, with the parts that were
+/// inside the container loose at the root of a later block. The run is the
+/// shape the author wrote, even though the tag saying so was left behind.
+fn gather(nodes: &[Node], node: &Node, index: &mut usize, want: Role) -> Vec<Node> {
+    let mut run = vec![node.clone()];
+    while let Some(next) = nodes.get(*index) {
+        match next {
+            Node::Element { name, .. } if role(name) == want => run.push(next.clone()),
+            // The whitespace between two tags is not a row or an item, and it
+            // is not content either.
+            Node::Text(text) if collapse(text).trim().is_empty() => {}
+            _ => break,
+        }
+        *index += 1;
+    }
+    run
+}
+
+// --- lists ----------------------------------------------------------------
+
+/// Lay a `<ul>` or `<ol>`'s children out as the same block a markdown list
+/// produces, so both reach the one emitter: same markers, same indent, same
+/// handling of a list nested in an item.
+///
+/// An item holds blocks, so everything [`blocks_from`] can make reaches an
+/// item too — a paragraph, a heading, a quote, a table, another list. What
+/// HTML can say and the block cannot is dropped: `type` picks a marker glyph,
+/// `reversed` counts down, and `value` renumbers one item, none of which the
+/// block represents. A `<li>` holding a task checkbox is not a task list
+/// either; `<input>` is opaque, so a block containing one never gets here.
+fn list_block(
+    name: &str,
+    attrs: &[(String, String)],
+    children: &[Node],
+    span: &Range<usize>,
+    slug: &mut dyn FnMut(&str) -> String,
+    out: &mut Vec<Block>,
+) {
+    // `<ol start>` is the one numbering attribute the block carries. A value
+    // that is not a number is the author saying nothing, not the author
+    // saying zero.
+    let start = (name == "ol").then(|| {
+        attr(attrs, "start")
+            .and_then(|value| value.trim().parse::<u64>().ok())
+            .unwrap_or(1)
+    });
+
+    let mut nodes = Vec::new();
+    for child in children {
+        lift_items(child, &mut nodes);
+    }
+
+    let mut items: Vec<ListItem> = Vec::new();
+    let mut loose: Vec<Node> = Vec::new();
+    for node in &nodes {
+        match node {
+            Node::Element { name, children, .. } if role(name) == Role::ListItem => {
+                close_item(&mut items, &mut loose, span, slug);
+                let mut blocks = Vec::new();
+                blocks_from(children, span, slug, &mut blocks);
+                items.push(ListItem {
+                    task: None,
+                    children: blocks,
+                });
+            }
+            // The whitespace laying the source out is not an item.
+            Node::Text(text) if collapse(text).trim().is_empty() => {}
+            other => loose.push(other.clone()),
+        }
+    }
+    close_item(&mut items, &mut loose, span, slug);
+
+    if !items.is_empty() {
+        out.push(Block::at(BlockKind::List { start, items }, span.clone()));
+    }
+}
+
+/// Attach content found loose in a list to the item above it, or make an item
+/// of it when it came before the first one.
+///
+/// A list may hold only items, and authors put a stray `<p>` or a bare
+/// sentence in one anyway. Both readings keep the words on the page; dropping
+/// them is the one thing that must not happen.
+fn close_item(
+    items: &mut Vec<ListItem>,
+    loose: &mut Vec<Node>,
+    span: &Range<usize>,
+    slug: &mut dyn FnMut(&str) -> String,
+) {
+    if loose.is_empty() {
+        return;
+    }
+    let nodes = std::mem::take(loose);
+    let mut blocks = Vec::new();
+    blocks_from(&nodes, span, slug, &mut blocks);
+    if blocks.is_empty() {
+        return;
+    }
+    match items.last_mut() {
+        Some(item) => item.children.append(&mut blocks),
+        None => items.push(ListItem {
+            task: None,
+            children: blocks,
+        }),
+    }
+}
+
+/// Lift the siblings an item swallowed back out of it.
+///
+/// `</li>` is the end tag a list author leaves out most, and a tree built by
+/// name-matching nests what they meant to close: in `<li>a<li>b`, the second
+/// item is a *child* of the first. A direct `<li>` child is never what an
+/// author means — a list nested in an item arrives wrapped in its own `<ul>`
+/// — so one found here is a sibling. This is the list's half of the rule
+/// [`Walk`] applies to `<tr><td>a<td>b`, and it unwinds a whole run of
+/// omissions because each lifted item is lifted again in turn.
+fn lift_items(node: &Node, out: &mut Vec<Node>) {
+    let Node::Element {
+        name,
+        attrs,
+        children,
+    } = node
+    else {
+        out.push(node.clone());
+        return;
+    };
+    let split = if role(name) == Role::ListItem {
+        children.iter().position(
+            |child| matches!(child, Node::Element { name, .. } if role(name) == Role::ListItem),
+        )
+    } else {
+        None
+    };
+    let Some(split) = split else {
+        out.push(node.clone());
+        return;
+    };
+    out.push(Node::Element {
+        name: name.clone(),
+        attrs: attrs.clone(),
+        children: children[..split].to_vec(),
+    });
+    for rest in &children[split..] {
+        lift_items(rest, out);
+    }
 }
 
 // --- tables ---------------------------------------------------------------
@@ -1303,6 +1466,21 @@ fn inlines_from(nodes: &[Node], out: &mut Vec<Inline>) {
                         out.push(Inline::Code(text.trim().to_owned()));
                     }
                 }
+                // A list reached in an inline position is a list in a table
+                // cell, because a cell holds inline content and nothing else.
+                // One item per line is what survives of it. No marker is
+                // synthesized: one added here would land in the plain mirror
+                // and become searchable text, which the markers the layout
+                // engine draws never are.
+                Role::List => {
+                    break_between(out);
+                    inlines_from(children, out);
+                    break_between(out);
+                }
+                Role::ListItem => {
+                    break_between(out);
+                    inlines_from(children, out);
+                }
                 Role::Strong => wrap_inline(children, Inline::Strong, out),
                 Role::Emphasis => wrap_inline(children, Inline::Emphasis, out),
                 Role::Strikethrough => wrap_inline(children, Inline::Strikethrough, out),
@@ -1342,6 +1520,26 @@ fn wrap_inline(children: &[Node], wrap: impl FnOnce(Vec<Inline>) -> Inline, out:
     inlines_from(children, &mut content);
     if !content.is_empty() {
         out.push(wrap(content));
+    }
+}
+
+/// Break the line between two runs that had no `<br>` between them.
+///
+/// Unlike `<br>`, which an author writes to make a blank line and which starts
+/// one wherever it lands, this only breaks where there is something to break
+/// from and no break already — so a cell does not open on an empty line, and
+/// two adjacent lists do not leave one between them.
+fn break_between(out: &mut Vec<Inline>) {
+    if let Some(Inline::Text(prev)) = out.last_mut() {
+        let trimmed = prev.trim_end().to_owned();
+        if trimmed.is_empty() {
+            out.pop();
+        } else {
+            *prev = trimmed;
+        }
+    }
+    if !out.is_empty() && !matches!(out.last(), Some(Inline::HardBreak)) {
+        out.push(Inline::HardBreak);
     }
 }
 
@@ -1431,6 +1629,10 @@ pub(super) enum InlineTag {
     Open(InlineKind),
     /// Contributes content and closes immediately.
     Void(Vec<Inline>),
+    /// Starts a line, but only where there is one to start: a list item in an
+    /// inline position has no marker to draw, so its own line is all that is
+    /// left to tell it from the item before it.
+    BreakBetween,
 }
 
 /// Interpret one opening inline tag, as `Event::InlineHtml` delivers it.
@@ -1449,6 +1651,10 @@ pub(super) fn inline_open(raw: &str) -> Option<InlineTag> {
     match role(name) {
         Role::Break => Some(InlineTag::Void(vec![Inline::HardBreak])),
         Role::Rule => Some(InlineTag::Void(vec![Inline::HardBreak])),
+        // A `<ul>` in a markdown table cell is how a cell gets a list, and a
+        // cell holds inline content: one item per line is what survives. The
+        // same shape `inlines_from` gives a list inside an HTML `<td>`.
+        Role::ListItem => Some(InlineTag::BreakBetween),
         Role::Image => Some(InlineTag::Void(image(attrs).into_iter().collect())),
         _ if void => Some(InlineTag::Void(Vec::new())),
         Role::Link => Some(InlineTag::Open(InlineKind::Link(
@@ -1473,7 +1679,9 @@ pub(super) fn inline_kind(name: &str) -> Option<InlineKind> {
         Role::Emphasis => Some(InlineKind::Emphasis),
         Role::Strikethrough => Some(InlineKind::Strikethrough),
         Role::Code => Some(InlineKind::Code),
-        Role::Break | Role::Image => None, // void: nothing was ever opened
+        // Nothing was ever opened: void elements, and an item that only ever
+        // started a line.
+        Role::Break | Role::Image | Role::ListItem => None,
         _ => Some(InlineKind::Transparent),
     }
 }
@@ -1683,7 +1891,6 @@ mod tests {
     #[test]
     fn opaque_elements_send_the_whole_block_back() {
         for raw in [
-            "<ul><li>one</li></ul>",
             "<dl><dt>term</dt><dd>meaning</dd></dl>",
             "<script>alert(1)</script>",
             "<style>body{}</style>",
@@ -2004,10 +2211,162 @@ mod tests {
     #[test]
     fn a_cell_holding_an_opaque_element_still_declines_the_whole_block() {
         // A known limitation, recorded so a change to it is deliberate: the
-        // opaque scan runs over the whole block, so one `<ul>` in one cell
+        // opaque scan runs over the whole block, so one `<pre>` in one cell
         // sends the table to the page as literal markup. Scoping the scan to
         // cells is a follow-up.
-        assert!(interpreted("<table><tr><td><ul><li>a</li></ul></td></tr></table>").is_none());
+        assert!(interpreted("<table><tr><td><pre>a</pre></td></tr></table>").is_none());
+    }
+
+    /// The plain text of every item of the one list `raw` produces.
+    fn items(raw: &str) -> (Option<u64>, Vec<String>) {
+        let blocks = interpreted(raw).expect("interpreted");
+        let [
+            Block {
+                kind: BlockKind::List { start, items },
+                ..
+            },
+        ] = blocks.as_slice()
+        else {
+            panic!("one list, got {blocks:#?}");
+        };
+        let text = |item: &ListItem| {
+            item.children
+                .iter()
+                .map(|block| match &block.kind {
+                    BlockKind::Paragraph(content) | BlockKind::Heading { content, .. } => {
+                        Inline::plain_text(content)
+                    }
+                    other => format!("{other:?}"),
+                })
+                .collect::<Vec<_>>()
+                .join(" / ")
+        };
+        (*start, items.iter().map(text).collect())
+    }
+
+    #[test]
+    fn a_bullet_list_carries_no_start_and_an_ordered_one_does() {
+        assert_eq!(
+            items("<ul><li>a</li><li>b</li></ul>"),
+            (None, vec!["a".to_owned(), "b".to_owned()])
+        );
+        // An `<ol>` with no `start` begins at one, which is what the block
+        // means by `Some(1)` and what a markdown `1.` produces.
+        assert_eq!(items("<ol><li>a</li></ol>").0, Some(1));
+        assert_eq!(items("<ol start=\"7\"><li>a</li></ol>").0, Some(7));
+        // A `start` that is not a number is the author saying nothing, not
+        // the author saying zero.
+        assert_eq!(items("<ol start=\"soon\"><li>a</li></ol>").0, Some(1));
+    }
+
+    #[test]
+    fn an_item_left_unclosed_does_not_swallow_the_ones_after_it() {
+        // `</li>` is the end tag a list author leaves out most, and `tree`
+        // matches by name: in `<li>a<li>b`, the second item is a *child* of
+        // the first. Rendering that literally gives one item with the rest
+        // nested inside it, one indent deeper per item.
+        assert_eq!(
+            items("<ul><li>a<li>b<li>c</ul>").1,
+            ["a".to_owned(), "b".to_owned(), "c".to_owned()]
+        );
+    }
+
+    #[test]
+    fn a_list_nested_in_an_item_stays_nested() {
+        // The distinction the lift rule must not break: an `<li>` inside a
+        // `<ul>` inside an item is a sublist, not a sibling.
+        let (_, items) = items("<ul><li>a<ul><li>inner</li></ul></li><li>b</li></ul>");
+        assert_eq!(items.len(), 2);
+        assert!(items[0].contains("inner"), "{items:#?}");
+        assert_eq!(items[1], "b");
+    }
+
+    #[test]
+    fn an_item_holds_blocks_not_just_a_sentence() {
+        // An item's children go back through `blocks_from`, so everything
+        // that module can make reaches an item too.
+        let (_, items) = items("<ul><li><h3>Title</h3><p>Body.</p></li></ul>");
+        assert_eq!(items, ["Title / Body."]);
+    }
+
+    #[test]
+    fn a_list_split_by_a_blank_line_is_gathered_back_together() {
+        // A CommonMark HTML block ends at a blank line, and writing one
+        // inside `<ul>` is how GitHub asks for markdown to render in an item,
+        // so the items arrive at the root of a later block with no list
+        // around them. Same shape as a table split the same way.
+        assert_eq!(
+            items("<li>a</li>\n<li>b</li>").1,
+            ["a".to_owned(), "b".to_owned()]
+        );
+        // The tag that said which list it was is in an earlier block, so the
+        // run is bulleted.
+        assert_eq!(items("<li>a</li>").0, None);
+    }
+
+    #[test]
+    fn content_loose_in_a_list_joins_the_item_above_it() {
+        // A list may hold only items, and authors put a stray paragraph in
+        // one anyway. Dropping the words is the one thing that must not
+        // happen; the whitespace laying the source out is not content.
+        let (_, joined) = items("<ul>\n  <li>a</li>\n  <p>stray</p>\n  <li>b</li>\n</ul>");
+        assert_eq!(joined, ["a / stray", "b"]);
+        // With nothing above it to join, it is an item of its own.
+        assert_eq!(
+            items("<ul><p>stray</p><li>a</li></ul>").1,
+            ["stray".to_owned(), "a".to_owned()]
+        );
+    }
+
+    #[test]
+    fn a_list_with_nothing_in_it_produces_nothing() {
+        // The `<ul>` half of a list split by a blank line: an opener whose
+        // items are all in a later block. A bare frame would draw an empty
+        // line the author never wrote.
+        assert!(interpreted("<ul>\n</ul>").expect("interpreted").is_empty());
+        assert!(interpreted("<ul>   </ul>").expect("interpreted").is_empty());
+    }
+
+    #[test]
+    fn a_list_nested_past_the_cap_does_not_overflow_the_stack() {
+        // `list_block` recurses through `blocks_from`, so the tree's depth
+        // cap is what bounds it — the same guard `<div>` nesting leans on.
+        let deep = MAX_NESTING + 50;
+        let raw = format!("{}x{}", "<ul><li>".repeat(deep), "</li></ul>".repeat(deep));
+        assert!(interpreted(&raw).is_some());
+    }
+
+    #[test]
+    fn a_list_in_a_cell_keeps_one_item_per_line() {
+        // The table renders — a list is no longer opaque — but a cell holds
+        // inline content, so the markers cannot come with it. A line each is
+        // what is left, and it beats sending the whole table to the page as
+        // markup, which is what a cell holding a list used to do.
+        let blocks = interpreted("<table><tr><td><ul><li>a</li><li>b</li></ul></td></tr></table>")
+            .expect("interpreted");
+        let [
+            Block {
+                kind: BlockKind::Table { rows, .. },
+                ..
+            },
+        ] = blocks.as_slice()
+        else {
+            panic!("one table, got {blocks:#?}");
+        };
+        let [row] = rows.as_slice() else {
+            panic!("one row, got {rows:#?}");
+        };
+        let [cell] = row.as_slice() else {
+            panic!("one cell, got {row:#?}");
+        };
+        assert_eq!(
+            cell.as_slice(),
+            [
+                Inline::Text("a".into()),
+                Inline::HardBreak,
+                Inline::Text("b".into()),
+            ]
+        );
     }
 
     #[test]

@@ -80,7 +80,7 @@ your place instead of teleporting you.
 change the colorscheme, or the desktop theme behind it, and the page is
 repainted without a keystroke.
 
-880 tests and a doctest, plus five `#[ignore]`d live checks against the real
+892 tests and a doctest, plus five `#[ignore]`d live checks against the real
 forges; `cargo clippy --all-targets -- -D warnings` and `cargo doc --no-deps`
 clean. Three pty checks under `scripts/` cover what a unit test cannot reach —
 handing an editor the terminal, claiming the wheel, and following a retint
@@ -113,8 +113,8 @@ The pre-1.0 launch runbook, kept because each item records what it cost:
    verified by installing from both. The release workflow's first run found
    the retired Intel macOS runners; the Intel build is now cross-compiled.
 
-Beyond that, the deferrals below are the backlog — HTML lists, a scrollable
-wide table, and images are the three most likely to be asked for.
+Beyond that, the deferrals below are the backlog — a scrollable wide table and
+images are the two most likely to be asked for.
 
 ## What each phase built, and why it is shaped that way
 
@@ -289,14 +289,18 @@ and cross-wrap search that narrows as you type). What remains is smaller:
 
 ## Deferred deliberately
 
-- **HTML with no emitter behind it.** `<ul>`/`<ol>`/`<li>`, `<details>`
-  folding, and `style="text-align:…"`. Each falls back to literal markup,
-  which is no worse than before HTML was interpreted at all. `<table>` was
-  the one worth doing and is done: it walks to the same block a pipe table
-  produces, so the column solver never learned there was a second source of
-  cells. The scan that declines a block is still whole-block, though, so one
-  `<ul>` in one cell sends the table to the page as markup; scoping it to
-  cells is what the list emitter would buy.
+- **HTML with no emitter behind it.** `<dl>`/`<dt>`/`<dd>`, `<pre>`,
+  `<input>`, `<details>` folding, and `style="text-align:…"`. Each falls back
+  to literal markup, which is no worse than before HTML was interpreted at
+  all. The two worth doing are done: `<table>` and `<ul>`/`<ol>`/`<li>` each
+  walk to the same block their markdown spelling produces, so the column
+  solver and the list emitter never learned there was a second source. A
+  description list is what is left, and it is left because the block tree has
+  no term-and-definition shape and no way to indent without a marker — a
+  bulleted `<dl>` would be a guess rendered as if it were known, which is the
+  one thing this module does not do. The scan that declines a block is still
+  whole-block, so one `<pre>` in one cell sends a table to the page as
+  markup.
 - **Images.** The target terminal (foot) has sixel, but Alacritty has nothing
   and no terminal here supports the kitty protocol. `ratatui-image` would add a
   blocking resize on the draw thread. Revisit only if asked.

@@ -183,9 +183,12 @@ arrives in a block of its own.
 </table>
 
 <details>
-<summary>Unrecognized, so this whole block stays literal markup</summary>
-<ul><li>including this</li></ul>
+<summary>A collapsible aside, rendered expanded</summary>
+<ul><li>holding a list, which is drawn by the markdown list emitter</li>
+<li>one item per line, markers and all</li></ul>
 </details>
+
+<dl><dt>No emitter behind it</dt><dd>so this whole block stays literal markup</dd></dl>
 
 ## Footnotes
 

@@ -615,15 +615,38 @@ fn a_centered_block_is_actually_centered() {
 
 #[test]
 fn unrecognized_html_still_renders_as_literal_markup() {
-    // A list has no emitter, and a list read as one run-on sentence is worse
-    // than one read as tags. The `<details>` around it is understood, but the
-    // decision is taken for the whole block, so the block stays literal.
+    // A description list has no emitter, and one read as a run-on sentence is
+    // worse than one read as tags: the terms carry the structure.
     let theme = Theme::new(ThemeVariant::Slate);
     let doc = render_html(FIXTURE, &theme, 80, HtmlMode::Render);
     assert!(
-        text_of(&doc).contains("<ul>"),
+        text_of(&doc).contains("<dl>"),
         "the declined block lost its markup"
     );
+}
+
+#[test]
+fn an_html_list_is_drawn_by_the_markdown_list_emitter() {
+    // The `<details>` in the fixture holds a `<ul>`; before lists had an
+    // emitter, that one element sent the whole block to the page as markup.
+    let theme = Theme::new(ThemeVariant::Slate);
+    let doc = render_html(FIXTURE, &theme, 80, HtmlMode::Render);
+    let text = text_of(&doc);
+    assert!(
+        !text.contains("<ul>"),
+        "the list reached the page as markup"
+    );
+    let marker = text
+        .lines()
+        .find(|line| line.contains("one item per line"))
+        .expect("the second item is on the page");
+    // Inside the `<details>`, so the quote's gutter comes first and the
+    // marker after it. Both are drawn by the layout engine, and neither is in
+    // the plain mirror as text the author wrote.
+    let (lead, _) = marker
+        .split_once("one item per line")
+        .expect("the line holds the item");
+    assert!(lead.contains('\u{2022}'), "no list marker on {marker:?}");
 }
 
 #[test]

@@ -581,6 +581,7 @@ impl TreeBuilder {
                     self.push_inline(inline);
                 }
             }
+            Some(html::InlineTag::BreakBetween) => self.break_between_inlines(),
             // Unparseable, or something with no inline meaning: drop it.
             None => {}
         }
@@ -711,6 +712,37 @@ impl TreeBuilder {
             .pop()
             .map(|f| f.content)
             .unwrap_or_default()
+    }
+
+    /// Break the line between two runs where the markup did not write a
+    /// `<br>` to ask for one.
+    ///
+    /// Unlike `<br>`, which starts a line wherever it lands, this breaks only
+    /// where there is something to break from and no break already — so a
+    /// cell whose content opens with a list does not open on a blank line.
+    fn break_between_inlines(&mut self) {
+        let Some(frame) = self
+            .inline_stack
+            .iter_mut()
+            .rev()
+            .find(|frame| !frame.content.is_empty())
+        else {
+            return; // nothing yet to break from
+        };
+        // A break ends a line, so the space that ran up to it was the source's
+        // layout rather than content.
+        if let Some(Inline::Text(text)) = frame.content.last_mut() {
+            let trimmed = text.trim_end().to_owned();
+            if trimmed.is_empty() {
+                frame.content.pop();
+            } else {
+                *text = trimmed;
+            }
+        }
+        let wanted = !matches!(frame.content.last(), None | Some(Inline::HardBreak));
+        if wanted {
+            self.push_inline(Inline::HardBreak);
+        }
     }
 
     fn open_inline(&mut self, kind: InlineKind) {
@@ -1320,16 +1352,43 @@ mod tests {
 
     #[test]
     fn unrecognized_html_falls_back_to_literal_markup() {
-        // A list read as one run-on sentence is worse than one read as tags:
-        // the markers carry the structure, and there is no emitter behind
-        // them to draw it.
-        let blocks = parse("<ul>\n<li>one</li>\n<li>two</li>\n</ul>\n");
+        // A description list read as one run-on sentence is worse than one
+        // read as tags: the terms carry the structure, and there is no
+        // emitter behind them to draw it.
+        let blocks = parse("<dl>\n<dt>term</dt>\n<dd>meaning</dd>\n</dl>\n");
         assert!(
             blocks
                 .iter()
-                .any(|b| matches!(&b.kind, BlockKind::Html(h) if h.contains("<ul>"))),
+                .any(|b| matches!(&b.kind, BlockKind::Html(h) if h.contains("<dl>"))),
             "{blocks:#?}"
         );
+    }
+
+    #[test]
+    fn an_html_list_reaches_the_tree_as_a_list() {
+        // The same block a markdown list produces, so the one emitter draws
+        // both: same markers, same indent, same nesting.
+        let blocks = parse("<ul>\n<li>one</li>\n<li>two</li>\n</ul>\n");
+        let [block] = blocks.as_slice() else {
+            panic!("one block, got {blocks:#?}");
+        };
+        let BlockKind::List { start, items } = &block.kind else {
+            panic!("a list, got {:?}", block.kind);
+        };
+        assert_eq!(*start, None);
+        let texts: Vec<String> = items
+            .iter()
+            .map(|item| match item.children.as_slice() {
+                [
+                    Block {
+                        kind: BlockKind::Paragraph(content),
+                        ..
+                    },
+                ] => Inline::plain_text(content),
+                other => panic!("one paragraph per item, got {other:#?}"),
+            })
+            .collect();
+        assert_eq!(texts, ["one", "two"]);
     }
 
     #[test]

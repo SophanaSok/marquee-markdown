@@ -17,6 +17,34 @@ Until 1.0 both halves may change.
 
 ### Added
 
+- **HTML `<ul>`, `<ol>` and `<li>` are rendered as a list**, not as tags. A
+  list in a README walks to the same block a markdown list produces, so the
+  markers, the indent, the ordered numbering and a list nested in an item all
+  apply to it unchanged — the list emitter was not touched, and nothing
+  downstream can tell which source the items came from.
+
+  An item holds blocks, so everything the HTML reader can make reaches an item
+  too: a heading, a paragraph, a quote, a table, another list. `<ol start>` is
+  honoured. `</li>` written and left out are both understood — `<li>a<li>b` is
+  two items, not one item holding the other, which is the list's half of the
+  tag-omission rule tables already had. A list split by a blank line — which
+  ends the HTML block, so its items arrive loose — is gathered back into one,
+  and a stray paragraph inside a list joins the item above it rather than
+  disappearing.
+
+  This is also what stops one `<ul>` from taking a whole `<details>` block to
+  the page as markup, which is what it did before.
+
+  Limits, deliberate: a list inside a table cell keeps one item per line but
+  loses its markers, because a cell holds inline content and a marker
+  synthesized there would land in the plain mirror as searchable text. The
+  same rule costs a list split by a blank line its numbering, because the
+  `<ol>` that said so is in an earlier block. `type`, `reversed` and `value`
+  are not read; the block tree has no way to say them. And `<dl>`/`<dt>`/`<dd>`
+  is still declined to literal markup: there is no term-and-definition shape
+  in the block tree and no way to indent without a marker, so a bulleted `<dl>`
+  would be a guess rendered as if it were known.
+
 - **HTML `<table>` is rendered as a table**, not as tags. A `<table>` in a
   README walks to the same block a markdown pipe table produces, so the
   column solver, the box drawing, the shaded header band and the narrow-width
@@ -43,7 +71,7 @@ Until 1.0 both halves may change.
   Limits, deliberate: a table inside a table is declined to literal markup,
   because a cell holds inline content and nesting could only flatten the
   inner one into a run-on sentence. A cell holding an element with no emitter
-  — `<ul>`, `<pre>`, `<input>` — still sends the whole block to literal
+  — `<pre>`, `<input>`, `<dl>` — still sends the whole block to literal
   markup, because the scan that declines runs over the block rather than the
   cell. `style="text-align:…"` is not read; only the `align` attribute is.
   Per-cell alignment is not representable, so a column takes the header

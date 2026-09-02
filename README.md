@@ -38,9 +38,9 @@
 - **Reads the HTML in a README too.** A centered `<h1>` becomes a heading in
   the contents pane, badge images become the links they advertise, `<br>`
   breaks a line, a `<details>` block is shown open with its `<summary>` as the
-  title, and an HTML `<table>` — spans, sections, captions and all — is drawn
-  by the same emitter a markdown table is, instead of the tags themselves
-  reaching the page.
+  title, and an HTML `<ul>` or `<table>` — spans, sections, captions and all —
+  is drawn by the same emitter its markdown spelling is, instead of the tags
+  themselves reaching the page.
 - **Math is notation, not punctuation.** `$E = mc^2$` reads as a code span
   rather than as a formula wearing its dollar signs. TeX is not typeset —
   there is no glyph budget for that in a cell grid — but the delimiters go.
@@ -77,7 +77,7 @@ over. But rendering the same document through glow 3.0.0 shows what this fixes:
 | Tables with no outer frame, columns stretched to the full width | box drawing with a shaded header band, columns sized to content |
 | Thematic breaks as `--------` | a hairline `─` across the column |
 | Long code lines wrap *out* of the block | they stay sealed inside the card |
-| Raw HTML in a README printed tag by tag | interpreted: the title joins the contents pane, badges read as links, an HTML table is framed like any other |
+| Raw HTML in a README printed tag by tag | interpreted: the title joins the contents pane, badges read as links, an HTML list and an HTML table are drawn like any other |
 | Link targets printed inline, interrupting the sentence | link text reads as text; `]` walks them, `enter` opens |
 | 2-space margin | a centered reading column, page painted edge to edge |
 | No outline, no in-document search | a scroll-tracking contents pane, and `/` `n` `N` |
