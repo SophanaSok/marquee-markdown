@@ -15,6 +15,14 @@ Until 1.0 both halves may change.
 
 ## [Unreleased]
 
+### Added
+
+- **`CLICOLOR_FORCE=1` (or `FORCE_COLOR=1`) forces color into a pipe**, so
+  `marquee-markdown doc.md | less -R` keeps its color, and `TERM=dumb` now
+  gets plain text — no color, no OSC 8 hyperlinks, no centering — which is
+  what an editor's embedded shell is asking for. `NO_COLOR` still wins over
+  everything; it is the reader's own hand on the switch.
+
 ### Changed
 
 - **`-w` is capped at 1000 columns**, and `-w 0` ("do not wrap") renders at

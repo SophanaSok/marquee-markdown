@@ -41,7 +41,10 @@ impl Settings {
         line_numbers: bool,
         preserve_new_lines: bool,
     ) -> Self {
-        let is_terminal = tty::stdout_is_terminal();
+        // A terminal that declared itself dumb is styled like a redirect:
+        // OSC 8 hyperlinks would land on screen as text, and centering pads
+        // a page nothing will center on.
+        let is_terminal = tty::stdout_is_terminal() && !tty::term_is_dumb();
         Self {
             requested_width,
             line_numbers,

@@ -243,7 +243,9 @@ wrong in a cron job.
 Output degrades on its own: piping or redirecting drops color, gutters, and
 hyperlinks, so `marquee-markdown doc.md > out.txt` contains just the text, and
 closing the pipe early (`… | head`) stops quietly rather than erroring.
-`NO_COLOR` is honored.
+`NO_COLOR` is honored, `TERM=dumb` gets plain text, and `CLICOLOR_FORCE=1`
+(or `FORCE_COLOR=1`) forces color back on for a pipe, so
+`marquee-markdown doc.md | less -R` keeps its color.
 
 Every flag `glow` takes is accepted and means the same thing:
 `-a -l -m -n -p -s -t -w`.

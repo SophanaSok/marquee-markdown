@@ -106,8 +106,12 @@ pub fn run() -> Result<()> {
         TerminalColors::UNKNOWN
     };
 
-    // Redirected output gets no styling, matching glow.
-    let theme = if stdout_is_tty {
+    // Redirected output gets no styling, matching glow — unless the reader
+    // forces it (`CLICOLOR_FORCE=1`), which is how a pipe into `less -R`
+    // keeps its color. The escape sequences land in the pipe either way;
+    // forcing just means somebody said a program that understands them is on
+    // the other end.
+    let theme = if stdout_is_tty || !util::tty::color_disabled() {
         registry::resolve(&config.style, &terminal)?
     } else {
         crate::theme::Theme::plain()
