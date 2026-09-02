@@ -7,8 +7,8 @@
 //! was in force.
 
 use marquee_markdown::app::event::{Event, ScriptedEvents};
-use marquee_markdown::app::keymap::Chord;
 use marquee_markdown::app::external::Request;
+use marquee_markdown::app::keymap::Chord;
 use marquee_markdown::app::{App, Options, drive};
 use marquee_markdown::doc::search::Match;
 use marquee_markdown::source::{Base, Source};

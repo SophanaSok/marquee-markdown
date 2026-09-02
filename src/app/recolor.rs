@@ -209,9 +209,15 @@ mod tests {
         // desktops a signal too. They describe the same change.
         let mut app = app();
         let start = Instant::now();
-        assert!(cooled_down(&mut app, start), "the first ask must go through");
+        assert!(
+            cooled_down(&mut app, start),
+            "the first ask must go through"
+        );
         assert!(!cooled_down(&mut app, start + COOLDOWN / 2));
-        assert!(!cooled_down(&mut app, start + COOLDOWN - Duration::from_millis(1)));
+        assert!(!cooled_down(
+            &mut app,
+            start + COOLDOWN - Duration::from_millis(1)
+        ));
         assert!(cooled_down(&mut app, start + COOLDOWN));
     }
 
