@@ -117,6 +117,13 @@ nobody can justify. Re-record it by hand when the reader visibly changes, the
 same as the screenshots — the difference is that nothing will tell you, so it
 is worth checking when a release changes how the reader looks.
 
+The GIF is tracked, and shown in the README at the end of "Reading". Two
+consequences: a stale one is on the front page rather than on somebody's
+laptop, and every re-recording is a new megabyte in history rather than a diff.
+It is excluded from the published crate in `Cargo.toml` — `docs/` otherwise
+ships inside it, and the GIF alone took the packaged crate from 374 KiB to
+1.4 MiB compressed for a file no `cargo install` can play.
+
 ## Cutting a release
 
 1. Update `CHANGELOG.md`: turn `[Unreleased]` into the version and the date,

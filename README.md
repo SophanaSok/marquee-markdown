@@ -309,6 +309,16 @@ a quarter of the screen to say nothing.
 
 <p align="center"><sub><code>/</code> narrows as you type; <code>n</code> and <code>N</code> walk the matches.</sub></p>
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/SophanaSok/marquee-markdown/main/docs/demo.gif" alt="The reader in motion: the contents pane tracking the scroll, a section folding and unfolding, a search narrowing as it is typed, and the theme picker previewing against the document behind it" width="100%">
+</p>
+
+<p align="center"><sub>
+  The parts a still cannot show: the pane tracking the scroll, folding,
+  search, and the picker previewing against your own document. Recorded with
+  <code>vhs docs/demo.tape</code>.
+</sub></p>
+
 ## Browsing
 
 Run `marquee-markdown` with no argument, or point it at a directory, and it
