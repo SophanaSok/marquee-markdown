@@ -17,20 +17,33 @@ Two of the four are now published, at 0.9.0:
 | Homebrew | [SophanaSok/homebrew-marquee](https://github.com/SophanaSok/homebrew-marquee) |
 | Scoop | [SophanaSok/scoop-marquee](https://github.com/SophanaSok/scoop-marquee) |
 
-**The AUR packages and the nixpkgs submission do not exist yet.** The AUR pair
-needs an account with an SSH key registered; the nixpkgs derivation needs a
-pull request that also adds its maintainer entry. Both build and lint clean —
-`makepkg` and `namcap` on the PKGBUILDs, `nix-build` on the derivation.
+The other two are not published, for different reasons:
 
-Publishing them is the one part of distribution that cannot be done from this
-repository, because each wants an account and a repository of its own:
+- **nixpkgs** is submitted and in review:
+  [NixOS/nixpkgs#558998](https://github.com/NixOS/nixpkgs/pull/558998), opened
+  as a draft. nixpkgs requires a `meta.maintainers` entry, so the pull request
+  carries the package and the `maintainers/maintainer-list.nix` addition
+  together. Its [automation/AI policy] requires an `Assisted-by:` trailer on
+  any LLM-assisted commit and says a `Co-authored-by:` trailer does not
+  satisfy it.
 
-| Channel | What to create | Then |
+- **The AUR has nowhere to publish to.** It has been closed to new accounts
+  since 15 June 2026, after a supply-chain attack that hijacked more than a
+  thousand packages to ship credential stealers; package adoption is disabled
+  as well, and neither has an announced reopening date. Both PKGBUILDs are
+  written, build under `makepkg` and pass `namcap`, and are one `git push`
+  each the day it reopens. Do not go looking for a way around this — it is an
+  active security control, not a queue.
+
+[automation/AI policy]: https://github.com/NixOS/nixpkgs/blob/master/CONTRIBUTING.md#automationai-policy
+
+What each remaining channel needs, when it can be done:
+
+| Channel | What to do | Then |
 | --- | --- | --- |
-| Homebrew | a `homebrew-marquee` repo | `brew install SophanaSok/marquee/marquee-markdown` works. Submit to homebrew-core once the project clears its notability bar. |
-| Scoop | a `scoop-marquee` repo | take `marquee-markdown.json` from the latest release; its `autoupdate` block keeps the bucket current on its own |
-| AUR | `marquee-markdown` and `marquee-markdown-bin` | `git push` the PKGBUILD to `ssh://aur@aur.archlinux.org/<name>.git`, with a `.SRCINFO` from `makepkg --printsrcinfo` |
-| nixpkgs | a PR to nixpkgs | copy `nix/default.nix` to `pkgs/by-name/ma/marquee-markdown/package.nix` and fill in both hashes |
+| AUR | register an SSH key with an AUR account, once registration reopens | `git push` each PKGBUILD to `ssh://aur@aur.archlinux.org/<name>.git`, with a `.SRCINFO` from `makepkg --printsrcinfo` |
+| nixpkgs | review the draft and mark it ready | the policy holds the submitter accountable for the contribution and for answering reviewers directly |
+| homebrew-core | submit once the project clears its notability bar | the tap stops being the only route |
 
 The AUR pair is deliberately two packages: `marquee-markdown` builds from
 source and runs the test suite, `marquee-markdown-bin` unpacks the release

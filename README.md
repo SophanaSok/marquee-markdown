@@ -143,19 +143,29 @@ scoop bucket add marquee https://github.com/SophanaSok/scoop-marquee
 scoop install marquee-markdown
 ```
 
-### Not yet published
+### Nix
 
-The AUR PKGBUILDs and the nixpkgs derivation live in
-[`packaging/`](packaging/), build and lint clean, and are kept current by a
-test that fails when one falls two releases behind — but neither has been
-submitted yet, so neither is something you can install today.
-[`packaging/README.md`](packaging/README.md) has what each one needs.
-
-Nix can build it from a checkout in the meantime:
+Submitted to nixpkgs and in review
+([NixOS/nixpkgs#558998](https://github.com/NixOS/nixpkgs/pull/558998)), so
+`nix-shell -p marquee-markdown` is not a thing yet. Until it is, the derivation
+builds from a checkout:
 
 ```sh
 nix-build -E 'with import <nixpkgs> {}; callPackage ./packaging/nix/default.nix {}'
 ```
+
+### Arch Linux
+
+Not available, and not for want of a package. Both PKGBUILDs are written and
+kept current in [`packaging/aur/`](packaging/aur/) — they build under `makepkg`
+and pass `namcap` — but **the AUR has been closed to new accounts since 15 June
+2026**, after a supply-chain attack that hijacked more than a thousand packages
+to ship credential stealers. Package adoption is disabled too, and there is no
+announced date for either reopening.
+
+So there is nowhere to publish them to. Until that changes, `cargo install
+marquee-markdown` or the [prebuilt archive](#prebuilt) above are the ways in on
+Arch; both PKGBUILDs are ready to push the day it reopens.
 
 ### From source
 
