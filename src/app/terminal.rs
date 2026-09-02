@@ -27,7 +27,10 @@ use crossterm::Command;
 use crossterm::cursor::{Hide, Show};
 #[cfg(windows)]
 use crossterm::event::EnableMouseCapture;
-use crossterm::event::{DisableBracketedPaste, DisableMouseCapture, EnableBracketedPaste};
+use crossterm::event::{
+    DisableBracketedPaste, DisableFocusChange, DisableMouseCapture, EnableBracketedPaste,
+    EnableFocusChange,
+};
 use crossterm::queue;
 use crossterm::terminal::{
     EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
@@ -178,6 +181,11 @@ fn setup(out: &mut impl Write, mouse: bool) -> io::Result<()> {
     // this outright, and a terminal without bracketed paste is still one this
     // program has to run on.
     let _ = queue!(out, EnableBracketedPaste);
+    // Focus reporting, which is how `--style system` notices that the terminal
+    // was retinted while the reader was looking at something else. Best-effort
+    // for the same reason as the paste above: a terminal that ignores mode
+    // 1004 simply never reports, and the other triggers still cover it.
+    let _ = queue!(out, EnableFocusChange);
     // Before the enable below, which names mode 1000 again: written the other
     // way round, the clear would undo it.
     let _ = queue!(out, DisableAllMouse);
@@ -207,6 +215,11 @@ fn teardown(out: &mut impl Write, mouse: bool) -> io::Result<()> {
         let _ = queue!(out, DisableAllMouse);
     }
     let _ = queue!(out, DisableBracketedPaste);
+    // Sent unconditionally, like `DisableAllMouse` above and for the same
+    // reason: `setup` asks for this best-effort, so there is no flag here
+    // saying whether it took, and a terminal left reporting focus would send
+    // `CSI I` at whatever owns the screen next.
+    let _ = queue!(out, DisableFocusChange);
     queue!(out, LeaveAlternateScreen, Show)
 }
 

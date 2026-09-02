@@ -189,6 +189,13 @@ fn options(cli: &Cli, config: &Config, terminal: TerminalColors) -> app::Options
         config_path: config.path.clone(),
         style_overridden,
         terminal,
+        style: config.style.clone(),
+        // Whether asking is worth doing again. A terminal that said nothing
+        // the first time is not asked a second: `UNKNOWN` here is `screen`, a
+        // dumb terminal, a Windows console, or a style that never asked at
+        // all, and none of those becomes able to answer later.
+        terminal_answers: terminal != TerminalColors::UNKNOWN,
+        theme_watch: config.theme_watch.clone(),
     }
 }
 
@@ -199,8 +206,13 @@ fn options(cli: &Cli, config: &Config, terminal: TerminalColors) -> app::Options
 /// default invocation asks the terminal nothing at all. A program that writes
 /// escape sequences nobody asked it to write is a program that will one day
 /// write them into a pipe.
+///
+/// Delegated rather than restated, because `app::recolor` asks the same
+/// question of the same style every time it considers a re-query: two spellings
+/// of this could disagree, and the way they would disagree is a reader whose
+/// `system` palette was built once and then never followed.
 fn asks_the_terminal(style: &str) -> bool {
-    style.trim().eq_ignore_ascii_case(registry::SYSTEM)
+    registry::follows_the_terminal(style)
 }
 
 /// Run a subcommand.

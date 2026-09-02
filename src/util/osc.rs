@@ -1,14 +1,21 @@
 //! Asking the terminal what colors it is drawing with.
 //!
 //! `OSC 10`, `OSC 11` and `OSC 4` are questions a terminal answers on the same
-//! stream it takes keystrokes from, which makes them the one thing this
-//! program must never do while the reader is running: the event thread owns
-//! standard input, and a reply it swallows is a reply nobody is waiting for
-//! any more. So the exchange happens exactly once, in `cli::run`, before the
-//! screen is taken and before that thread exists. What it learns is carried on
-//! `App` from then on, and no key press asks the terminal anything.
+//! stream it takes keystrokes from, so asking while the reader is running is
+//! only safe when nothing else is reading: a reply the event thread swallows
+//! is a reply nobody is waiting for any more.
 //!
-//! Three details make this safe to do at startup rather than merely possible:
+//! The first exchange happens in `cli::run`, before the screen is taken and
+//! before that thread exists. Later ones happen while it is running, and are
+//! safe for a different reason: [`crate::app::recolor`] takes
+//! [`crate::app::gate::pause`] first, which does not return until every reader
+//! has parked at the top of its loop, and hands the proof to
+//! `event::discard_pending_input` afterwards so a late reply never parses into
+//! ordinary-looking keys. That is the same handshake an editor handoff uses,
+//! and this module is sound under it and under nothing weaker. Do not call
+//! into here from anywhere that does not hold a `Paused`.
+//!
+//! Four details make the exchange safe:
 //!
 //! - **It runs on `/dev/tty`, not on standard input or output.** So a piped
 //!   document (`cat x.md | mmd`) is still a document, redirected output still
@@ -60,6 +67,22 @@ use crate::theme::system::TerminalColors;
 /// soon as it lands, which on a local terminal is single-digit milliseconds.
 pub const TIMEOUT: Duration = Duration::from_millis(100);
 
+/// How much to ask for.
+///
+/// The distinction exists because the two callers want different things.
+/// Building a palette needs every answer; noticing that the palette *changed*
+/// needs one, and asking for eighteen to find out that nothing moved is
+/// eighteen round trips of nothing. A background is enough to detect a theme
+/// switch: no colorscheme worth switching to keeps the old page color.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Ask {
+    /// Both defaults and all sixteen slots — everything a palette is built
+    /// from.
+    Everything,
+    /// The background alone, as a change detector.
+    Background,
+}
+
 /// Ask the terminal about its colors, or give up.
 ///
 /// Never fails and never blocks longer than `timeout`: a terminal that will
@@ -68,16 +91,31 @@ pub const TIMEOUT: Duration = Duration::from_millis(100);
 /// different from what it does with a partial answer.
 #[must_use]
 pub fn query(timeout: Duration) -> TerminalColors {
-    platform::query(timeout)
+    query_for(Ask::Everything, timeout)
 }
 
-/// The bytes to send: both defaults, all sixteen slots, then the sentinel.
-fn request() -> Vec<u8> {
+/// Ask the terminal only what `ask` names.
+///
+/// # Safety of a running reader
+/// Sound only while the terminal reader is standing down — see the module
+/// header. [`crate::app::recolor`] is the only caller that runs with the
+/// screen taken, and it holds a [`crate::app::gate::Paused`] across this.
+#[must_use]
+pub fn query_for(ask: Ask, timeout: Duration) -> TerminalColors {
+    platform::query(ask, timeout)
+}
+
+/// The bytes to send, ending in the sentinel whatever was asked for.
+fn request(ask: Ask) -> Vec<u8> {
     let mut out = Vec::new();
-    out.extend_from_slice(b"\x1b]10;?\x07");
+    // The background goes first in both shapes, so a terminal that answers
+    // one question and then stops still answers the one that detects a change.
     out.extend_from_slice(b"\x1b]11;?\x07");
-    for slot in 0..16 {
-        out.extend_from_slice(format!("\x1b]4;{slot};?\x07").as_bytes());
+    if matches!(ask, Ask::Everything) {
+        out.extend_from_slice(b"\x1b]10;?\x07");
+        for slot in 0..16 {
+            out.extend_from_slice(format!("\x1b]4;{slot};?\x07").as_bytes());
+        }
     }
     // Primary Device Attributes, last, as the sentinel. Answered even by
     // terminals that ignore every question above it, which is what makes the
@@ -226,10 +264,10 @@ mod platform {
     use rustix::io::ioctl_fionread;
     use rustix::termios::{OptionalActions, SpecialCodeIndex, Termios, tcgetattr, tcsetattr};
 
-    use super::{MAX_REPLY, answered, parse, request};
+    use super::{Ask, MAX_REPLY, answered, parse, request};
     use crate::theme::system::TerminalColors;
 
-    pub fn query(timeout: Duration) -> TerminalColors {
+    pub fn query(ask: Ask, timeout: Duration) -> TerminalColors {
         let Ok(tty) = OpenOptions::new().read(true).write(true).open("/dev/tty") else {
             return TerminalColors::UNKNOWN;
         };
@@ -257,7 +295,7 @@ mod platform {
         // From here on the terminal is in raw mode, and putting it back is not
         // optional. The guard owns that, including if anything below panics.
         let guard = Restore { tty: &tty, saved };
-        let replies = exchange(&tty, timeout);
+        let replies = exchange(&tty, ask, timeout);
         drop(guard);
         parse(&replies)
     }
@@ -294,9 +332,9 @@ mod platform {
     ///
     /// Returns what it has rather than an error: a short read, a closed
     /// terminal and a terminal with no opinion are all the same answer.
-    fn exchange(tty: &File, timeout: Duration) -> Vec<u8> {
+    fn exchange(tty: &File, ask: Ask, timeout: Duration) -> Vec<u8> {
         let mut writer = tty;
-        if writer.write_all(&request()).is_err() || writer.flush().is_err() {
+        if writer.write_all(&request(ask)).is_err() || writer.flush().is_err() {
             return Vec::new();
         }
         let deadline = Instant::now() + timeout;
@@ -332,6 +370,7 @@ mod platform {
 mod platform {
     use std::time::Duration;
 
+    use super::Ask;
     use crate::theme::system::TerminalColors;
 
     /// Windows consoles deliver these replies through the console input API
@@ -339,7 +378,7 @@ mod platform {
     /// the one above rather than a variation on it. Until that is written,
     /// saying "no answer" gets the documented fallback rather than a wrong
     /// palette.
-    pub fn query(_timeout: Duration) -> TerminalColors {
+    pub fn query(_ask: Ask, _timeout: Duration) -> TerminalColors {
         TerminalColors::UNKNOWN
     }
 }
@@ -467,12 +506,34 @@ mod tests {
 
     #[test]
     fn the_request_asks_about_everything_and_ends_with_the_sentinel() {
-        let request = request();
+        let request = request(Ask::Everything);
         assert!(find(&request, b"\x1b]10;?").is_some());
         assert!(find(&request, b"\x1b]11;?").is_some());
         assert!(find(&request, b"\x1b]4;0;?").is_some());
         assert!(find(&request, b"\x1b]4;15;?").is_some());
         assert!(find(&request, b"\x1b]4;16;?").is_none());
         assert!(request.ends_with(b"\x1b[c"), "the sentinel must go last");
+    }
+
+    #[test]
+    fn a_background_probe_asks_two_questions_and_no_more() {
+        // The whole point of the probe: a reader who alt-tabs all day pays two
+        // sequences to learn that nothing changed, not nineteen.
+        let probe = request(Ask::Background);
+        assert!(find(&probe, b"\x1b]11;?").is_some());
+        assert!(find(&probe, b"\x1b]10;?").is_none());
+        assert!(find(&probe, b"\x1b]4;").is_none());
+        assert!(probe.ends_with(b"\x1b[c"), "the sentinel must go last");
+        assert!(probe.len() < request(Ask::Everything).len() / 4);
+    }
+
+    #[test]
+    fn the_background_comes_first_in_both_shapes() {
+        // A terminal that answers one question and then stops still has to
+        // answer the one a change is detected from.
+        for ask in [Ask::Everything, Ask::Background] {
+            let bytes = request(ask);
+            assert!(bytes.starts_with(b"\x1b]11;?"), "{ask:?}");
+        }
     }
 }

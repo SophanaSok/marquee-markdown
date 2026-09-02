@@ -8,6 +8,7 @@
 
 use marquee_markdown::app::event::{Event, ScriptedEvents};
 use marquee_markdown::app::keymap::Chord;
+use marquee_markdown::app::external::Request;
 use marquee_markdown::app::{App, Options, drive};
 use marquee_markdown::doc::search::Match;
 use marquee_markdown::source::{Base, Source};
@@ -1171,4 +1172,72 @@ fn copying_an_in_document_link_copies_what_the_markdown_says() {
         "{:?}",
         app.message
     );
+}
+
+#[test]
+fn the_recolor_key_asks_the_loop_rather_than_the_terminal() {
+    // The whole reason this is a request. A headless run has no terminal and
+    // must not go looking for one, so pressing the key records what was wanted
+    // and stops — exactly as `e` records an edit without opening an editor.
+    let mut options = Options::default();
+    options.style = "system".to_owned();
+    options.terminal_answers = true;
+    let app = run_with(&document(), "R", options);
+    assert_eq!(
+        app.pending,
+        Some(Request::Recolor { loud: true }),
+        "the key has to reach the loop as a request"
+    );
+    // Loud, because a key press is a question owed an answer. The message
+    // itself is written when the request is performed, which a headless run
+    // deliberately never does.
+    assert!(app.message.is_none(), "{:?}", app.message);
+}
+
+#[test]
+fn a_reader_following_nothing_is_told_so_rather_than_ignored() {
+    // `--style auto` resolves to the same palette whatever the terminal says,
+    // so there is nothing to follow. Silently doing nothing would leave the
+    // reader pressing the key harder.
+    let app = run(&document(), "R");
+    assert_eq!(app.pending, None);
+    assert!(
+        app.message.is_some_and(|m| m.contains("not following")),
+        "a key that cannot work has to say why"
+    );
+}
+
+#[test]
+fn toggling_light_and_dark_stops_following_the_terminal() {
+    // `T` names a palette rather than a source. Following on afterwards would
+    // let the next terminal retint resolve `system` straight back over the
+    // palette the reader just asked for.
+    let mut options = Options::default();
+    options.style = "system".to_owned();
+    options.terminal_answers = true;
+    let app = run_with(&document(), "T", options);
+    assert_eq!(app.following, None);
+    // And so the key that follows has nothing left to do.
+    assert_eq!(app.pending, None);
+}
+
+#[test]
+fn choosing_a_theme_follows_the_one_that_was_chosen() {
+    // Picking `system` is how a reader asks to track their terminal — and how
+    // following resumes after `T` turned it off.
+    // Accepting writes the choice down, so this needs somewhere of its own to
+    // write it: without `config_path` the picker would reach for the real
+    // configuration file and change how the reader's own `mmd` starts.
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut options = Options::default();
+    options.config_path = Some(dir.path().join("config.toml"));
+    options.terminal = TerminalColors {
+        fg: Some(Rgb(0xd8, 0xd8, 0xd8)),
+        bg: Some(Rgb(0x18, 0x18, 0x18)),
+        ..TerminalColors::UNKNOWN
+    };
+    // `system` is the last row; `G` lands on it and `enter` accepts.
+    let app = run_with(&document(), "sG\n", options);
+    assert_eq!(app.following.as_deref(), Some("system"));
+    assert_eq!(app.options.style, "system");
 }

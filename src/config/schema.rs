@@ -27,6 +27,8 @@ pub struct File {
     pub ui: Ui,
     /// How documents are rendered.
     pub render: Render,
+    /// Keeping the palette in step with what it came from.
+    pub theme: ThemeSection,
     /// Key bindings, per mode.
     pub keys: BTreeMap<String, BTreeMap<String, String>>,
 }
@@ -58,6 +60,29 @@ pub struct General {
     /// every other style — the default included — is unaffected, because
     /// nothing else asks.
     pub terminal_query: Option<bool>,
+}
+
+/// `[theme]`.
+///
+/// Not `[general]`, whose doc comment promises every setting there also has a
+/// command-line flag. This has none on purpose: it describes where a *desktop*
+/// keeps its theme state, which is a property of the machine rather than of a
+/// run, and a flag would invite it onto a command line that is then wrong on
+/// the next machine.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default, rename_all = "kebab-case")]
+#[non_exhaustive]
+pub struct ThemeSection {
+    /// Paths whose change means the terminal may have been retinted.
+    ///
+    /// For `--style system` on a desktop that swaps a theme underneath a
+    /// terminal window that never loses focus — which is the one case regaining
+    /// focus cannot notice. A leading `~` is expanded; nothing else is.
+    ///
+    /// On Omarchy this is `~/.local/state/omarchy/current/theme`. No desktop's
+    /// layout is compiled in, because there is no version of that list that
+    /// stays right.
+    pub watch: Option<Vec<String>>,
 }
 
 /// `[render]`.
@@ -110,6 +135,7 @@ const KNOWN: &[(&str, &[&str])] = &[
     ),
     ("render", &["html"]),
     ("ui", &["contents", "hints"]),
+    ("theme", &["watch"]),
 ];
 
 /// Parse a configuration file, along with anything in it we did not recognize.
@@ -175,6 +201,36 @@ fn check_key_sections(contents: &toml::Value, unknown: &mut Vec<String>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_theme_section_is_read_and_not_warned_about() {
+        // A section missing from `KNOWN` parses into the struct and warns at
+        // the reader anyway, which is the worst of both: it works, and it says
+        // it does not.
+        let (file, warnings) = parse(
+            r#"
+            [theme]
+            watch = ["~/.local/state/omarchy/current/theme", "/etc/theme"]
+            "#,
+        )
+        .expect("parse");
+        assert_eq!(
+            file.theme.watch.as_deref(),
+            Some(
+                &[
+                    "~/.local/state/omarchy/current/theme".to_owned(),
+                    "/etc/theme".to_owned()
+                ][..]
+            )
+        );
+        assert!(warnings.is_empty(), "{warnings:?}");
+    }
+
+    #[test]
+    fn a_misspelled_theme_key_is_still_reported() {
+        let (_, warnings) = parse("[theme]\nwatches = []\n").expect("parse");
+        assert_eq!(warnings, vec!["theme.watches".to_owned()]);
+    }
 
     #[test]
     fn an_empty_file_is_all_defaults() {

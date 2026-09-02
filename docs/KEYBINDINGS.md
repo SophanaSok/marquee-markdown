@@ -33,6 +33,7 @@ here can be pasted into `[keys.<mode>]`.
 | `c` | `copy-document` | copy the document |
 | `e` | `edit` | edit this document |
 | `r` | `reload` | reload from disk |
+| `R` | `recolor` | re-read the terminal's colors |
 | `t` | `toggle-toc` | show / hide contents |
 | `tab` | `focus-next` | focus contents / document |
 | `T` | `toggle-theme` | switch light / dark |
@@ -57,6 +58,7 @@ here can be pasted into `[keys.<mode>]`.
 | `/` | `filter-start` | filter the list |
 | `r` | `browser-rescan` | rescan the directory |
 | `.` | `browser-toggle-hidden` | show / hide hidden files |
+| `R` | `recolor` | re-read the terminal's colors |
 | `T` | `toggle-theme` | switch light / dark |
 | `s` | `theme-picker` | choose a theme |
 | `?` | `toggle-help` | toggle this help |
@@ -78,6 +80,7 @@ here can be pasted into `[keys.<mode>]`.
 | `tab` | `focus-next` | focus contents / document |
 | `t` | `toggle-toc` | show / hide contents |
 | `/` | `search-start` | search |
+| `R` | `recolor` | re-read the terminal's colors |
 | `T` | `toggle-theme` | switch light / dark |
 | `s` | `theme-picker` | choose a theme |
 | `?` | `toggle-help` | toggle this help |

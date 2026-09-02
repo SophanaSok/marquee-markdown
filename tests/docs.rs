@@ -354,3 +354,55 @@ fn every_pinned_package_manifest_points_at_a_real_release() {
         }
     }
 }
+
+/// The longest name `pkill -x` can ever match.
+///
+/// The kernel stores a process name in a fixed 16-byte field, so `comm` is
+/// fifteen characters and a `pkill -x` pattern longer than that matches
+/// nothing at all — it does not fall back to a prefix, it just never fires.
+const COMM_MAX: usize = 15;
+
+#[test]
+fn the_theme_hook_signals_a_name_pkill_can_actually_match() {
+    // This was shipped spelling the binary in full, which looks obviously
+    // right and silently signals nothing: `marquee-markdown` is sixteen
+    // characters, so only `mmd` was ever reached. It cost a live desktop test
+    // to notice, which is exactly the kind of thing worth a guard.
+    let hook = std::fs::read_to_string("packaging/omarchy/theme-set.d/reload-marquee")
+        .expect("the theme hook is in the tree");
+
+    let mut signalled = Vec::new();
+    for line in hook.lines() {
+        let line = line.trim();
+        if line.starts_with('#') {
+            continue;
+        }
+        // `pkill -USR1 -x <name>`: the name is the last word.
+        if let Some(name) = line.strip_prefix("pkill ").and_then(|rest| {
+            rest.contains("-x")
+                .then(|| rest.split_whitespace().next_back())
+                .flatten()
+        }) {
+            assert!(
+                name.len() <= COMM_MAX,
+                "the hook signals {name:?}, which is {} characters: `pkill -x` \
+                 caps at {COMM_MAX} and would match nothing",
+                name.len()
+            );
+            signalled.push(name.to_owned());
+        }
+    }
+
+    // Both binaries, or a reader who ran the one that is not covered never
+    // hears about a theme change.
+    assert!(
+        signalled.iter().any(|name| name == "mmd"),
+        "the hook has to signal `mmd`: {signalled:?}"
+    );
+    assert!(
+        signalled
+            .iter()
+            .any(|name| "marquee-markdown".starts_with(name.as_str()) && name.len() == COMM_MAX),
+        "the hook has to signal the long binary under its truncated name: {signalled:?}"
+    );
+}

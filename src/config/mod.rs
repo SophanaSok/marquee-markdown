@@ -56,6 +56,9 @@ pub struct Config {
     pub update_check: bool,
     /// Let `--style system` ask the terminal what colors it is using.
     pub terminal_query: bool,
+    /// Paths whose change means the terminal may have been retinted, and
+    /// `--style system` should ask it again.
+    pub theme_watch: Vec<PathBuf>,
     /// Start with the contents pane showing.
     pub contents: bool,
     /// Start with the hint line showing above the status bar.
@@ -155,6 +158,7 @@ impl Config {
             preserve_new_lines: layer.preserve_new_lines.unwrap_or(false),
             update_check: layer.update_check.unwrap_or(true),
             terminal_query: layer.terminal_query.unwrap_or(true),
+            theme_watch: layer.theme_watch.unwrap_or_default(),
             contents: layer.contents.unwrap_or(true),
             hints: layer.hints.unwrap_or(true),
             html: layer.html.unwrap_or_default(),
@@ -191,6 +195,29 @@ impl Config {
         let _ = writeln!(out, "preserve-new-lines = {}", self.preserve_new_lines);
         let _ = writeln!(out, "update-check = {}", self.update_check);
         let _ = writeln!(out, "terminal-query = {}", self.terminal_query);
+        // Printed even when empty, and as a comment then: `mmd config` is how
+        // a reader makes their first file, and a setting that only appears
+        // once it is already set is one nobody discovers. Paths come back out
+        // absolute because loading expanded them, which is what makes this
+        // round-trip — a `~` written here would be expanded a second time to
+        // the same place.
+        if self.theme_watch.is_empty() {
+            out.push_str(
+                "\n[theme]\n\
+                 # watch = [\"~/.local/state/omarchy/current/theme\"]\n\
+                 # Paths whose change means the terminal may have been retinted,\n\
+                 # for `--style system` on a desktop that swaps a theme underneath\n\
+                 # a window that never loses focus. Regaining focus is already a\n\
+                 # trigger, so this is only needed when focus never moves.\n",
+            );
+        } else {
+            let paths: Vec<String> = self
+                .theme_watch
+                .iter()
+                .map(|path| format!("{:?}", path.display().to_string()))
+                .collect();
+            let _ = writeln!(out, "\n[theme]\nwatch = [{}]", paths.join(", "));
+        }
         let _ = writeln!(out, "\n[render]\nhtml = {:?}", self.html.name());
         let _ = writeln!(out, "\n[ui]\ncontents = {}", self.contents);
         let _ = writeln!(out, "hints = {}", self.hints);
@@ -412,6 +439,32 @@ mod tests {
     }
 
     #[test]
+    fn a_watched_theme_path_survives_being_printed_and_read_back() {
+        // The round-trip above starts from a file with no `[theme]` in it, so
+        // it would pass just as well if this setting were never printed —
+        // which is exactly how `mmd config > config.toml` comes to lose it.
+        let (_dir, path) = write("[theme]\nwatch = [\"/etc/theme-state\"]\n");
+        let config = Config::load(Layer::default(), Some(&path), &no_env).expect("load");
+        assert_eq!(config.theme_watch, vec![PathBuf::from("/etc/theme-state")]);
+
+        let (_dir2, again) = write(&config.to_toml());
+        let reloaded = Config::load(Layer::default(), Some(&again), &no_env).expect("reload");
+        assert!(reloaded.warnings.is_empty(), "{:?}", reloaded.warnings);
+        assert_eq!(reloaded.theme_watch, config.theme_watch);
+    }
+
+    #[test]
+    fn the_watch_setting_is_advertised_even_when_it_is_unset() {
+        // `mmd config` is how a reader makes their first file. A setting that
+        // only appears once it is already set is one nobody discovers.
+        let config = Config::default();
+        assert!(config.theme_watch.is_empty());
+        let printed = config.to_toml();
+        assert!(printed.contains("[theme]"), "{printed}");
+        assert!(printed.contains("# watch = ["), "{printed}");
+    }
+
+    #[test]
     fn the_effective_configuration_round_trips_through_a_file() {
         let (_dir, path) =
             write("[general]\nstyle = \"paper\"\nwidth = 72\n[keys.document]\nx = \"quit\"\n");
@@ -427,6 +480,7 @@ mod tests {
         );
         assert_eq!(reloaded.style, config.style);
         assert_eq!(reloaded.width, config.width);
+        assert_eq!(reloaded.theme_watch, config.theme_watch);
         // Every chord resolves the same. The order the bindings are stored in
         // differs — a TOML table is sorted — and that only affects how the key
         // reference groups them.

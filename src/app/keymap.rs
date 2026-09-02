@@ -281,6 +281,10 @@ const DEFAULTS: &[(Mode, &str, Action)] = &[
     (Mode::Document, "c", Action::CopyDocument),
     (Mode::Document, "e", Action::Edit),
     (Mode::Document, "r", Action::Reload),
+    // Beside `r` deliberately: one re-reads the document, the other re-reads
+    // the palette, and a reader who wants "pick up what changed" should not
+    // have to remember which half they meant.
+    (Mode::Document, "R", Action::Recolor),
     (Mode::Document, "t", Action::ToggleToc),
     (Mode::Document, "tab", Action::FocusNext),
     (Mode::Document, "T", Action::ToggleTheme),
@@ -321,6 +325,7 @@ const DEFAULTS: &[(Mode, &str, Action)] = &[
     // for hidden files.
     (Mode::Browser, "r", Action::BrowserRescan),
     (Mode::Browser, ".", Action::BrowserToggleHidden),
+    (Mode::Browser, "R", Action::Recolor),
     (Mode::Browser, "T", Action::ToggleTheme),
     (Mode::Browser, "s", Action::ThemePicker),
     (Mode::Browser, "?", Action::ToggleHelp),
@@ -347,6 +352,7 @@ const DEFAULTS: &[(Mode, &str, Action)] = &[
     (Mode::Toc, "tab", Action::FocusNext),
     (Mode::Toc, "t", Action::ToggleToc),
     (Mode::Toc, "/", Action::SearchStart),
+    (Mode::Toc, "R", Action::Recolor),
     (Mode::Toc, "T", Action::ToggleTheme),
     (Mode::Toc, "s", Action::ThemePicker),
     (Mode::Toc, "?", Action::ToggleHelp),

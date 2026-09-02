@@ -10,7 +10,6 @@ use super::action::Action;
 use super::event::Event;
 use super::keymap::Mode;
 use super::state::{App, Focus, Overlay, Prompt, PromptKind, Screen, ThemePicker};
-use crate::theme::{Appearance, Theme, ThemeVariant};
 
 /// Apply one event.
 pub fn handle(app: &mut App, event: Event) {
@@ -36,7 +35,31 @@ pub fn handle(app: &mut App, event: Event) {
         // Resizes are handled by recomputing pane geometry before the next
         // draw, which happens for every iteration anyway.
         Event::Resize(_, _) => {}
+        // Focus came back, a watched theme path settled, or a signal arrived.
+        // Silent, because all three fire without the reader having asked for
+        // anything.
+        Event::Recolor => request_recolor(app, false),
     }
+}
+
+/// Ask the loop to bring the palette back in step with what it came from.
+///
+/// Recorded rather than carried out here for the same reason an edit is: a
+/// headless run has no terminal and must not go looking for one, and the loop
+/// is what has it. A second trigger before the first is performed overwrites
+/// it rather than queueing, which is the coalescing the burst case wants —
+/// one theme switch arrives as a watched path *and* a focus regain.
+fn request_recolor(app: &mut App, loud: bool) {
+    if app.following.is_none() {
+        // Nothing is being followed: the reader picked this theme, or it is
+        // one of the styles that resolves to the same palette whatever the
+        // terminal says. Saying so out loud is only useful when they asked.
+        if loud {
+            app.message = Some("not following a theme; pick one with the theme picker".to_owned());
+        }
+        return;
+    }
+    app.pending = Some(crate::app::external::Request::Recolor { loud });
 }
 
 /// Apply one action.
@@ -74,6 +97,13 @@ pub fn apply(app: &mut App, action: Action) {
         Action::ToggleHints => app.hints = !app.hints,
         Action::ToggleTheme => {
             std::mem::swap(&mut app.theme, &mut app.alternate);
+            // And stop following whatever this was resolved from. `T` names a
+            // palette rather than a source, so there is nothing left to keep
+            // in step with — and a terminal retinted afterwards would
+            // otherwise resolve `system` straight back over the palette the
+            // reader just asked for. Choosing `system` again in the picker is
+            // how following resumes.
+            app.following = None;
             // The layout cache notices the change on the next reconcile and
             // re-lays out the document, keeping the reading position.
         }
@@ -128,6 +158,9 @@ pub fn apply(app: &mut App, action: Action) {
         Action::BrowserBottom => with_browser(app, crate::browser::Browser::to_last),
         Action::BrowserOpen => open_selected_file(app),
         Action::Reload => reload(app, true),
+        // Loud, unlike every automatic trigger: somebody pressed a key and is
+        // owed an answer, even when the answer is that nothing moved.
+        Action::Recolor => request_recolor(app, true),
         Action::BrowserRescan => rescan(app),
         Action::BrowserToggleHidden => {
             app.options.all = !app.options.all;
@@ -514,16 +547,20 @@ fn accept_theme(app: &mut App) {
     // reader started with. Picking that same theme would leave both sides of
     // the swap identical and `T` doing nothing at all.
     if app.alternate.appearance == app.theme.appearance {
-        app.alternate = Theme::new(match app.theme.appearance {
-            Appearance::Light => ThemeVariant::Slate,
-            Appearance::Dark => ThemeVariant::Paper,
-        });
+        app.alternate = crate::app::state::counterpart(&app.theme);
     }
 
     let name = match picker.entries.get(picker.cursor) {
         Some(entry) => entry.name.clone(),
         None => return,
     };
+
+    // Follow what was just chosen, rather than stopping. Picking `system` is
+    // how a reader asks to track their terminal, and picking a theme somebody
+    // is editing is how they ask to see it change — both are the same
+    // question as `--style` was, asked again at runtime.
+    app.options.style = name.clone();
+    app.following = crate::app::state::follows(&name);
     // Nothing to save if the cursor never left a theme that would not load, or
     // it is already what is in force.
     if picker.failed.contains(&name) {

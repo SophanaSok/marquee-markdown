@@ -21,12 +21,32 @@ use super::terminal;
 /// recorded and unperformed, which is what lets a test assert that pressing
 /// `e` asked to edit the right line without an editor opening.
 #[derive(Debug, Clone, PartialEq, Eq)]
+// Adding `Recolor` was a breaking change because this was exhaustive. It is
+// the kind of enum that grows — the reader will want the terminal to itself
+// again — so the next one is not.
+#[non_exhaustive]
 pub enum Request {
     /// Open a file in the reader's editor, at a line.
     Edit { path: PathBuf, line: usize },
     /// Stop, and let the shell have the terminal back.
     #[cfg(unix)]
     Suspend,
+    /// Ask the terminal about its colors again, because something suggests it
+    /// was retinted.
+    ///
+    /// The one variant no other program is handed the terminal for: it is
+    /// carried out by [`super::recolor::run`] without a
+    /// [`super::terminal::restore`], because nothing else is taking the
+    /// screen. It is a request all the same — it needs the terminal to itself,
+    /// which is what this enum is for, and routing it here is what lets a
+    /// headless test see that a trigger asked for it without a terminal
+    /// existing.
+    Recolor {
+        /// Whether to report an unchanged palette and a failed theme file.
+        /// True for the key, false for every automatic trigger — a message on
+        /// each alt-tab would be its own kind of broken.
+        loud: bool,
+    },
 }
 
 /// Carry out a request, restoring the terminal around it.
@@ -36,6 +56,17 @@ pub enum Request {
 /// cannot be started. The caller should show it rather than exit: failing to
 /// open an editor is not a reason to lose the reader's place.
 pub fn run(request: &Request, mouse: bool) -> Result<()> {
+    // Performed by `recolor::run` instead, which needs the reader stood down
+    // but must not give the screen back. Routed in `app::perform`; reaching
+    // here means that routing was lost, and restoring the terminal to ask a
+    // colour question would flash the reader's shell for no reason.
+    debug_assert!(
+        !matches!(request, Request::Recolor { .. }),
+        "Request::Recolor is performed by recolor::run, not here"
+    );
+    if matches!(request, Request::Recolor { .. }) {
+        return Ok(());
+    }
     // Stand the terminal reader down before the terminal changes hands, and
     // not a moment after: from here until the guard drops, this thread is the
     // only one in the process reading the terminal, so every byte the other
@@ -53,6 +84,10 @@ pub fn run(request: &Request, mouse: bool) -> Result<()> {
         Request::Edit { path, line } => edit(path, *line),
         #[cfg(unix)]
         Request::Suspend => suspend(),
+        // Unreachable: guarded at the top of this function, where returning
+        // early is what keeps the screen from being handed back to nobody for
+        // a colour question.
+        Request::Recolor { .. } => Ok(()),
     };
     // Take the terminal back whatever happened, so a failed editor does not
     // also cost the reader their session.

@@ -39,6 +39,12 @@ pub enum Event {
     },
     /// The document changed on disk.
     Reload,
+    /// Something happened that may mean the terminal's own colors changed:
+    /// the window regained focus, a watched theme path settled, or a signal
+    /// arrived. Only a reader on `--style system` has any use for it, and
+    /// whether it costs a round trip is decided in the update loop rather than
+    /// here — a producer does not know what style is in force.
+    Recolor,
 }
 
 /// Where events come from.
@@ -149,6 +155,43 @@ impl EventSource for Events {
     }
 }
 
+/// Post a [`Event::Recolor`] whenever `SIGUSR1` arrives.
+///
+/// The trigger for a desktop whose theme hook can reach this process. It is
+/// the only one with no race in it: a hook runs *after* the terminals have
+/// been retinted, so the answer to the question it provokes is the new palette
+/// rather than the old one. The other three have to tolerate arriving early,
+/// which is what the probe-and-compare in [`super::recolor`] is for.
+///
+/// `SIGUSR1` rather than `SIGHUP` or `SIGWINCH`: those already mean something,
+/// and the second is delivered on every resize. Best-effort — a process that
+/// cannot register for a signal keeps its other three triggers — and the
+/// thread ends when the queue closes, which is what makes it not hold the
+/// program open.
+#[cfg(unix)]
+pub fn watch_signals(sender: Sender<Event>) {
+    use signal_hook::consts::SIGUSR1;
+    use signal_hook::iterator::Signals;
+
+    let Ok(mut signals) = Signals::new([SIGUSR1]) else {
+        return;
+    };
+    thread::spawn(move || {
+        // Deliberately not registered with the gate: this thread reads a
+        // self-pipe, never the terminal, so it has nothing to stand down from
+        // and `pause` must not wait for it.
+        for _ in &mut signals {
+            if sender.send(Event::Recolor).is_err() {
+                return;
+            }
+        }
+    });
+}
+
+/// Windows has no `SIGUSR1` to map this onto; the other triggers cover it.
+#[cfg(not(unix))]
+pub fn watch_signals(_sender: Sender<Event>) {}
+
 /// Throw away terminal input left over from another program.
 ///
 /// An editor asks the terminal a series of questions on the way up — what it
@@ -221,6 +264,12 @@ pub fn translate(event: event::Event) -> Option<Event> {
         event::Event::Mouse(mouse) if is_wheel(mouse.kind) => Some(Event::Mouse(mouse)),
         event::Event::Resize(cols, rows) => Some(Event::Resize(cols, rows)),
         event::Event::Paste(text) => Some(Event::Paste(text)),
+        // Coming back to the window is the portable way to notice a terminal
+        // that was retinted while the reader was elsewhere, which is where a
+        // theme is nearly always changed from. Losing focus is not: nothing
+        // can have changed yet, and probing on the way out would ask the
+        // question at the one moment the answer is guaranteed to be stale.
+        event::Event::FocusGained => Some(Event::Recolor),
         _ => None,
     }
 }
@@ -319,8 +368,21 @@ mod tests {
     }
 
     #[test]
-    fn focus_changes_are_dropped() {
-        assert!(translate(event::Event::FocusGained).is_none());
+    fn regaining_focus_asks_whether_the_terminal_was_retinted() {
+        // The portable trigger for `--style system`: a theme is nearly always
+        // changed while the reader is looking at something else, so coming
+        // back is when to ask.
+        assert_eq!(
+            translate(event::Event::FocusGained),
+            Some(Event::Recolor),
+            "regaining focus has to reach the loop"
+        );
+    }
+
+    #[test]
+    fn losing_focus_is_still_dropped() {
+        // Probing on the way out would ask at the one moment the answer is
+        // guaranteed not to have changed yet.
         assert!(translate(event::Event::FocusLost).is_none());
     }
 

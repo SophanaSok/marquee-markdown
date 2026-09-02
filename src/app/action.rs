@@ -128,6 +128,17 @@ pub enum Action {
     // order lives, and it is free to put this wherever it belongs.
     /// Show or hide the hint line above the status bar.
     ToggleHints,
+    /// Bring the palette back in step with what it was resolved from: ask the
+    /// terminal about its colors again on `--style system`, or re-read a theme
+    /// file that has been edited.
+    ///
+    /// Declared last rather than beside [`Action::Reload`], which is where it
+    /// belongs by meaning. `Ord` is derived from declaration order, so
+    /// inserting a variant in the middle renumbers every one after it and
+    /// breaks anyone who compared two of these. [`Action::ALL`] is where the
+    /// reading order lives, and that is what the key reference is generated
+    /// from — so this costs nothing a reader can see.
+    Recolor,
 }
 
 impl Action {
@@ -177,6 +188,7 @@ impl Action {
         #[cfg(unix)]
         Self::Suspend,
         Self::Reload,
+        Self::Recolor,
         Self::ToggleTheme,
         Self::ThemePicker,
         Self::ThemeDown,
@@ -241,6 +253,7 @@ impl Action {
             Self::BrowserRescan => "browser-rescan",
             Self::BrowserToggleHidden => "browser-toggle-hidden",
             Self::Reload => "reload",
+            Self::Recolor => "recolor",
             Self::LinkNext => "link-next",
             Self::LinkPrevious => "link-previous",
             Self::LinkOpen => "link-open",
@@ -303,6 +316,7 @@ impl Action {
             Self::BrowserRescan => "rescan the directory",
             Self::BrowserToggleHidden => "show / hide hidden files",
             Self::Reload => "reload from disk",
+            Self::Recolor => "re-read the terminal's colors",
             Self::LinkNext => "next link",
             Self::LinkPrevious => "previous link",
             Self::LinkOpen => "open the link",
@@ -396,6 +410,7 @@ mod tests {
             | Action::BrowserRescan
             | Action::BrowserToggleHidden
             | Action::Reload
+            | Action::Recolor
             | Action::LinkNext
             | Action::LinkPrevious
             | Action::LinkOpen
@@ -418,7 +433,7 @@ mod tests {
         // Suspending is a unix idea, and the action does not exist elsewhere
         // rather than existing and doing nothing — the key reference is
         // generated from what is bound, so an inert entry would be a lie.
-        let expected = if cfg!(unix) { 54 } else { 53 };
+        let expected = if cfg!(unix) { 55 } else { 54 };
         assert_eq!(Action::ALL.len(), expected, "Action::ALL is out of date");
     }
 

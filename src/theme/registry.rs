@@ -93,6 +93,18 @@ pub fn list() -> Vec<Entry> {
 /// The name of the theme built from the terminal's own colors.
 pub const SYSTEM: &str = "system";
 
+/// Whether resolving `style` consults what the terminal answered.
+///
+/// The single definition of "this palette is the terminal's", asked by
+/// [`crate::cli`] before the screen is taken and by
+/// [`crate::app::recolor`] every time something suggests it was retinted. One
+/// answer, so a style cannot be worth querying for in one place and not the
+/// other.
+#[must_use]
+pub fn follows_the_terminal(style: &str) -> bool {
+    style.trim().eq_ignore_ascii_case(SYSTEM)
+}
+
 /// Resolve a `--style` value.
 ///
 /// `terminal` is what the terminal answered when asked about its own colors —
