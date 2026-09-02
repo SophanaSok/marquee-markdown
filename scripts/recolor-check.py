@@ -99,6 +99,22 @@ def read_until(fd: int, predicate, deadline: float) -> bytes:
     return seen
 
 
+def wait_for_exit(pid: int, deadline: float):
+    """Reap `pid`, or give up. `None` means it was still running.
+
+    Bounded on purpose. A blocking `waitpid` here is the one unbounded wait in
+    this script, and the failure it would hide — a reader that stopped
+    listening — is exactly the failure this check exists to catch, so it would
+    hang a CI runner rather than report it.
+    """
+    while time.monotonic() < deadline:
+        done, status = os.waitpid(pid, os.WNOHANG)
+        if done == pid:
+            return status
+        time.sleep(0.05)
+    return None
+
+
 def serve_query(fd: int, bg: tuple[int, int, int], deadline: float) -> bytes:
     """Wait for a colour question and answer it. Returns what was asked."""
     asked = read_until(fd, lambda seen: b"\x1b[c" in seen, deadline)
@@ -188,7 +204,12 @@ def follows_the_terminal(binary: str) -> None:
             #    quitting — so reaching here at all is most of the check;
             #    `q` proves it is still listening rather than merely alive.
             os.write(fd, b"q")
-            _, status = os.waitpid(pid, 0)
+            status = wait_for_exit(pid, deadline)
+            if status is None:
+                raise SystemExit(
+                    "the reader did not quit when told to: either a reply was "
+                    "parsed as some other binding, or it stopped listening"
+                )
             if not os.WIFEXITED(status) or os.WEXITSTATUS(status) != 0:
                 raise SystemExit(f"the reader did not quit cleanly: {status}")
         finally:
