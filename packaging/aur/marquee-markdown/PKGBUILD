@@ -15,9 +15,25 @@ pkgdesc="TUI markdown reader that renders documents like Claude artifacts, with 
 arch=('x86_64' 'aarch64')
 url="https://github.com/SophanaSok/marquee-markdown"
 license=('MIT')
-depends=('gcc-libs')
+# `libgcc` and `glibc`, not `gcc-libs`: the binary's only NEEDED libraries are
+# libgcc_s.so.1, libm.so.6 and libc.so.6, and current Arch has split gcc-libs
+# into components — it now pulls libstdc++, libasan, libgfortran and nine more
+# onto a system that wants a markdown reader. namcap says so, twice.
+depends=('glibc' 'libgcc')
 makedepends=('cargo')
-provides=('mmd')
+# `!lto` because makepkg turns LTO on by default and this cannot use it.
+# TLS comes from rustls, which reaches `aws-lc-sys` — a C library shipped as a
+# static archive built without LTO bitcode. Linking it under `-flto=auto` with
+# `-Clinker-plugin-lto` drops every symbol it defines, and the build ends in a
+# page of `undefined symbol: aws_lc_0_44_0_*`. Nothing here is hot enough to
+# miss the optimisation.
+# `!debug` because `[profile.release]` in Cargo.toml sets `strip = true`, so
+# there are no symbols left for makepkg's debug package to collect however
+# much `-C debuginfo=2` it passes. Without this it builds one anyway: an empty
+# usr/src/debug and two build-id symlinks pointing at nothing, which namcap
+# reports as errors. Stripping is upstream's choice for binary size and not
+# something a package should quietly undo.
+options=('!lto' '!debug')
 conflicts=('marquee-markdown-bin')
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
 sha256sums=('d93e90e813354a1e2854d76a8491854ebfb32aeb76cdf692348e1ef19ef9ac41')
@@ -39,7 +55,10 @@ check() {
   cd "$pkgname-$pkgver"
   export RUSTUP_TOOLCHAIN=stable
   # The live-forge checks are `#[ignore]`d, so this needs no network.
-  cargo test --frozen --all-targets
+  # `--all-features` rather than `--all-targets`: it is what the Rust
+  # package guidelines specify, it matches build(), and it runs the
+  # doctest on the public render example, which `--all-targets` skips.
+  cargo test --frozen --all-features
 }
 
 package() {

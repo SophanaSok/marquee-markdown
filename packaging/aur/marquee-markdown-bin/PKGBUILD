@@ -16,16 +16,20 @@ pkgdesc="TUI markdown reader that renders documents like Claude artifacts (prebu
 arch=('x86_64')
 url="https://github.com/SophanaSok/marquee-markdown"
 license=('MIT')
-depends=('gcc-libs')
-provides=('marquee-markdown' 'mmd')
+# `libgcc` and `glibc`, not `gcc-libs`: the binary's only NEEDED libraries are
+# libgcc_s.so.1, libm.so.6 and libc.so.6, and current Arch has split gcc-libs
+# into components — it now pulls libstdc++, libasan, libgfortran and nine more
+# onto a system that wants a markdown reader. namcap says so, twice.
+depends=('glibc' 'libgcc')
+provides=("marquee-markdown=$pkgver")
 conflicts=('marquee-markdown')
-options=('!strip')
-source_x86_64=("$pkgname-$pkgver-x86_64.tar.gz::$url/releases/download/v$pkgver/$_pkgname-v$pkgver-x86_64-linux.tar.gz")
+options=('!strip' '!debug')
+source_x86_64=("$pkgname-$pkgver-$CARCH.tar.gz::$url/releases/download/v$pkgver/$_pkgname-v$pkgver-$CARCH-linux.tar.gz")
 # From the release's `checksums.txt`, which the release workflow writes.
 sha256sums_x86_64=('504411f72b3e173c48263759cb258214ece1938dc27643d3c61441471082bdbf')
 
 package() {
-  cd "$_pkgname-v$pkgver-x86_64-linux"
+  cd "$_pkgname-v$pkgver-$CARCH-linux"
 
   install -Dm755 marquee-markdown "$pkgdir/usr/bin/marquee-markdown"
   install -Dm755 mmd "$pkgdir/usr/bin/mmd"
