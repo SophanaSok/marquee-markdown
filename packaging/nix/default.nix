@@ -19,16 +19,16 @@
 
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "marquee-markdown";
-  version = "0.9.0";
+  version = "0.10.0";
 
   src = fetchFromGitHub {
     owner = "SophanaSok";
     repo = "marquee-markdown";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-au4JAmk1OiBWWQwEjiL0pCBrH00dj4n2LASmFt/Ib8I=";
+    hash = "sha256-ijTZ0qmAWdt9viBgtqhXKbdZrcU3moIhCYKgr0WYNtc=";
   };
 
-  cargoHash = "sha256-1iEpLTcqCm0pRou90d3aYkY3mvmg4aTu9ZiNOp/SvGE=";
+  cargoHash = "sha256-j4hm2jfVuNakfsBHpV7fiiNUrCxVvXtxwqfMMWyqFFM=";
 
   nativeBuildInputs = [ installShellFiles ];
 
@@ -76,7 +76,7 @@ rustPlatform.buildRustPackage (finalAttrs: {
     changelog = "https://github.com/SophanaSok/marquee-markdown/blob/v${finalAttrs.version}/CHANGELOG.md";
     license = lib.licenses.mit;
     # Required for a new package, and deliberately unresolvable until the
-    # submission lands: `lib.maintainers.sophanasok` does not exist in nixpkgs
+    # submission lands: `lib.maintainers.SophanaSok` does not exist in nixpkgs
     # yet, so forcing this attribute — `nix-instantiate --eval --strict ...
     # .meta.maintainers` — fails with an undefined variable. `nix-build` is
     # unaffected, because `meta` is lazy and never forced by a build, which is
@@ -84,12 +84,12 @@ rustPlatform.buildRustPackage (finalAttrs: {
     #
     # The entry it refers to goes in `maintainers/maintainer-list.nix` in the
     # same pull request, which is what makes it resolve:
-    #   sophanasok = {
+    #   SophanaSok = {
     #     name = "Sophana Sok";
     #     github = "SophanaSok";
     #     githubId = 5224183;
     #   };
-    maintainers = with lib.maintainers; [ sophanasok ];
+    maintainers = with lib.maintainers; [ SophanaSok ];
     mainProgram = "mmd";
     platforms = lib.platforms.unix ++ lib.platforms.windows;
   };

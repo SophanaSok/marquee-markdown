@@ -47,12 +47,12 @@ another.
 
 ## The maintainer entry
 
-`meta.maintainers` names `sophanasok`, which does not exist in nixpkgs until
+`meta.maintainers` names `SophanaSok`, which does not exist in nixpkgs until
 the submission adds it. So this evaluates only once that entry is in the same
 tree:
 
 ```sh
-# fails today, with "undefined variable 'sophanasok'"
+# fails today, with "undefined variable 'SophanaSok'"
 nix-instantiate --eval --strict -E '...(callPackage ./default.nix {}).meta.maintainers'
 ```
 
@@ -61,7 +61,7 @@ flow above still works from a checkout. The pull request carries both halves:
 
 ```nix
 # maintainers/maintainer-list.nix
-sophanasok = {
+SophanaSok = {
   name = "Sophana Sok";
   github = "SophanaSok";
   githubId = 5224183;
