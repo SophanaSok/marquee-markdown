@@ -11,8 +11,9 @@
 //! existed. There is no case where a guess is rendered as if it were known.
 //!
 //! This is deliberately not an HTML parser. It does not build a DOM to spec,
-//! it does not implement the tag-omission rules, and it never will — anything
-//! needing that is opaque to it and goes back to the caller untouched.
+//! and it never will — anything needing that is opaque to it and goes back to
+//! the caller untouched. The one tag-omission rule it knows is the one tables
+//! lean on (`<tr><td>a<td>b`), and `Walk` applies it inside a table only.
 
 use std::ops::Range;
 use std::str::FromStr;
@@ -511,11 +512,20 @@ enum Role {
     /// `<summary>` — the label of a `<details>`. Only meaningful inside one;
     /// loose, it is an ordinary paragraph.
     Summary,
+    /// `<table>` — becomes the same block a markdown pipe table does, and is
+    /// drawn by the same emitter. See [`table_blocks`].
+    Table,
+    /// `<thead>`, `<tbody>`, `<tfoot>` or `<tr>` met at block level, which is
+    /// what a blank line inside a table leaves behind: a `CommonMark` HTML
+    /// block ends at the blank line, so the rest of the table arrives as later
+    /// blocks with its rows at the root. A run of them is laid out as a table
+    /// of its own.
+    TableFragment,
     /// Understood well enough to know this renderer would make a mess of it.
     /// One of these anywhere sends the whole block back to be rendered as
     /// literal text, because the markup carries more than the flattened words
-    /// would: a table read as one run-on sentence is worse than a table read
-    /// as tags.
+    /// would: a list read as one run-on sentence is worse than a list read as
+    /// tags.
     Opaque,
 }
 
@@ -530,6 +540,8 @@ impl Role {
                 | Self::Rule
                 | Self::Details
                 | Self::Summary
+                | Self::Table
+                | Self::TableFragment
         )
     }
 }
@@ -542,7 +554,11 @@ fn role(name: &str) -> Role {
         "h4" => Role::Heading(4),
         "h5" => Role::Heading(5),
         "h6" => Role::Heading(6),
-        "p" | "div" | "section" | "article" | "header" | "footer" | "main" => Role::Paragraph,
+        // `<center>` is a `<div align="center">` with the alignment in its
+        // name; `alignment` reads it from there.
+        "p" | "div" | "section" | "article" | "header" | "footer" | "main" | "center" => {
+            Role::Paragraph
+        }
         "blockquote" => Role::Quote,
         "hr" => Role::Rule,
         "br" => Role::Break,
@@ -554,12 +570,15 @@ fn role(name: &str) -> Role {
         "code" | "kbd" | "samp" | "tt" => Role::Code,
         "details" => Role::Details,
         "summary" => Role::Summary,
+        "table" => Role::Table,
+        "thead" | "tbody" | "tfoot" | "tr" => Role::TableFragment,
+        // The rest of a table's vocabulary means something only inside the
+        // table walk, which matches on the name; loose, a cell is its words.
         // Structure this renderer has no emitter for. Literal is the honest
         // answer: the tags say more than the words would on their own.
-        "table" | "thead" | "tbody" | "tfoot" | "tr" | "td" | "th" | "caption" | "colgroup"
-        | "col" | "ul" | "ol" | "li" | "dl" | "dt" | "dd" | "pre" | "script" | "style"
-        | "textarea" | "iframe" | "object" | "embed" | "svg" | "math" | "form" | "input"
-        | "button" | "select" | "option" | "textpath" => Role::Opaque,
+        "ul" | "ol" | "li" | "dl" | "dt" | "dd" | "pre" | "script" | "style" | "textarea"
+        | "iframe" | "object" | "embed" | "svg" | "math" | "form" | "input" | "button"
+        | "select" | "option" | "textpath" => Role::Opaque,
         _ => Role::Transparent,
     }
 }
@@ -574,7 +593,9 @@ fn alignment(name: &str, attrs: &[(String, String)]) -> Option<Alignment> {
         .find(|(key, _)| key == "align")
         .map(|(_, value)| value.to_lowercase());
     match value.as_deref() {
-        Some("center") => Some(Alignment::Center),
+        // `middle` is the legacy spelling for a table cell; old hand-written
+        // tables still carry it.
+        Some("center" | "middle") => Some(Alignment::Center),
         Some("right") => Some(Alignment::Right),
         Some("left") => Some(Alignment::Left),
         _ => None,
@@ -604,15 +625,33 @@ pub(super) fn interpret(
     slug: &mut dyn FnMut(&str) -> String,
 ) -> Option<Vec<Block>> {
     let tokens = scan(raw)?;
-    let opaque = tokens.iter().any(|token| {
+    // One pass for both reasons to decline. `open` counts tables currently
+    // open: a table inside a table is declined, because the inner one has
+    // nowhere to go — a cell holds inline content, so nesting could only
+    // flatten it, and a table read as one run-on sentence is the thing this
+    // module exists to avoid.
+    let mut open = 0usize;
+    for token in &tokens {
         let name = match token {
             Token::Open { name, .. } | Token::Void { name, .. } | Token::Close(name) => name,
-            Token::Text(_) => return false,
+            Token::Text(_) => continue,
         };
-        role(name) == Role::Opaque
-    });
-    if opaque {
-        return None;
+        if role(name) == Role::Opaque {
+            return None;
+        }
+        if name == "table" {
+            match token {
+                Token::Open { .. } => {
+                    open += 1;
+                    if open > 1 {
+                        return None;
+                    }
+                }
+                Token::Close(_) => open = open.saturating_sub(1),
+                // `<table/>` holds nothing; it opens nothing either.
+                Token::Void { .. } | Token::Text(_) => {}
+            }
+        }
     }
 
     let nodes = tree(tokens);
@@ -631,7 +670,10 @@ fn blocks_from(
 ) {
     let mut pending: Vec<Inline> = Vec::new();
 
-    for node in nodes {
+    let mut index = 0;
+    while index < nodes.len() {
+        let node = &nodes[index];
+        index += 1;
         let Node::Element {
             name,
             attrs,
@@ -641,8 +683,13 @@ fn blocks_from(
             inlines_from(std::slice::from_ref(node), &mut pending);
             continue;
         };
-        let role = role(name);
-        if !role.is_block() {
+        let role = self::role(name);
+        // A wrapper with no meaning of its own still delimits blocks: a
+        // `<span>` or a custom element around a heading is a container, not a
+        // sentence. Deciding by content is the same rule `<div>` uses, so the
+        // container case is handled the same way too.
+        let container = !role.is_block() && holds_blocks(children);
+        if !role.is_block() && !container {
             inlines_from(std::slice::from_ref(node), &mut pending);
             continue;
         }
@@ -651,6 +698,7 @@ fn blocks_from(
         let align = alignment(name, attrs);
         let mut produced = Vec::new();
         match role {
+            _ if container => blocks_from(children, span, slug, &mut produced),
             Role::Heading(level) => {
                 let mut content = Vec::new();
                 inlines_from(children, &mut content);
@@ -736,6 +784,28 @@ fn blocks_from(
                     produced.push(Block::at(BlockKind::Paragraph(content), span.clone()));
                 }
             }
+            Role::Table => table_blocks(children, span, &mut produced),
+            // A blank line ends a `CommonMark` HTML block, so a table written
+            // with one inside it arrives in pieces: `<table>` alone, then its
+            // rows or sections at the root of a later block. Gather the run of
+            // them and lay it out as a table of its own, which is the shape
+            // the author wrote even if the frame is drawn once per piece.
+            Role::TableFragment => {
+                let mut run = vec![node.clone()];
+                while let Some(next) = nodes.get(index) {
+                    match next {
+                        Node::Element { name, .. } if self::role(name) == Role::TableFragment => {
+                            run.push(next.clone());
+                        }
+                        // The whitespace between two tags is not a row, and it
+                        // is not content either.
+                        Node::Text(text) if collapse(text).trim().is_empty() => {}
+                        _ => break,
+                    }
+                    index += 1;
+                }
+                table_blocks(&run, span, &mut produced);
+            }
             // A `<div>` wrapping other blocks is a container; one wrapping
             // text is a paragraph. Deciding by content is what lets a centered
             // `<div>` around a heading keep the heading.
@@ -766,10 +836,398 @@ fn blocks_from(
     flush(&mut pending, span, out);
 }
 
-/// Whether any child would become a block, deciding container from paragraph.
+// --- tables ---------------------------------------------------------------
+
+/// Largest `colspan`/`rowspan` honoured, which is the value HTML's own parser
+/// clamps `colspan` to. Nothing is allocated per span — the number only bounds
+/// the arithmetic — but a cell claiming a million columns still has to stop
+/// somewhere.
+const MAX_SPAN: usize = 1000;
+
+/// Which part of the table a row belongs to. `<tfoot>` is rendered last
+/// whatever its source position, as a browser does, and the header is chosen
+/// after that move so a footer row can never become the header.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+enum Section {
+    Head,
+    #[default]
+    Body,
+    Foot,
+}
+
+/// One cell, placed on the grid but not yet given a dense column index.
+struct Cell {
+    column: usize,
+    /// Columns the cell covers, from `colspan`. Only the first holds the
+    /// content; the rest push the cells after it along.
+    width: usize,
+    /// `<th>`, which decides the header row and bolds a row-header cell.
+    header: bool,
+    align: Option<Alignment>,
+    content: Vec<Inline>,
+}
+
+/// One row of placed cells, with the columns a `rowspan` from an earlier row
+/// has taken out of it.
+struct Row {
+    section: Section,
+    align: Option<Alignment>,
+    cells: Vec<Cell>,
+}
+
+/// A column range one cell holds down for the rows below it.
+struct Reservation {
+    columns: Range<usize>,
+    /// Last row index the reservation covers.
+    through: usize,
+}
+
+/// Lay a `<table>`'s children out as the same block a markdown pipe table
+/// produces, so both are drawn by the one emitter and the column solver has no
+/// idea which it is looking at.
+///
+/// A `<caption>` becomes a paragraph before the table, sharing its alignment.
+/// Nothing else is added to the page: the frame, the header band and the
+/// narrow-width card fallback all belong to the emitter.
+fn table_blocks(nodes: &[Node], span: &Range<usize>, out: &mut Vec<Block>) {
+    let mut walk = Walk::default();
+    walk.nodes(nodes);
+    let Walk {
+        mut rows,
+        caption,
+        table_align,
+        ..
+    } = walk;
+
+    if let Some(content) = caption {
+        out.push(Block {
+            kind: BlockKind::Paragraph(vec![Inline::Strong(content)]),
+            span: span.clone(),
+            align: table_align.unwrap_or_default(),
+        });
+    }
+
+    // `<tfoot>` last, everything else in the order it was written. A stable
+    // sort by section is the whole of it.
+    rows.sort_by_key(|row| row.section);
+
+    // The header is the last `<thead>` row — an earlier one is a spanning
+    // title above the labels, not the labels — or else a leading row whose
+    // every cell is a `<th>`.
+    let head_count = rows.iter().filter(|r| r.section == Section::Head).count();
+    let header_at = if head_count > 0 {
+        Some(head_count - 1)
+    } else {
+        rows.first()
+            .filter(|row| !row.cells.is_empty() && row.cells.iter().all(|c| c.header))
+            .map(|_| 0)
+    };
+
+    // Dense column indices, from the columns that actually hold something.
+    // This drops the spacer columns authors use for gutters, and makes a
+    // `colspan` of a thousand cost one column rather than a thousand.
+    let mut used: Vec<usize> = rows
+        .iter()
+        .flat_map(|row| &row.cells)
+        .filter(|cell| !cell.content.is_empty())
+        .map(|cell| cell.column)
+        .collect();
+    used.sort_unstable();
+    used.dedup();
+    if used.is_empty() {
+        return;
+    }
+    let dense = |column: usize| used.binary_search(&column).ok();
+
+    let columns = used.len();
+    let mut alignments: Vec<Option<Alignment>> = vec![None; columns];
+    let mut header: Vec<Vec<Inline>> = Vec::new();
+    let mut body: Vec<Vec<Vec<Inline>>> = Vec::new();
+
+    for (index, row) in rows.iter().enumerate() {
+        let is_header = header_at == Some(index);
+        let mut cells: Vec<Vec<Inline>> = vec![Vec::new(); columns];
+        for cell in &row.cells {
+            let Some(column) = dense(cell.column) else {
+                continue; // an empty cell in a column nothing else filled
+            };
+            // A column takes its alignment from the header cell if that one
+            // states any, else from the first body cell that does; a `<tr
+            // align>` stands in for a cell that says nothing.
+            let stated = cell.align.or(row.align);
+            if let Some(align) = stated
+                && (is_header || alignments[column].is_none())
+            {
+                alignments[column] = Some(align);
+            }
+            // A `<th>` in a body row is a row header. There is no column for
+            // it in the block, so it keeps its weight instead.
+            cells[column] = if cell.header && !is_header && !cell.content.is_empty() {
+                vec![Inline::Strong(cell.content.clone())]
+            } else {
+                cell.content.clone()
+            };
+        }
+        // Trailing empties would draw a blank line each in card layout, and
+        // the emitter reads a short row as empty cells anyway.
+        while cells.last().is_some_and(Vec::is_empty) {
+            cells.pop();
+        }
+        if is_header {
+            header = cells;
+        } else if !cells.is_empty() {
+            body.push(cells);
+        }
+    }
+
+    if header.is_empty() && body.is_empty() {
+        return;
+    }
+    out.push(Block {
+        kind: BlockKind::Table {
+            alignments: alignments
+                .into_iter()
+                .map(Option::unwrap_or_default)
+                .collect(),
+            header,
+            rows: body,
+        },
+        span: span.clone(),
+        align: table_align.unwrap_or_default(),
+    });
+}
+
+/// The table walk's state.
+///
+/// Flat on purpose. `</td>` and `</tr>` are the end tags authors leave out
+/// most, and a tree built by name-matching nests what they meant to close: in
+/// `<tr><td>a<td>b`, the second cell is a *child* of the first. So the walk
+/// tracks the open row and cell as indices and lifts a cell or row met inside
+/// another one out to where it belongs, at any depth. Anything else met with
+/// no cell open opens one — which is also how the words survive when
+/// [`MAX_NESTING`] flattens a `<tr>` and splices its cells into the table.
+#[derive(Default)]
+struct Walk {
+    rows: Vec<Row>,
+    caption: Option<Vec<Inline>>,
+    table_align: Option<Alignment>,
+    section: Section,
+    /// Reservations from `rowspan`, one per spanning cell rather than one per
+    /// covered position: a `rowspan` costs nothing to honour and nothing to
+    /// ignore once the rows it names do not exist.
+    reserved: Vec<Reservation>,
+    row: Option<usize>,
+    cell: Option<usize>,
+}
+
+impl Walk {
+    fn nodes(&mut self, nodes: &[Node]) {
+        for node in nodes {
+            match node {
+                Node::Text(text) => {
+                    let text = collapse(&decode_entities(text));
+                    if !text.trim().is_empty() {
+                        self.content(std::slice::from_ref(node));
+                    }
+                }
+                Node::Element {
+                    name,
+                    attrs,
+                    children,
+                } => self.element(name, attrs, children, node),
+            }
+        }
+    }
+
+    fn element(&mut self, name: &str, attrs: &[(String, String)], children: &[Node], node: &Node) {
+        match name {
+            "table" => {
+                // Only reachable for a table inside a table, which `interpret`
+                // declines — but the walk does not depend on that: the inner
+                // table's words go into the open cell rather than nowhere.
+                self.table_align = self.table_align.or_else(|| alignment(name, attrs));
+                self.nodes(children);
+            }
+            "caption" => {
+                let mut content = Vec::new();
+                inlines_from(children, &mut content);
+                trim(&mut content);
+                // HTML uses the first caption and ignores the rest.
+                if self.caption.is_none() && !content.is_empty() {
+                    self.caption = Some(content);
+                }
+            }
+            "thead" | "tbody" | "tfoot" => {
+                let outer = self.section;
+                self.section = match name {
+                    "thead" => Section::Head,
+                    "tfoot" => Section::Foot,
+                    _ => Section::Body,
+                };
+                self.close_row();
+                self.nodes(children);
+                self.close_row();
+                self.section = outer;
+            }
+            // Columns describe widths this renderer solves for itself.
+            "colgroup" | "col" => {}
+            "tr" => {
+                self.close_row();
+                self.open_row(alignment(name, attrs));
+                let opened = self.row;
+                self.nodes(children);
+                // Only close the row this element opened: a lifted `<tr>`
+                // inside it has already replaced the open one.
+                if self.row == opened {
+                    self.close_row();
+                }
+            }
+            "td" | "th" => {
+                self.open_cell(name == "th", alignment(name, attrs), attrs);
+                let opened = (self.row, self.cell);
+                self.nodes(children);
+                if (self.row, self.cell) == opened {
+                    self.cell = None;
+                }
+            }
+            _ => {
+                // Everything else is cell content — including a block-level
+                // element, whose words would otherwise run into the next one.
+                if role(name).is_block() && self.cell.is_some() {
+                    self.hard_break();
+                    self.content(std::slice::from_ref(node));
+                    self.hard_break();
+                } else {
+                    self.content(std::slice::from_ref(node));
+                }
+            }
+        }
+    }
+
+    /// Append inline content to the open cell, opening one if the table put
+    /// content where only a cell can hold it.
+    fn content(&mut self, nodes: &[Node]) {
+        // A cell lifted out of another cell is not content: it is the next
+        // cell, and `element` handles it. Everything reaching here is words.
+        if self.cell.is_none() {
+            self.open_cell(false, None, &[]);
+        }
+        let Some(cell) = self.current_cell() else {
+            return;
+        };
+        inlines_from(nodes, cell);
+    }
+
+    fn hard_break(&mut self) {
+        if let Some(cell) = self.current_cell()
+            && !cell.is_empty()
+            && !matches!(cell.last(), Some(Inline::HardBreak))
+        {
+            cell.push(Inline::HardBreak);
+        }
+    }
+
+    fn current_cell(&mut self) -> Option<&mut Vec<Inline>> {
+        let row = self.row?;
+        let cell = self.cell?;
+        Some(&mut self.rows[row].cells[cell].content)
+    }
+
+    fn open_row(&mut self, align: Option<Alignment>) {
+        let index = self.rows.len();
+        // Reservations that end above this row can never fire again.
+        self.reserved.retain(|r| r.through >= index);
+        self.rows.push(Row {
+            section: self.section,
+            align,
+            cells: Vec::new(),
+        });
+        self.row = Some(index);
+        self.cell = None;
+    }
+
+    fn close_row(&mut self) {
+        if let Some(row) = self.row.take() {
+            trim_cells(&mut self.rows[row].cells);
+        }
+        self.cell = None;
+    }
+
+    fn open_cell(&mut self, header: bool, align: Option<Alignment>, attrs: &[(String, String)]) {
+        if self.row.is_none() {
+            self.open_row(None);
+        }
+        if let Some(cell) = self.current_cell() {
+            trim(cell);
+        }
+        let row = self.row.expect("a row was just opened");
+        let index = self.rows[row].cells.len();
+        // The next column no earlier row is holding down, and no cell in this
+        // row has taken.
+        let mut column = self.rows[row]
+            .cells
+            .last()
+            .map_or(0, |last| last.column.saturating_add(last.width));
+        while self
+            .reserved
+            .iter()
+            .any(|r| r.through >= row && r.columns.contains(&column))
+        {
+            column += 1;
+        }
+        let columns = span_of(attrs, "colspan");
+        let rows = span_of(attrs, "rowspan");
+        if rows > 1 {
+            self.reserved.push(Reservation {
+                columns: column..column.saturating_add(columns),
+                through: row.saturating_add(rows - 1),
+            });
+        }
+        // A `colspan` is the one thing a single-column block cannot say, so
+        // the cell keeps its own column, the columns it covers stay empty —
+        // and are dropped unless another row fills them — and the cells after
+        // it start beyond them.
+        self.rows[row].cells.push(Cell {
+            column,
+            width: columns,
+            header,
+            align,
+            content: Vec::new(),
+        });
+        self.cell = Some(index);
+    }
+}
+
+/// Trim every cell of a finished row.
+fn trim_cells(cells: &mut [Cell]) {
+    for cell in cells {
+        trim(&mut cell.content);
+    }
+}
+
+/// A `colspan`/`rowspan` value, by HTML's non-negative-integer rules: leading
+/// whitespace and a `+` are allowed, the digits that follow are the number,
+/// and anything else — `0`, `auto`, empty — is one.
+fn span_of(attrs: &[(String, String)], name: &str) -> usize {
+    let raw = attr(attrs, name).unwrap_or_default();
+    let digits: String = raw
+        .trim_start()
+        .trim_start_matches('+')
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .collect();
+    digits.parse::<usize>().unwrap_or(1).clamp(1, MAX_SPAN)
+}
+
+/// Whether any descendant would become a block, deciding container from
+/// paragraph.
+///
+/// Looks through elements that are not blocks themselves, so a `<table>` inside
+/// a `<span>` inside a `<center>` still makes each of them a container. Bounded
+/// by [`MAX_NESTING`], which is what caps the tree's depth.
 fn holds_blocks(nodes: &[Node]) -> bool {
     nodes.iter().any(|node| match node {
-        Node::Element { name, .. } => role(name).is_block(),
+        Node::Element { name, children, .. } => role(name).is_block() || holds_blocks(children),
         Node::Text(_) => false,
     })
 }
@@ -1225,10 +1683,11 @@ mod tests {
     #[test]
     fn opaque_elements_send_the_whole_block_back() {
         for raw in [
-            "<table><tr><td>a</td></tr></table>",
+            "<ul><li>one</li></ul>",
+            "<dl><dt>term</dt><dd>meaning</dd></dl>",
             "<script>alert(1)</script>",
             "<style>body{}</style>",
-            "<ul><li>one</li></ul>",
+            "<pre>preformatted</pre>",
         ] {
             assert!(interpreted(raw).is_none(), "should decline: {raw}");
         }
@@ -1334,6 +1793,371 @@ mod tests {
         };
         assert_eq!(dest, "https://page");
         assert!(alt.is_empty());
+    }
+
+    // --- tables -----------------------------------------------------------
+
+    /// The one table a snippet interprets to, flattened to plain text:
+    /// alignments, the header row, then the body.
+    fn table(raw: &str) -> (Vec<Alignment>, Vec<String>, Vec<Vec<String>>) {
+        let blocks = interpreted(raw).expect("interpreted");
+        let Some(BlockKind::Table {
+            alignments,
+            header,
+            rows,
+        }) = blocks
+            .iter()
+            .map(|b| &b.kind)
+            .find(|kind| matches!(kind, BlockKind::Table { .. }))
+        else {
+            panic!("a table, got {blocks:#?}");
+        };
+        let text = |cells: &Vec<Vec<Inline>>| -> Vec<String> {
+            cells.iter().map(|c| Inline::plain_text(c)).collect()
+        };
+        (
+            alignments.clone(),
+            text(header),
+            rows.iter().map(text).collect(),
+        )
+    }
+
+    #[test]
+    fn a_table_of_rows_and_cells_becomes_a_table_block() {
+        let (alignments, header, rows) = table(
+            "<table><tr><th>Name</th><th>Value</th></tr>\
+             <tr><td>a</td><td>1</td></tr>\
+             <tr><td>b</td><td>2</td></tr></table>",
+        );
+        assert_eq!(alignments, [Alignment::Left, Alignment::Left]);
+        assert_eq!(header, ["Name", "Value"]);
+        assert_eq!(rows, [["a", "1"], ["b", "2"]]);
+    }
+
+    #[test]
+    fn the_header_is_the_last_thead_row_and_the_ones_above_it_are_body() {
+        // A two-row `<thead>` is nearly always a spanning title over the
+        // labels. Taking the first row would label every column with the
+        // title and leave the labels loose in the body.
+        let (_, header, rows) = table(
+            "<table><thead>\
+             <tr><th colspan=\"2\">Spanning title</th></tr>\
+             <tr><th>Name</th><th>Value</th></tr>\
+             </thead><tbody><tr><td>a</td><td>1</td></tr></tbody></table>",
+        );
+        assert_eq!(header, ["Name", "Value"]);
+        assert_eq!(rows, [vec!["Spanning title"], vec!["a", "1"]]);
+    }
+
+    #[test]
+    fn a_leading_row_of_only_th_is_the_header_without_a_thead() {
+        // The shape a hand-written README table has, `<thead>` being the tag
+        // authors leave out most.
+        let (_, header, rows) =
+            table("<table><tr><th>A</th><th>B</th></tr><tr><td>1</td><td>2</td></tr></table>");
+        assert_eq!(header, ["A", "B"]);
+        assert_eq!(rows, [["1", "2"]]);
+    }
+
+    #[test]
+    fn a_table_whose_first_row_holds_a_td_has_no_header() {
+        let (_, header, rows) =
+            table("<table><tr><td>1</td><td>2</td></tr><tr><td>3</td><td>4</td></tr></table>");
+        assert!(header.is_empty(), "{header:#?}");
+        assert_eq!(rows, [["1", "2"], ["3", "4"]]);
+    }
+
+    #[test]
+    fn a_th_in_a_body_row_keeps_its_weight_as_a_row_header() {
+        // There is no row-header column in the block, so the only way to say
+        // "this cell labels its row" is the weight the author asked for.
+        let blocks = interpreted(
+            "<table><tr><td>a</td><td>b</td></tr><tr><th>Label</th><td>c</td></tr></table>",
+        )
+        .expect("interpreted");
+        let BlockKind::Table { rows, .. } = &blocks[0].kind else {
+            panic!("a table, got {:?}", blocks[0].kind);
+        };
+        assert!(
+            matches!(rows[1][0].as_slice(), [Inline::Strong(_)]),
+            "{:#?}",
+            rows[1][0]
+        );
+    }
+
+    #[test]
+    fn a_column_takes_its_alignment_from_the_header_then_the_first_body_cell() {
+        let (alignments, ..) = table(
+            "<table>\
+             <tr><th align=\"right\">R</th><th align=\"middle\">C</th><th>?</th></tr>\
+             <tr><td>1</td><td>2</td><td align=\"center\">3</td></tr>\
+             <tr><td align=\"right\">4</td><td>5</td><td align=\"right\">6</td></tr>\
+             </table>",
+        );
+        // `middle` is the legacy cell spelling of `center`; the third column
+        // is stated by the first body cell that states anything, and a later
+        // row does not overrule it.
+        assert_eq!(
+            alignments,
+            [Alignment::Right, Alignment::Center, Alignment::Center]
+        );
+    }
+
+    #[test]
+    fn a_row_alignment_stands_in_for_a_cell_that_states_none() {
+        let (alignments, ..) =
+            table("<table><tr align=\"center\"><td>1</td><td align=\"right\">2</td></tr></table>");
+        assert_eq!(alignments, [Alignment::Center, Alignment::Right]);
+    }
+
+    #[test]
+    fn a_colspan_keeps_one_column_and_pushes_the_cells_after_it_along() {
+        let (_, _, rows) = table(
+            "<table><tr><td colspan=\"2\">wide</td><td>c</td></tr>\
+             <tr><td>a</td><td>b</td><td>d</td></tr></table>",
+        );
+        // The covered column stays empty rather than repeating the text, and
+        // `c` lands over `d` where the author put it.
+        assert_eq!(rows, [["wide", "", "c"], ["a", "b", "d"]]);
+    }
+
+    #[test]
+    fn a_rowspan_holds_its_column_down_for_the_rows_below() {
+        let (_, _, rows) = table(
+            "<table><tr><td rowspan=\"2\">tall</td><td>b</td></tr>\
+             <tr><td>c</td></tr></table>",
+        );
+        assert_eq!(rows, [["tall", "b"], ["", "c"]]);
+    }
+
+    #[test]
+    fn a_span_of_a_thousand_columns_costs_two_columns_not_a_thousand() {
+        // The allocation bomb this design exists to avoid: nothing is stored
+        // per covered position, so a document cannot multiply its own cell
+        // count by writing a large span.
+        let (alignments, _, rows) = table(
+            "<table><tr><td colspan=\"1000\" rowspan=\"1000\">wide</td><td>b</td></tr>\
+             <tr><td>c</td></tr></table>",
+        );
+        assert_eq!(alignments.len(), 2);
+        assert_eq!(rows, [["wide", "b"], ["", "c"]]);
+    }
+
+    #[test]
+    fn a_rowspan_over_two_hundred_rows_places_every_one_of_them() {
+        let mut raw = String::from("<table><tr><td rowspan=\"200\">tall</td><td>0</td></tr>");
+        for row in 1..200 {
+            raw.push_str(&format!("<tr><td>{row}</td></tr>"));
+        }
+        raw.push_str("</table>");
+        let (alignments, _, rows) = table(&raw);
+        assert_eq!(alignments.len(), 2);
+        assert_eq!(rows.len(), 200);
+        assert_eq!(rows[0], ["tall", "0"]);
+        assert_eq!(rows[199], ["", "199"]);
+    }
+
+    #[test]
+    fn a_column_nothing_fills_is_dropped() {
+        // Authors use an empty column as a gutter. Keeping it would spend
+        // width on a separator the frame already draws.
+        let (alignments, _, rows) = table(
+            "<table><tr><td>a</td><td></td><td>b</td></tr>\
+             <tr><td>c</td><td>   </td><td>d</td></tr></table>",
+        );
+        assert_eq!(alignments.len(), 2);
+        assert_eq!(rows, [["a", "b"], ["c", "d"]]);
+    }
+
+    #[test]
+    fn an_omitted_closing_cell_or_row_tag_still_lands_where_it_was_meant_to() {
+        // `</td>` and `</tr>` are the end tags HTML lets you leave out, and a
+        // tree built by name-matching nests what they meant to close: the
+        // second cell arrives as a *child* of the first.
+        let (_, _, rows) = table("<table><tr><td>a<td>b<tr><td>c<td>d</table>");
+        assert_eq!(rows, [["a", "b"], ["c", "d"]]);
+    }
+
+    #[test]
+    fn a_table_inside_a_table_is_declined_but_two_side_by_side_are_not() {
+        // A cell holds inline content, so nesting could only flatten the
+        // inner table into one run-on sentence — the thing this module
+        // exists to avoid. Declining shows the markup instead, which at
+        // least says what it is.
+        assert!(
+            interpreted("<table><tr><td><table><tr><td>x</td></tr></table></td></tr></table>")
+                .is_none()
+        );
+        let blocks =
+            interpreted("<table><tr><td>a</td></tr></table><table><tr><td>b</td></tr></table>")
+                .expect("interpreted");
+        assert_eq!(
+            blocks
+                .iter()
+                .filter(|b| matches!(b.kind, BlockKind::Table { .. }))
+                .count(),
+            2,
+            "{blocks:#?}"
+        );
+    }
+
+    #[test]
+    fn a_cell_holding_an_opaque_element_still_declines_the_whole_block() {
+        // A known limitation, recorded so a change to it is deliberate: the
+        // opaque scan runs over the whole block, so one `<ul>` in one cell
+        // sends the table to the page as literal markup. Scoping the scan to
+        // cells is a follow-up.
+        assert!(interpreted("<table><tr><td><ul><li>a</li></ul></td></tr></table>").is_none());
+    }
+
+    #[test]
+    fn a_caption_becomes_a_strong_paragraph_before_the_table() {
+        let blocks = interpreted(
+            "<table><caption>First</caption><caption>Second</caption>\
+             <tr><td>a</td></tr></table>",
+        )
+        .expect("interpreted");
+        let [caption, table] = blocks.as_slice() else {
+            panic!("a caption and a table, got {blocks:#?}");
+        };
+        let BlockKind::Paragraph(content) = &caption.kind else {
+            panic!("a paragraph, got {:?}", caption.kind);
+        };
+        // HTML uses the first caption and ignores the rest.
+        assert!(
+            matches!(content.as_slice(), [Inline::Strong(_)]),
+            "{content:#?}"
+        );
+        assert_eq!(Inline::plain_text(content), "First");
+        assert!(matches!(table.kind, BlockKind::Table { .. }));
+    }
+
+    #[test]
+    fn a_caption_survives_a_table_with_no_cells_in_it() {
+        // The table itself is nothing to draw, but the words the author wrote
+        // are still words.
+        let blocks =
+            interpreted("<table><caption>Only this</caption></table>").expect("interpreted");
+        let [block] = blocks.as_slice() else {
+            panic!("just the caption, got {blocks:#?}");
+        };
+        assert_eq!(
+            Inline::plain_text(match &block.kind {
+                BlockKind::Paragraph(c) => c,
+                other => panic!("a paragraph, got {other:?}"),
+            }),
+            "Only this"
+        );
+    }
+
+    #[test]
+    fn a_tfoot_is_rendered_last_wherever_it_was_written() {
+        let (_, header, rows) = table(
+            "<table><thead><tr><th>H</th></tr></thead>\
+             <tfoot><tr><td>foot</td></tr></tfoot>\
+             <tbody><tr><td>body</td></tr></tbody></table>",
+        );
+        assert_eq!(header, ["H"]);
+        assert_eq!(rows, [["body"], ["foot"]]);
+    }
+
+    #[test]
+    fn a_footer_row_of_th_is_never_mistaken_for_the_header() {
+        // `<tfoot>` sorts last before the header is chosen, so the
+        // leading-all-`th` rule cannot reach it — a totals row written with
+        // `<th>` would otherwise become the labels.
+        let (_, header, rows) = table(
+            "<table><tfoot><tr><th>Total</th></tr></tfoot>\
+             <tbody><tr><td>a</td></tr></tbody></table>",
+        );
+        assert!(header.is_empty(), "{header:#?}");
+        assert_eq!(rows, [["a"], ["Total"]]);
+    }
+
+    #[test]
+    fn rows_loose_at_the_root_are_gathered_into_one_table() {
+        // A blank line ends a CommonMark HTML block, so a table written with
+        // one inside it reaches us in pieces and the rows arrive with no
+        // `<table>` around them.
+        let (_, header, rows) =
+            table("<thead><tr><th>H</th></tr></thead>\n<tr><td>a</td></tr>\n<tr><td>b</td></tr>");
+        assert_eq!(header, ["H"]);
+        assert_eq!(rows, [["a"], ["b"]]);
+    }
+
+    #[test]
+    fn a_br_in_a_cell_is_a_line_break_and_not_a_lost_space() {
+        let blocks =
+            interpreted("<table><tr><td>one<br>two</td></tr></table>").expect("interpreted");
+        let BlockKind::Table { rows, .. } = &blocks[0].kind else {
+            panic!("a table, got {:?}", blocks[0].kind);
+        };
+        assert!(rows[0][0].contains(&Inline::HardBreak), "{:#?}", rows[0][0]);
+        assert_eq!(Inline::plain_text(&rows[0][0]), "one two");
+    }
+
+    #[test]
+    fn a_contributor_cell_of_a_badge_over_a_name_keeps_its_column() {
+        // The all-contributors grid, which is the single most common HTML
+        // table in a README. The image is decorative, so the cell's only
+        // words are the name under it — a cell measured by its text alone
+        // would look empty and lose the column.
+        let (alignments, _, rows) = table(
+            "<table><tr>\
+             <td align=\"center\"><a href=\"https://github.com/one\">\
+             <img src=\"1.png\" alt=\"\"/><br /><sub><b>One</b></sub></a></td>\
+             <td align=\"center\"><a href=\"https://github.com/two\">\
+             <img src=\"2.png\" alt=\"\"/><br /><sub><b>Two</b></sub></a></td>\
+             </tr></table>",
+        );
+        assert_eq!(alignments, [Alignment::Center, Alignment::Center]);
+        assert_eq!(rows.len(), 1);
+        assert!(rows[0][0].contains("One"), "{:?}", rows[0][0]);
+        assert!(rows[0][1].contains("Two"), "{:?}", rows[0][1]);
+    }
+
+    #[test]
+    fn a_wrapper_around_a_table_still_leaves_a_table_and_lends_its_alignment() {
+        for raw in [
+            "<center><table><tr><td>a</td></tr></table></center>",
+            "<div align=\"center\"><table><tr><td>a</td></tr></table></div>",
+        ] {
+            let blocks = interpreted(raw).expect("interpreted");
+            let [block] = blocks.as_slice() else {
+                panic!("one table, got {blocks:#?}");
+            };
+            assert!(matches!(block.kind, BlockKind::Table { .. }), "{raw}");
+            assert_eq!(block.align, Alignment::Center, "{raw}");
+        }
+    }
+
+    #[test]
+    fn a_table_inside_details_is_a_table_inside_the_quote() {
+        let blocks = interpreted(
+            "<details><summary>S</summary><table><tr><td>a</td></tr></table></details>",
+        )
+        .expect("interpreted");
+        let BlockKind::BlockQuote { children, .. } = &blocks[0].kind else {
+            panic!("a quote, got {:?}", blocks[0].kind);
+        };
+        assert!(
+            matches!(children[1].kind, BlockKind::Table { .. }),
+            "{children:#?}"
+        );
+    }
+
+    #[test]
+    fn a_span_attribute_follows_htmls_own_rules_for_reading_a_number() {
+        let span = |value: &str| span_of(&[("colspan".into(), value.into())], "colspan");
+        assert_eq!(span("3"), 3);
+        assert_eq!(span(" +4"), 4, "leading space and a plus sign are allowed");
+        assert_eq!(span("2x"), 2, "the digits that start it are the number");
+        assert_eq!(span("0"), 1, "a span is at least one column");
+        assert_eq!(span("auto"), 1);
+        assert_eq!(span(""), 1);
+        assert_eq!(span("-3"), 1, "not a non-negative integer");
+        assert_eq!(span("99999"), MAX_SPAN, "clamped, not honoured");
+        assert_eq!(span_of(&[], "colspan"), 1, "absent");
     }
 
     #[test]

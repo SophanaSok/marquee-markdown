@@ -159,9 +159,32 @@ arrives in a block of its own.
 
 </div>
 
+<div align="center">
+<table>
+<thead>
+<tr><th>Construct</th><th align="right">Count</th><th>Notes</th></tr>
+</thead>
+<tbody>
+<tr><td colspan="2">A cell across two columns</td><td>and a third</td></tr>
+<tr>
+  <td><a href="https://example.com/ci"><img alt="CI" src="https://img.example/ci.svg"></a><br><sub><b>A caption under it</b></sub></td>
+  <td align="right">42</td>
+  <td>Wrapping prose in a cell, long enough that a narrow column has to break it somewhere.</td>
+</tr>
+<tr><th>Row header</th><td align="right">7</td><td>with <code>code</code> and <em>emphasis</em></td></tr>
+</tbody>
+</table>
+</div>
+
+<table>
+<caption>A table split by a blank line, which ends the HTML block</caption>
+
+<tr><td>so its rows arrive on their own</td><td>in a block of their own</td></tr>
+</table>
+
 <details>
 <summary>Unrecognized, so this whole block stays literal markup</summary>
-<table><tr><td>including this</td></tr></table>
+<ul><li>including this</li></ul>
 </details>
 
 ## Footnotes

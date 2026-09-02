@@ -1320,14 +1320,47 @@ mod tests {
 
     #[test]
     fn unrecognized_html_falls_back_to_literal_markup() {
-        // A table read as one run-on sentence is worse than one read as tags.
-        let blocks = parse("<table>\n<tr><td>a</td></tr>\n</table>\n");
+        // A list read as one run-on sentence is worse than one read as tags:
+        // the markers carry the structure, and there is no emitter behind
+        // them to draw it.
+        let blocks = parse("<ul>\n<li>one</li>\n<li>two</li>\n</ul>\n");
         assert!(
             blocks
                 .iter()
-                .any(|b| matches!(&b.kind, BlockKind::Html(h) if h.contains("table"))),
+                .any(|b| matches!(&b.kind, BlockKind::Html(h) if h.contains("<ul>"))),
             "{blocks:#?}"
         );
+    }
+
+    #[test]
+    fn an_html_table_reaches_the_tree_as_a_table() {
+        // The same block a pipe table produces, so the one emitter draws both.
+        let source = "<table>\n<tr><th>H</th></tr>\n<tr><td>a</td></tr>\n</table>\n";
+        let blocks = parse(source);
+        let [block] = blocks.as_slice() else {
+            panic!("one block, got {blocks:#?}");
+        };
+        let BlockKind::Table {
+            alignments,
+            header,
+            rows,
+        } = &block.kind
+        else {
+            panic!("a table, got {:?}", block.kind);
+        };
+        assert_eq!(alignments.len(), 1);
+        assert_eq!(Inline::plain_text(&header[0]), "H");
+        assert_eq!(rows.len(), 1);
+        assert_eq!(Inline::plain_text(&rows[0][0]), "a");
+        // The other two modes are untouched by interpretation.
+        assert!(matches!(
+            parse_html(source, HtmlMode::Literal).as_slice(),
+            [Block {
+                kind: BlockKind::Html(_),
+                ..
+            }]
+        ));
+        assert!(parse_html(source, HtmlMode::Hide).is_empty());
     }
 
     #[test]
@@ -1402,7 +1435,9 @@ mod tests {
         let code_count = count_kind(&blocks, &|k| matches!(k, BlockKind::CodeBlock { .. }));
         let quote_count = count_kind(&blocks, &|k| matches!(k, BlockKind::BlockQuote { .. }));
         assert!(heading_count >= 10, "headings: {heading_count}");
-        assert_eq!(table_count, 2, "tables");
+        // Two pipe tables, plus the fixture's HTML table and the half of a
+        // blank-line-split one that carries rows.
+        assert_eq!(table_count, 4, "tables");
         assert!(code_count >= 4, "code blocks: {code_count}");
         assert!(quote_count >= 6, "quotes incl. alerts: {quote_count}");
     }

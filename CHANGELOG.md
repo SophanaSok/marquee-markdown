@@ -15,6 +15,42 @@ Until 1.0 both halves may change.
 
 ## [Unreleased]
 
+### Added
+
+- **HTML `<table>` is rendered as a table**, not as tags. A `<table>` in a
+  README walks to the same block a markdown pipe table produces, so the
+  column solver, the box drawing, the shaded header band and the narrow-width
+  `label: value` cards all apply to it unchanged — `solve_widths` was not
+  touched, and nothing downstream can tell which source the cells came from.
+
+  What it understands is what READMEs actually contain: `<thead>`/`<tbody>`/
+  `<tfoot>` (the footer renders last wherever it was written), a leading row
+  of `<th>` as the header when `<thead>` was left out, `align` on a cell, row
+  or table, `colspan` and `rowspan`, `<caption>` as a strong paragraph above
+  the table, a `<br>` inside a cell, and `<td>`/`<tr>` written without their
+  closing tags. A `<center>` or `<div align>` around the table lends it their
+  alignment, and a table split by a blank line — which ends the HTML block, so
+  its rows arrive loose — is gathered back into one.
+
+  Three fixes fell out of it and apply to markdown tables too: a header with
+  no rows under it drew a doubled bottom edge, a cell containing a line break
+  claimed the width of all its lines at once, and card layout centred each
+  value behind its label instead of setting it flush.
+
+  Links inside a framed cell are now interned, so `]` walks a contributor
+  grid; before this they were on the page but not reachable.
+
+  Limits, deliberate: a table inside a table is declined to literal markup,
+  because a cell holds inline content and nesting could only flatten the
+  inner one into a run-on sentence. A cell holding an element with no emitter
+  — `<ul>`, `<pre>`, `<input>` — still sends the whole block to literal
+  markup, because the scan that declines runs over the block rather than the
+  cell. `style="text-align:…"` is not read; only the `align` attribute is.
+  Per-cell alignment is not representable, so a column takes the header
+  cell's alignment or the first body cell that states one. And search matches
+  a table line by line, so a phrase that wraps inside a cell is not found
+  across the wrap.
+
 ## [0.10.0] - 2026-09-02
 
 A hardening release. The two changes a reader can meet are refusals: `-w`

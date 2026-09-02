@@ -554,6 +554,12 @@ fn interpreted_html_puts_no_markup_on_the_page() {
             "</div>",
             "align=\"center\"",
             "<br>",
+            "<table",
+            "<tr",
+            "<td",
+            "<th",
+            "</td>",
+            "colspan",
         ] {
             assert!(
                 !text.contains(markup),
@@ -609,13 +615,108 @@ fn a_centered_block_is_actually_centered() {
 
 #[test]
 fn unrecognized_html_still_renders_as_literal_markup() {
-    // `<details>` and `<table>` have no emitter, and a table read as one
-    // run-on sentence is worse than one read as tags.
+    // A list has no emitter, and a list read as one run-on sentence is worse
+    // than one read as tags. The `<details>` around it is understood, but the
+    // decision is taken for the whole block, so the block stays literal.
     let theme = Theme::new(ThemeVariant::Slate);
     let doc = render_html(FIXTURE, &theme, 80, HtmlMode::Render);
     assert!(
-        text_of(&doc).contains("<details>"),
+        text_of(&doc).contains("<ul>"),
         "the declined block lost its markup"
+    );
+}
+
+#[test]
+fn an_html_table_is_framed_when_it_fits_and_labelled_cards_when_it_does_not() {
+    // The point of routing HTML tables through the markdown emitter: they get
+    // the column solver, the frame, and the narrow-width card fallback for
+    // free, and nothing downstream can tell which source the cells came from.
+    let theme = Theme::new(ThemeVariant::Slate);
+    // The three-column HTML table in the fixture, picked out by source offset:
+    // the markdown tables are above it and the two-column one is below, and
+    // that one is narrow enough to keep its frame even at 20.
+    let html_at = FIXTURE
+        .find("<div align=\"center\">\n<table>")
+        .expect("the fixture has an HTML table");
+    let next_at = FIXTURE
+        .find("<table>\n<caption>")
+        .expect("and a second one after it");
+    let html_table_lines = move |doc: &RenderedDoc| -> Vec<(usize, String)> {
+        doc.meta
+            .iter()
+            .enumerate()
+            .filter(|(_, m)| {
+                m.kind == LineKind::Table
+                    && m.source
+                        .as_ref()
+                        .is_some_and(|s| (html_at..next_at).contains(&s.start))
+            })
+            .map(|(i, m)| (i, doc.plain[m.plain.clone()].to_owned()))
+            .collect()
+    };
+
+    let wide = render_html(FIXTURE, &theme, 80, HtmlMode::Render);
+    let narrow = render_html(FIXTURE, &theme, 20, HtmlMode::Render);
+
+    // Framed at 80, so the border characters are on the page.
+    let framed = html_table_lines(&wide);
+    assert!(
+        framed.iter().any(|(_, text)| text.contains('\u{2502}')),
+        "no framed HTML table lines at 80: {framed:#?}"
+    );
+
+    // At 20 the frame does not fit, so every one of those lines is a card
+    // line: no border characters anywhere, and the labels introduce the
+    // values.
+    for (i, text) in html_table_lines(&narrow) {
+        assert!(
+            !text.contains('\u{2502}') && !text.contains('\u{250c}'),
+            "line {i} still draws a frame at 20: {text:?}"
+        );
+    }
+    // The words survive both, which is what makes the table searchable. A
+    // narrow column wraps prose, so only the short cells stay contiguous.
+    for word in [
+        "Construct",
+        "and a third",
+        "Row header",
+        "narrow column has to break it somewhere.",
+        // The badge's alt text and the name under it, from the `<br>` cell.
+        "CI",
+        // The rows that arrived in a block of their own, and the caption that
+        // introduces them.
+        "so its rows arrive on their own",
+        "A table split by a blank line",
+    ] {
+        assert!(wide.plain.contains(word), "80 lost {word:?}");
+    }
+    // A card column is 20 cells wide less its label, so only the short cells
+    // stay contiguous; that the rest survive the wrap is the paragraph
+    // emitter's business, tested where it lives.
+    for word in ["Construct: ", "Count: 42", "Count: 7"] {
+        assert!(narrow.plain.contains(word), "20 lost {word:?}");
+    }
+
+    // And the links inside the cells are walkable at either width, which the
+    // framed path had to be taught: a bordered cell is assembled span by span,
+    // and the column ranges have to be recorded as it goes.
+    let links = |doc: &RenderedDoc| -> usize {
+        doc.meta
+            .iter()
+            .filter(|m| {
+                m.kind == LineKind::Table
+                    && m.source
+                        .as_ref()
+                        .is_some_and(|s| (html_at..next_at).contains(&s.start))
+            })
+            .map(|m| m.links.len())
+            .sum()
+    };
+    assert!(links(&wide) > 0, "a framed cell interned no link");
+    assert_eq!(
+        links(&wide),
+        links(&narrow),
+        "a link is reachable at one width and not the other"
     );
 }
 

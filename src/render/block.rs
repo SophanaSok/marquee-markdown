@@ -52,9 +52,9 @@ pub struct Block {
     /// Which edge the content is set against.
     ///
     /// Only raw HTML's `align` attribute ever sets this — markdown has no
-    /// syntax that could ask for it — and only the heading and paragraph
-    /// emitters honour it. A field rather than a wrapping `BlockKind` variant
-    /// on purpose: the tree is walked by several hand-written recursive
+    /// syntax that could ask for it — and only the heading, paragraph and
+    /// table emitters honour it. A field rather than a wrapping `BlockKind`
+    /// variant on purpose: the tree is walked by several hand-written recursive
     /// helpers that end in `_ => 0`, and a new container variant any one of
     /// them forgot would make `Document::heading_count` disagree with the
     /// outline silently. That is the pane-geometry bug this project has
@@ -131,7 +131,9 @@ pub struct ListItem {
     pub children: Vec<Block>,
 }
 
-/// Table column alignment from the delimiter row.
+/// Which edge content is set against: a table column's alignment, from
+/// markdown's delimiter row or an HTML cell's `align` attribute, and a block's
+/// own alignment when raw HTML asked for one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Alignment {
     #[default]

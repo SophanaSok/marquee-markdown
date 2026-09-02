@@ -75,7 +75,7 @@ prop_compose! {
 
 /// One markdown block built around adversarial text, optionally nested.
 fn block() -> impl Strategy<Value = String> {
-    (0usize..16, nasty_text(6), 0usize..4).prop_map(|(kind, text, depth)| {
+    (0usize..19, nasty_text(6), 0usize..4).prop_map(|(kind, text, depth)| {
         let text = nest(&text, depth);
         match kind {
             0 => format!("# {text}"),
@@ -106,6 +106,19 @@ fn block() -> impl Strategy<Value = String> {
             // that does not lex at all.
             14 => format!("<details><summary>{text}</summary>{text}</details>"),
             15 => format!("<p align=\"{text}\" {text}>{text}</p"),
+            // HTML tables, which feed the column solver a second source of
+            // cells. Spans, an omitted `</td>`, a `<br>` inside a cell and a
+            // caption are the shapes that place a cell somewhere other than
+            // where the tags say.
+            16 => format!(
+                "<table><caption>{text}</caption>\n<thead><tr><th align=\"{text}\">{text}</th><th>{text}</th></tr></thead>\n<tr><td colspan=\"2\">{text}</td><td>{text}</td></tr>\n<tr><th>{text}</th><td>{text}<br>{text}</td></table>"
+            ),
+            17 => format!(
+                "<div align=\"center\"><table><tr><td rowspan=\"3\">{text}</td><td>{text}</td><tr><td>{text}</td></table></div>"
+            ),
+            // Rows loose at the root, which is what a blank line inside a
+            // table leaves behind.
+            18 => format!("<tr><td>{text}</td><td>{text}</td></tr>"),
             _ => text,
         }
     })

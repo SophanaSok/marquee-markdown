@@ -15,7 +15,7 @@ use ratatui::text::Span;
 use super::Context;
 use crate::render::block::{Alignment, Inline};
 use crate::render::doc::LineKind;
-use crate::render::frag::{self, Breaks, Frag, FragKind, IgnoreLinks};
+use crate::render::frag::{self, Breaks, Frag, FragKind, IgnoreLinks, LinkSink};
 use crate::render::measure;
 use crate::render::wrap::{self, WrapMode};
 use crate::theme::Theme;
@@ -33,6 +33,11 @@ pub(super) fn emit(
     if columns == 0 {
         return;
     }
+    // A framed table is a fixed-width object, so it is set against an edge as
+    // a whole rather than line by line: the alignment leaves the context and
+    // becomes one pad in front of every line. Cards are ordinary wrapped text
+    // and would otherwise centre each value line behind its own label.
+    let outer = std::mem::replace(&mut ctx.align, Alignment::Left);
     let avail = ctx.available_width();
     // Frame chrome: k+1 borders plus 2 padding cells per column.
     let chrome = 3 * columns + 1;
@@ -43,41 +48,72 @@ pub(super) fn emit(
         .then(|| solve_widths(ctx, columns, header, rows, avail - chrome))
         .flatten()
     else {
-        return emit_cards(ctx, header, rows, span);
+        emit_cards(ctx, header, rows, span);
+        ctx.align = outer;
+        return;
+    };
+
+    let room = avail.saturating_sub(widths.iter().sum::<usize>() + chrome);
+    let frame = Frame {
+        indent: match outer {
+            Alignment::Left => 0,
+            Alignment::Center => room / 2,
+            Alignment::Right => room,
+        },
+        widths: &widths,
+        span,
     };
 
     let border = ctx.theme.table_border();
     let header_style = ctx.theme.table_header();
     let body_style = ctx.theme.body();
+    let mid_rule = ("├", "┼", "┤");
 
-    frame_row(ctx, &widths, "┌", "┬", "┐", border, span);
+    frame_row(ctx, &frame, ("┌", "┬", "┐"), border);
     if !header.is_empty() {
         cells_rows(
             ctx,
-            &widths,
+            &frame,
             alignments,
             header,
-            header_style,
-            header_style,
-            span,
+            (header_style, header_style),
         );
-        frame_row(ctx, &widths, "├", "┼", "┤", border, span);
+        // A header with nothing under it needs no rule under it either;
+        // drawing one lays a double line along the bottom edge.
+        if !rows.is_empty() {
+            frame_row(ctx, &frame, mid_rule, border);
+        }
     }
     for (i, row) in rows.iter().enumerate() {
         if i > 0 {
-            frame_row(ctx, &widths, "├", "┼", "┤", border, span);
+            frame_row(ctx, &frame, mid_rule, border);
         }
-        cells_rows(
-            ctx,
-            &widths,
-            alignments,
-            row,
-            body_style,
-            ctx.theme.page(),
-            span,
-        );
+        cells_rows(ctx, &frame, alignments, row, (body_style, ctx.theme.page()));
     }
-    frame_row(ctx, &widths, "└", "┴", "┘", border, span);
+    frame_row(ctx, &frame, ("└", "┴", "┘"), border);
+    ctx.align = outer;
+}
+
+/// The fixed geometry of one table, shared by every line it emits.
+struct Frame<'a> {
+    /// Cells of page between the content edge and the table's left border,
+    /// from the block's own alignment.
+    indent: usize,
+    widths: &'a [usize],
+    span: &'a Range<usize>,
+}
+
+/// The lead for one table line: the container prefix, then the pad that sets
+/// the table against its edge.
+///
+/// Part of the lead rather than the content so `LineMeta` counts it as
+/// decoration, which is the same reason `Context::align_pad` gives.
+fn lead_with(ctx: &mut Context<'_>, frame: &Frame<'_>) -> Vec<Span<'static>> {
+    let mut lead = ctx.lead();
+    if frame.indent > 0 {
+        lead.push(Span::styled(" ".repeat(frame.indent), ctx.theme.page()));
+    }
+    lead
 }
 
 /// Longest word we insist on fitting before giving up on a framed table; one
@@ -100,7 +136,19 @@ fn measure_cell(content: &[Inline], theme: &Theme) -> (usize, usize) {
         &mut IgnoreLinks,
         Breaks::Collapse,
     );
-    let natural: usize = frags.iter().map(|f| f.width).sum();
+    // Natural is the widest *line*, not the total: a cell holding a `<br>`
+    // wraps there whatever column it gets, so asking for the sum of its lines
+    // would claim room no line of it uses.
+    let (mut natural, mut line) = (0usize, 0usize);
+    for f in &frags {
+        if f.kind == FragKind::Break {
+            natural = natural.max(line);
+            line = 0;
+        } else {
+            line += f.width;
+        }
+    }
+    natural = natural.max(line);
 
     // The widest run the wrapper cannot break: a word plus the glue stuck to it.
     let (mut widest, mut run) = (0usize, 0usize);
@@ -191,50 +239,44 @@ fn solve_widths(
 /// A horizontal frame line: `├───┼─────┤` etc.
 fn frame_row(
     ctx: &mut Context<'_>,
-    widths: &[usize],
-    left: &str,
-    mid: &str,
-    right: &str,
+    frame: &Frame<'_>,
+    (left, mid, right): (&str, &str, &str),
     border: Style,
-    span: &Range<usize>,
 ) {
     let mut text = String::from(left);
-    for (i, w) in widths.iter().enumerate() {
+    for (i, w) in frame.widths.iter().enumerate() {
         if i > 0 {
             text.push_str(mid);
         }
         text.push_str(&"─".repeat(w + 2));
     }
     text.push_str(right);
-    let frame = Span::styled(text, border);
-    let lead = ctx.lead();
+    let rule = Span::styled(text, border);
+    let lead = lead_with(ctx, frame);
     ctx.sink
-        .push_spans(lead, vec![frame], LineKind::Table, Some(span.clone()));
+        .push_spans(lead, vec![rule], LineKind::Table, Some(frame.span.clone()));
 }
 
 /// Emit one logical row, wrapping cells and padding short ones, as one or more
 /// physical lines.
 fn cells_rows(
     ctx: &mut Context<'_>,
-    widths: &[usize],
+    frame: &Frame<'_>,
     alignments: &[Alignment],
     row: &[Vec<Inline>],
-    text_style: Style,
-    pad_style: Style,
-    span: &Range<usize>,
+    (text_style, pad_style): (Style, Style),
 ) {
     let border = ctx.theme.table_border();
-    // Wrap every cell to its column width.
-    let wrapped: Vec<Vec<Vec<Frag>>> = (0..widths.len())
+    // Wrap every cell to its column width. Links are interned as they are
+    // found, so a cell of badges is walkable with `]` exactly as the same
+    // links are in the narrow-width card layout.
+    let wrapped: Vec<Vec<Vec<Frag>>> = (0..frame.widths.len())
         .map(|col| {
             let content = row.get(col).map(Vec::as_slice).unwrap_or(&[]);
-            let frags = frag::fragment(
-                content,
-                text_style,
-                ctx.theme,
-                &mut IgnoreLinks,
-                Breaks::Collapse,
-            );
+            let frags = {
+                let mut links = Links(ctx.sink);
+                frag::fragment(content, text_style, ctx.theme, &mut links, Breaks::Collapse)
+            };
             // Cell text inherits the row background (header band vs page).
             let frags: Vec<Frag> = frags
                 .into_iter()
@@ -245,39 +287,61 @@ fn cells_rows(
                     f
                 })
                 .collect();
-            wrap::wrap(frags, widths[col], WrapMode::Word)
+            wrap::wrap(frags, frame.widths[col], WrapMode::Word)
         })
         .collect();
     let height = wrapped.iter().map(Vec::len).max().unwrap_or(1);
 
     for line_idx in 0..height {
-        let lead = ctx.lead();
-        let mut spans = vec![Span::styled("│", border)];
+        // Assembled as fragments rather than spans so the sink records which
+        // columns a link covers; borders and padding are fragments carrying no
+        // link, which is what keeps them out of the walk.
+        let mut frags = vec![chrome_frag("│", border)];
         for (col, cell_lines) in wrapped.iter().enumerate() {
-            spans.push(Span::styled(" ", pad_style));
+            frags.push(chrome_frag(" ", pad_style));
             let empty = Vec::new();
             let segment = cell_lines.get(line_idx).unwrap_or(&empty);
             let content_w = wrap::line_width(segment);
-            let pad = widths[col].saturating_sub(content_w);
+            let pad = frame.widths[col].saturating_sub(content_w);
             let (before, after) = match alignments.get(col).copied().unwrap_or_default() {
                 Alignment::Left => (0, pad),
                 Alignment::Right => (pad, 0),
                 Alignment::Center => (pad / 2, pad - pad / 2),
             };
             if before > 0 {
-                spans.push(Span::styled(" ".repeat(before), pad_style));
+                frags.push(chrome_frag(&" ".repeat(before), pad_style));
             }
-            for f in segment {
-                spans.push(Span::styled(f.text.clone(), f.style));
-            }
+            frags.extend(segment.iter().cloned());
             if after > 0 {
-                spans.push(Span::styled(" ".repeat(after), pad_style));
+                frags.push(chrome_frag(&" ".repeat(after), pad_style));
             }
-            spans.push(Span::styled(" ", pad_style));
-            spans.push(Span::styled("│", border));
+            frags.push(chrome_frag(" ", pad_style));
+            frags.push(chrome_frag("│", border));
         }
+        let lead = lead_with(ctx, frame);
         ctx.sink
-            .push_spans(lead, spans, LineKind::Table, Some(span.clone()));
+            .push_frags(lead, &frags, LineKind::Table, Some(frame.span.clone()));
+    }
+}
+
+/// A border or padding fragment: drawn, never part of a link, and never
+/// dropped at a line end (the wrapper is done with the line by now).
+fn chrome_frag(text: &str, style: Style) -> Frag {
+    Frag {
+        text: text.to_owned(),
+        style,
+        link: None,
+        width: measure::width(text),
+        kind: FragKind::Word,
+    }
+}
+
+/// Interns the links found while fragmenting a cell.
+struct Links<'a>(&'a mut crate::render::sink::LineSink);
+
+impl LinkSink for Links<'_> {
+    fn intern(&mut self, dest: &str) -> u32 {
+        self.0.intern_link(dest)
     }
 }
 
@@ -296,6 +360,14 @@ fn emit_cards(
     span: &Range<usize>,
 ) {
     let labels: Vec<String> = header.iter().map(|c| Inline::plain_text(c)).collect();
+    // A header with no rows under it has nothing to label, so it is the one
+    // row there is. Labelling it with itself would print `Name: Name`.
+    let only = [header.to_vec()];
+    let (labels, rows) = if rows.is_empty() {
+        (Vec::new(), &only[..])
+    } else {
+        (labels, rows)
+    };
 
     for (row_idx, row) in rows.iter().enumerate() {
         if row_idx > 0 {
@@ -305,6 +377,11 @@ fn emit_cards(
                 .push_spans(lead, vec![divider], LineKind::Table, Some(span.clone()));
         }
         for (col, cell) in row.iter().enumerate() {
+            // An empty cell with no label to introduce it says nothing, and a
+            // line is what saying nothing would cost.
+            if cell.is_empty() && labels.get(col).is_none_or(String::is_empty) {
+                continue;
+            }
             let width = ctx.available_width();
             let label = labels.get(col).map_or_else(String::new, |l| {
                 measure::truncate(l, width.saturating_sub(2).max(1) / 2, "\u{2026}")
