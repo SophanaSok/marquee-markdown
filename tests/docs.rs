@@ -406,3 +406,156 @@ fn the_theme_hook_signals_a_name_pkill_can_actually_match() {
         "the hook has to signal the long binary under its truncated name: {signalled:?}"
     );
 }
+
+#[test]
+fn one_description_serves_every_channel_and_keeps_to_the_strictest_rules() {
+    // The crate description is also the Debian synopsis, and the same wording
+    // is spelled again as the RPM summary, the Homebrew `desc`, and the Scoop
+    // `description`. So it obeys the union of the channels' rules — Debian:
+    // under 80 characters, no initial article (lintian `synopsis-too-long`,
+    // the Developers Reference); Homebrew: no article, capitalized, no
+    // trailing full stop, does not begin with the name — and the copies must
+    // not drift. It shipped at 98 characters with a leading "A " once; every
+    // channel that renders a synopsis would have flagged it before any test
+    // here did.
+    let manifest: toml::Value = toml::from_str(include_str!("../Cargo.toml")).expect("Cargo.toml");
+    let description = manifest["package"]["description"]
+        .as_str()
+        .expect("a description");
+
+    assert!(
+        description.len() < 80,
+        "{} characters; Debian wants the synopsis under 80: {description}",
+        description.len()
+    );
+    for article in ["A ", "An ", "The "] {
+        assert!(
+            !description.starts_with(article),
+            "leading article: {description}"
+        );
+    }
+    assert!(
+        !description.ends_with('.'),
+        "trailing full stop: {description}"
+    );
+    assert!(
+        !description.to_ascii_lowercase().starts_with("marquee"),
+        "starts with the name: {description}"
+    );
+    assert!(
+        description
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_uppercase()),
+        "not capitalized: {description}"
+    );
+
+    let summary = manifest["package"]["metadata"]["generate-rpm"]["summary"]
+        .as_str()
+        .expect("an RPM summary");
+    assert_eq!(summary, description, "the RPM summary drifted");
+
+    // The formula and the template are excluded from the published crate, so
+    // inside the package there is nothing more to hold together.
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    if let Ok(formula) =
+        std::fs::read_to_string(root.join("packaging/homebrew/marquee-markdown.rb"))
+    {
+        let desc = formula
+            .lines()
+            .find_map(|line| line.trim().strip_prefix("desc \""))
+            .and_then(|rest| rest.split('"').next())
+            .expect("the formula has a desc");
+        assert_eq!(desc, description, "the Homebrew desc drifted");
+    }
+    if let Ok(template) =
+        std::fs::read_to_string(root.join("packaging/scoop/marquee-markdown.template.json"))
+    {
+        let template: serde_json::Value = serde_json::from_str(&template).expect("template JSON");
+        assert_eq!(
+            template["description"].as_str().expect("a description"),
+            description,
+            "the Scoop description drifted"
+        );
+    }
+}
+
+#[test]
+fn the_release_archive_names_match_binstall_and_the_scoop_template() {
+    // `cargo binstall` and Scoop construct download names from hand-written
+    // strings in `Cargo.toml` and the template, while the workflow names the
+    // real archives independently in `release.yml`. A rename on either side
+    // breaks installs for every user with a green CI — the same class of bug
+    // the Scoop hash test was written against. `.github/` is excluded from
+    // the published crate, so inside the package there is nothing to check.
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let Ok(workflow) = std::fs::read_to_string(root.join(".github/workflows/release.yml")) else {
+        return;
+    };
+
+    // The one line every fetcher's expectations descend from.
+    assert!(
+        workflow.contains(r#"name="marquee-markdown-${GITHUB_REF_NAME}-${{ matrix.name }}""#),
+        "the archive naming line in release.yml changed; the binstall overrides \
+         and the Scoop template name archives after it"
+    );
+
+    let manifest = include_str!("../Cargo.toml");
+    for (platform, ext) in [
+        ("x86_64-linux", "tar.gz"),
+        ("aarch64-macos", "tar.gz"),
+        ("x86_64-macos", "tar.gz"),
+        ("x86_64-windows", "zip"),
+    ] {
+        assert!(
+            workflow.contains(&format!("name: {platform}")),
+            "release.yml no longer builds {platform}, but a binstall override \
+             still points at it"
+        );
+        let stem = format!("{{ name }}-v{{ version }}-{platform}.{ext}");
+        assert!(
+            manifest.contains(&stem),
+            "no binstall override fetches …-{platform}.{ext}; \
+             `cargo binstall` would fall back to building from source"
+        );
+    }
+
+    if let Ok(template) =
+        std::fs::read_to_string(root.join("packaging/scoop/marquee-markdown.template.json"))
+    {
+        let stem = "marquee-markdown-v@VERSION@-x86_64-windows.zip";
+        assert!(
+            template.contains(stem),
+            "the template lost the archive name"
+        );
+        assert!(
+            workflow.contains("marquee-markdown-v$version-x86_64-windows.zip"),
+            "the workflow's Scoop step names a different archive than it builds"
+        );
+    }
+}
+
+#[test]
+fn the_linux_packages_carry_man_pages_and_completions_for_both_binaries() {
+    // Debian counts a binary without a man page as a bug (lintian
+    // `binary-without-manpage`), and both packages shipped bare binaries for
+    // four releases before anyone noticed — nothing builds a .deb until a tag
+    // is pushed. The asset lists are plain strings in `Cargo.toml`, so the
+    // cheapest guard is that each generated file is named by both tables.
+    let manifest = include_str!("../Cargo.toml");
+    for name in ["marquee-markdown", "mmd"] {
+        for file in [
+            format!("dist/man/{name}.1.gz"),
+            format!("dist/completions/{name}.bash"),
+            format!("dist/completions/{name}.zsh"),
+            format!("dist/completions/{name}.fish"),
+        ] {
+            let uses = manifest.matches(file.as_str()).count();
+            assert!(
+                uses >= 2,
+                "{file} appears {uses} time(s) in Cargo.toml; the deb and rpm \
+                 asset lists must both ship it"
+            );
+        }
+    }
+}

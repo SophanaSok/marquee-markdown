@@ -46,7 +46,7 @@ Until 1.0 both halves may change.
   applies** — under 80 characters, no leading article — because it is also
   the Debian synopsis, the RPM summary, the Homebrew `desc`, and the Scoop
   `description`. It was 98 characters with a leading "A ", which lintian
-  rejects outright.
+  rejects outright. A test now holds all four spellings together.
 - **The release workflow's token is read-only except where the release is
   published**, third-party actions included; the checkout action is on the
   same major as CI's, and the changelog-notes heredoc uses a random delimiter
