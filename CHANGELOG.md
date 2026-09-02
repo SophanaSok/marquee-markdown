@@ -15,6 +15,8 @@ Until 1.0 both halves may change.
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-01
+
 `--style system` stops being a snapshot. It asked the terminal what colors it
 was using once, before the screen was taken, and then painted in those colors
 for the rest of the session — so changing your terminal's colorscheme, or the
@@ -1033,7 +1035,8 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
 - Resizing re-lays out on every event; a large document dragged by a window
   edge will work harder than it needs to until a debounce lands.
 
-[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.7.1...v0.8.0
 [0.7.1]: https://github.com/SophanaSok/marquee-markdown/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.6.1...v0.7.0
