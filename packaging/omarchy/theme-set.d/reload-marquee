@@ -1,0 +1,38 @@
+#!/bin/bash
+#
+# Tell every running marquee-markdown to re-read the terminal's colors.
+#
+# Omarchy runs `theme-set.d` hooks last, after the terminal configs have been
+# rewritten and the terminals told to reload them — so by the time this runs,
+# asking a terminal what colors it is using gets the new answer rather than the
+# old one. That ordering is the whole reason to install this rather than rely
+# on the other triggers: focus regain and a watched path can both fire while
+# the terminal is still repainting, and have to probe-and-compare to cope.
+#
+# Install with:
+#
+#   install -Dm755 packaging/omarchy/theme-set.d/reload-marquee \
+#     ~/.config/omarchy/hooks/theme-set.d/reload-marquee
+#
+# Nothing here is Omarchy-specific except the directory it lives in. Any
+# desktop that can run a command after retinting its terminals can send the
+# same signal.
+#
+# Both binaries, because a reader may have started either: they are two real
+# binaries rather than a symlink, so only the one that was actually run is
+# there to signal.
+#
+# `marquee-markdow` is not a typo. `pkill -x` matches the kernel's process
+# name, which is capped at 15 characters — `marquee-markdown` is 16, so
+# spelling it in full matches nothing at all and `pkill` says so on standard
+# error. `-f` against the whole command line would avoid the truncation and
+# introduce a worse problem: it would match any editor, pager or shell with
+# the string in its arguments, and signal those instead.
+#
+# A run with no reader open exits 1, which is not a failure worth reporting,
+# hence the explicit success below.
+
+pkill -USR1 -x marquee-markdow
+pkill -USR1 -x mmd
+
+exit 0

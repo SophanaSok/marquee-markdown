@@ -124,6 +124,8 @@ impl Cli {
             preserve_new_lines: self.preserve_new_lines.then_some(true),
             update_check: None,
             terminal_query: None,
+            // No flag: `[theme] watch` describes the machine, not the run.
+            theme_watch: None,
             contents: None,
             hints: None,
             // No flag: this module keeps glow's surface, and glow has no

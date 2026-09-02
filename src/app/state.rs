@@ -9,6 +9,7 @@
 use std::fmt;
 use std::path::PathBuf;
 use std::sync::mpsc::Sender;
+use std::time::Instant;
 
 use crate::browser::Browser;
 use crate::doc::{DocCache, Links, Search, View};
@@ -57,14 +58,34 @@ pub struct Options {
     /// next run, so a theme saved from the picker would appear not to take —
     /// which is worth saying rather than letting the reader discover it.
     pub style_overridden: bool,
-    /// What the terminal said about its own colors, asked once before the
-    /// screen was taken.
+    /// What the terminal said about its own colors.
     ///
-    /// Carried rather than re-asked because the event thread owns standard
-    /// input from here on: a question put to the terminal now would wait for
-    /// a reply that thread has already swallowed. This is what lets the
-    /// picker preview `system` on a key press.
+    /// Asked once before the screen was taken, and asked again — through
+    /// [`crate::app::recolor`], which stands the reader down first — whenever
+    /// something suggests the terminal was retinted. This is also what lets
+    /// the picker preview `system` on a key press.
     pub terminal: TerminalColors,
+    /// The `--style` in force, as written.
+    ///
+    /// Kept beside the resolved [`Theme`] because a theme cannot be resolved
+    /// twice from itself: `system` has to be re-resolved against a *new*
+    /// answer from the terminal, and a file-backed theme against the file as
+    /// it now reads.
+    pub style: String,
+    /// Whether the terminal answered anything at all when first asked.
+    ///
+    /// The guard that keeps this free for readers whose terminal has no
+    /// opinion — `screen`, a dumb terminal, every Windows console, anything
+    /// behind a pipe. One silence is taken as final: a terminal does not grow
+    /// the ability to answer `OSC 11` halfway through a session, and asking
+    /// again would spend the timeout on every trigger forever.
+    pub terminal_answers: bool,
+    /// Paths whose change means the terminal may have been retinted.
+    ///
+    /// For a desktop that swaps a theme underneath a terminal that keeps
+    /// focus, where nothing else would say so. A value rather than a compiled
+    /// -in list, so no desktop's directory layout ends up in this program.
+    pub theme_watch: Vec<PathBuf>,
 }
 
 impl Default for Options {
@@ -81,6 +102,9 @@ impl Default for Options {
             config_path: None,
             style_overridden: false,
             terminal: TerminalColors::UNKNOWN,
+            style: String::new(),
+            terminal_answers: false,
+            theme_watch: Vec::new(),
         }
     }
 }
@@ -132,6 +156,21 @@ impl fmt::Debug for FileWatch {
         } else {
             "FileWatch(idle)"
         })
+    }
+}
+
+/// The running watches on the theme's own sources, if any.
+///
+/// Held apart from [`FileWatch`] because they have different lifetimes: the
+/// document watch is replaced every time a different file is opened, and these
+/// last the session. Folding them together is how opening a second document
+/// would quietly stop a reader following their desktop theme.
+#[derive(Default)]
+pub struct ThemeWatches(Vec<crate::doc::watch::Watch>);
+
+impl fmt::Debug for ThemeWatches {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ThemeWatches({})", self.0.len())
     }
 }
 
@@ -268,21 +307,73 @@ pub struct App {
     pub pending: Option<crate::app::external::Request>,
     /// Set when the reader should exit.
     pub should_quit: bool,
+    /// The style being followed live, when one is.
+    ///
+    /// Set from [`Options::style`] and cleared the moment the reader chooses a
+    /// theme by hand — accepting one in the picker, or toggling light and
+    /// dark. Following means "keep this in step with what it was resolved
+    /// from"; a theme somebody picked is not resolved from anything, and
+    /// re-resolving over it would undo the choice on the next alt-tab.
+    pub following: Option<String>,
+    /// When the terminal was last asked about its colors.
+    ///
+    /// The rate limit. Triggers arrive in bursts — a focus regain and a
+    /// watched path settling are the same theme switch seen twice — and each
+    /// round trip parks the reader, so they are worth collapsing into one.
+    pub last_probe: Option<Instant>,
     /// Where background producers post. `None` in headless tests, which is
     /// also what makes them free of threads.
     pub events: Option<Sender<Event>>,
     /// The watch on the open document, if it has a path and watching worked.
     watch: FileWatch,
+    /// Watches on `[theme] watch`, started once for the session.
+    theme_watches: ThemeWatches,
+}
+
+/// The palette `toggle-theme` switches to, for a theme in force.
+///
+/// Extracted so that a theme arriving later — from the picker, or from a
+/// terminal that was retinted — moves its counterpart with it. Leaving the old
+/// one standing is how `T` comes to toggle to the opposite of a theme that is
+/// no longer on the screen.
+#[must_use]
+pub fn counterpart(theme: &Theme) -> Theme {
+    Theme::new(match theme.appearance {
+        Appearance::Light => ThemeVariant::Slate,
+        Appearance::Dark => ThemeVariant::Paper,
+    })
+}
+
+/// Whether a style is one to keep in step, and with what.
+#[must_use]
+///
+/// `system` is resolved from what the terminal answered and a theme file from
+/// a file, so both can go out of date underneath the reader. The names that
+/// resolve to a compiled-in palette whatever anything else says cannot:
+/// `auto` is an alias for the dark palette rather than an adaptive choice, and
+/// the `notty` family is the absence of a palette. Following either would be a
+/// re-resolve that arrives at the identical theme.
+///
+/// A plain name is followed rather than dismissed as compiled-in, because a
+/// user theme of that name wins over a shipped one in
+/// [`registry::resolve`] — so `--style dracula` may well be a file somebody is
+/// editing.
+pub fn follows(style: &str) -> Option<String> {
+    let name = style.trim();
+    if name.is_empty() {
+        return None;
+    }
+    match name.to_ascii_lowercase().as_str() {
+        "auto" | "notty" | "plain" | "none" => None,
+        _ => Some(name.to_owned()),
+    }
 }
 
 impl App {
     /// Build the reader over a document.
     #[must_use]
     pub fn new(source: Source, theme: Theme, options: Options) -> Self {
-        let alternate = Theme::new(match theme.appearance {
-            Appearance::Light => ThemeVariant::Slate,
-            Appearance::Dark => ThemeVariant::Paper,
-        });
+        let alternate = counterpart(&theme);
         Self {
             doc: DocCache::with_options(source, ParseOptions { html: options.html }),
             view: View::default(),
@@ -304,11 +395,14 @@ impl App {
             prompt: None,
             active: None,
             message: None,
+            following: follows(&options.style),
+            last_probe: None,
             options,
             pending: None,
             should_quit: false,
             events: None,
             watch: FileWatch::default(),
+            theme_watches: ThemeWatches::default(),
         }
     }
 
@@ -357,6 +451,40 @@ impl App {
         self.watch = FileWatch(
             crate::doc::watch::spawn(&path, move || sender.send(Event::Reload).is_ok()).ok(),
         );
+    }
+
+    /// Start watching the paths that say the terminal may have been retinted.
+    ///
+    /// Once per session, unlike [`App::start_watching`]: these describe the
+    /// desktop rather than the open document, and re-spawning them on every
+    /// file opened would drop and rebuild a watch for no reason.
+    ///
+    /// A path that cannot be watched is skipped rather than reported. The
+    /// setting is a hint about where a desktop keeps its state — a reader who
+    /// upgrades and finds the path moved should not meet an error about it on
+    /// a document they were trying to read, and focus regain still covers the
+    /// common case.
+    pub fn start_watching_theme(&mut self) {
+        let Some(sender) = self.events.clone() else {
+            return;
+        };
+        self.theme_watches = ThemeWatches(
+            self.options
+                .theme_watch
+                .clone()
+                .iter()
+                .filter_map(|path| {
+                    let sender = sender.clone();
+                    crate::doc::watch::spawn(path, move || sender.send(Event::Recolor).is_ok()).ok()
+                })
+                .collect(),
+        );
+    }
+
+    /// How many of `[theme] watch` are actually being watched.
+    #[must_use]
+    pub fn theme_watch_count(&self) -> usize {
+        self.theme_watches.0.len()
     }
 
     /// Whether the open document is being watched for changes.

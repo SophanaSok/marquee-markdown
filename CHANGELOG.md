@@ -15,6 +15,79 @@ Until 1.0 both halves may change.
 
 ## [Unreleased]
 
+`--style system` stops being a snapshot. It asked the terminal what colors it
+was using once, before the screen was taken, and then painted in those colors
+for the rest of the session — so changing your terminal's colorscheme, or the
+desktop theme behind it, left the page in colors the terminal had stopped
+using. It now follows.
+
+### Added
+
+- **`--style system` follows the terminal while you read.** Change the
+  colorscheme and the page is repainted in the new palette with no keystroke.
+  Four things can prompt it and the common case needs none of them set up:
+  regaining focus (portable, and where a theme change is nearly always noticed,
+  because a theme is nearly always changed from another window), the new `R`
+  key, a path named in `[theme] watch`, and `SIGUSR1`.
+
+- **`R`, bound in the document, browser and contents panes**, re-reads the
+  terminal's colors — or re-reads a theme file, so a palette being written is
+  visible without restarting the reader.
+
+- **`[theme] watch`**, a list of paths whose change means the terminal may have
+  been retinted. For a desktop that swaps a theme underneath a window that
+  never loses focus, which is the one case regaining focus cannot see. A
+  leading `~` expands. No desktop's directory layout is compiled in; on Omarchy
+  the path is `~/.local/state/omarchy/current/theme`.
+
+- **`SIGUSR1` re-reads the terminal's colors.** The one trigger with no race in
+  it: a desktop's theme hook runs after the terminals have been retinted, so
+  the answer is already the new palette. `packaging/omarchy/` ships the hook.
+
+- **`scripts/recolor-check.py`**, a pty check for what a unit test cannot
+  reach: that a retint is followed, that a burst of triggers costs one
+  question, that a signal is a trigger, that a terminal which never answers is
+  never asked twice — and that none of the replies leak into the key stream and
+  get parsed as bindings.
+
+### Changed
+
+- **The terminal may now be asked about its colors while the reader is
+  running.** `src/util/osc.rs` said this must never happen, and that is no
+  longer true: `app::recolor` takes the same `gate::pause` handshake that
+  hands an editor the terminal, so every reader has provably left its read
+  before a question goes out, and `discard_pending_input` runs before the gate
+  reopens so a late reply is not parsed as a handful of keys.
+
+- **Following stops when you choose a palette by hand.** `T` and accepting in
+  the theme picker both mean *this one* rather than *keep following*; choosing
+  `system` in the picker starts it again.
+
+- **`mmd config` prints the `[theme]` section** even when nothing is set, so
+  the setting is discoverable rather than only documented.
+
+### Performance
+
+Regaining focus happens far more often than a theme changes, so the cost of
+noticing nothing had to be near zero:
+
+- A terminal that answered nothing when first asked is never asked again, so
+  `screen`, a dumb terminal and every Windows console pay nothing at all rather
+  than a 100 ms timeout per trigger.
+- A trigger asks for the background alone — two escape sequences rather than
+  nineteen — and only a background that actually moved pays for the full
+  sixteen-slot read. An unanswered probe buys nothing and is not followed up.
+- Triggers arriving together are collapsed into one question, which matters
+  because one theme switch usually arrives twice: as a watched path and as a
+  regained focus.
+
+### Breaking
+
+- `app::external::Request` has gained a variant and is now `#[non_exhaustive]`,
+  so a downstream `match` over it needs a wildcard arm. It is part of the
+  internal half of the API, which this file has always said may change before
+  1.0; the enum is marked so that the next variant is not another break.
+
 ## [0.8.0] - 2026-09-01
 
 The reader tells you how to use it. A hint line above the status bar names the

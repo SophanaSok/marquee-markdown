@@ -283,6 +283,7 @@ Keys are written here the way a configuration file will spell them.
 | `c` | copy the document |
 | `e` | edit, at the line on screen |
 | `r` | reload from disk |
+| `R` | re-read the terminal's colors |
 | `t` | show / hide the contents pane |
 | `tab` | move focus between the panes |
 | `T` | switch light / dark |
@@ -335,6 +336,7 @@ first screenful is there immediately and a large tree fills in behind it.
 | `enter` | read this file |
 | `/` | filter the list |
 | `r` | rescan the directory |
+| `R` | re-read the terminal's colors |
 | `.` | show / hide hidden and ignored files |
 | `T` `s` | switch light / dark, choose a theme |
 | `H` | show / hide the hint line |
@@ -440,6 +442,12 @@ preserve-new-lines = false
 update-check = true        # mention a newer release on the way out
 terminal-query = true      # let `--style system` ask the terminal its colors
 
+[theme]
+# Paths whose change means the terminal may have been retinted, for
+# `--style system`. Only needed when your desktop retints a window that
+# never loses focus — regaining focus is already a trigger. `~` expands.
+watch = ["~/.local/state/omarchy/current/theme"]
+
 [render]
 html = "render"            # render | hide | literal
 
@@ -538,6 +546,64 @@ falls back to a shipped palette, and costs nothing to try:
 
 `terminal-query = false` stops it being asked at all, and nothing but
 `-s system` ever asked in the first place.
+
+#### Following your terminal while you read
+
+`system` keeps up. Change your terminal's colorscheme — or your desktop's
+theme, which changes your terminal's — and the page is repainted in the new
+palette without your touching anything.
+
+Four things can prompt it, and you need none of them set up for the common
+case:
+
+| trigger | needs | notices |
+| --- | --- | --- |
+| **coming back to the window** | nothing | a theme changed while you were elsewhere, which is nearly always |
+| **`R`** | nothing | whenever you ask |
+| **a watched path** | one line of config | a theme changed while this window kept focus |
+| **`SIGUSR1`** | a hook that sends it | the same, exactly when the retint has finished |
+
+Coming back to the window is the one that does the work. A theme is almost
+always changed from somewhere else — a picker, a hotkey, another window — so
+regaining focus is both the moment the answer has settled and a moment you
+were going to have anyway.
+
+If your desktop retints a terminal that never loses focus, name the file it
+touches:
+
+```toml
+[theme]
+watch = ["~/.local/state/omarchy/current/theme"]
+```
+
+For an exact trigger with no race in it, have your desktop's theme hook send
+the signal instead — it runs after the terminals have been retinted, so the
+colors are already the new ones when the question is asked:
+
+```sh
+# ~/.config/omarchy/hooks/theme-set.d/reload-marquee
+pkill -USR1 -x marquee-markdow   # not a typo: `pkill -x` caps names at 15
+pkill -USR1 -x mmd
+```
+
+`packaging/omarchy/` has that hook ready to copy.
+
+**It costs nothing while nothing changes**, which matters because focus is
+regained far more often than a theme is switched:
+
+- A terminal that answered nothing when first asked is never asked again — so
+  `screen`, a dumb terminal and every Windows console pay nothing at all,
+  forever, rather than a timeout per trigger.
+- A trigger asks for the background alone — two escape sequences, not
+  nineteen. Only a background that actually moved pays for the full palette.
+- Triggers that arrive together are one question. A theme switch usually
+  arrives twice, as a watched path *and* a regained focus.
+
+Following stops the moment you choose a palette by hand: `T` and the theme
+picker both mean *this one*, not *keep following*. Choosing `system` in the
+picker starts it again. A theme file follows the same rule — edit
+`~/.config/marquee-markdown/themes/mine.toml` while reading with `-s mine`,
+and `R` shows you the change.
 
 Adding one needs no Rust and no recompile:
 

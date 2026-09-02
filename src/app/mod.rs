@@ -21,6 +21,7 @@ pub mod gate;
 pub mod hints;
 pub mod keymap;
 pub mod layout;
+pub mod recolor;
 pub mod state;
 pub mod terminal;
 pub mod update;
@@ -69,6 +70,8 @@ fn take_over(mut app: App) -> Result<()> {
     let (mut events, sender) = event::Events::new();
     app.events = Some(sender);
     app.start_watching();
+    app.start_watching_theme();
+    event::watch_signals(app.events.clone().expect("the sender was just set"));
     // The initial scan takes the same path a rescan does, so there is one
     // spawn site rather than two that can drift.
     if app.screen == Screen::Browser {
@@ -158,6 +161,14 @@ where
 
 /// Carry out a request that needed the terminal to itself.
 fn perform(app: &mut App, request: &external::Request) {
+    // Not an external program: nothing else is taking the screen, so the
+    // terminal is never given back. It still belongs here rather than in the
+    // update loop, because it stands the reader down to read a reply and only
+    // this thread may do that.
+    if let external::Request::Recolor { loud } = request {
+        recolor::run(app, *loud);
+        return;
+    }
     if let Err(error) = external::run(request, app.options.mouse) {
         app.message = Some(format!("{error:#}"));
         return;

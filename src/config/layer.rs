@@ -5,6 +5,8 @@
 //! program. Doing it field by field at each call site is how a program ends up
 //! with a flag that beats the config in one place and loses in another.
 
+use std::path::PathBuf;
+
 use super::schema::File;
 use crate::render::HtmlMode;
 use crate::theme::ThemeVariant;
@@ -42,6 +44,8 @@ pub struct Layer {
     pub hints: Option<bool>,
     /// What to do with raw HTML.
     pub html: Option<HtmlMode>,
+    /// Paths whose change means the terminal may have been retinted.
+    pub theme_watch: Option<Vec<PathBuf>>,
 }
 
 impl Layer {
@@ -61,6 +65,7 @@ impl Layer {
             preserve_new_lines: self.preserve_new_lines.or(lower.preserve_new_lines),
             update_check: self.update_check.or(lower.update_check),
             terminal_query: self.terminal_query.or(lower.terminal_query),
+            theme_watch: self.theme_watch.or(lower.theme_watch),
             contents: self.contents.or(lower.contents),
             hints: self.hints.or(lower.hints),
             html: self.html.or(lower.html),
@@ -93,6 +98,9 @@ impl Layer {
             preserve_new_lines: Some(false),
             update_check: Some(true),
             terminal_query: Some(true),
+            // No desktop's layout is compiled in: an empty list is the honest
+            // default, and a reader who wants this names the path.
+            theme_watch: Some(Vec::new()),
             // The contents pane is the reason the program exists; it still
             // hides itself on a narrow terminal or a document with nothing to
             // list.
@@ -121,6 +129,11 @@ impl Layer {
             preserve_new_lines: file.general.preserve_new_lines,
             update_check: file.general.update_check,
             terminal_query: file.general.terminal_query,
+            theme_watch: file
+                .theme
+                .watch
+                .as_ref()
+                .map(|paths| paths.iter().map(|path| expand_tilde(path)).collect()),
             contents: file.ui.contents,
             hints: file.ui.hints,
             html: file
@@ -150,6 +163,9 @@ impl Layer {
             preserve_new_lines: flag(get, "MARQUEE_PRESERVE_NEW_LINES", &mut warnings),
             update_check: flag(get, "MARQUEE_UPDATE_CHECK", &mut warnings),
             terminal_query: flag(get, "MARQUEE_TERMINAL_QUERY", &mut warnings),
+            // Deliberately not in the environment. It describes the machine,
+            // and a machine does not need to say so once per shell.
+            theme_watch: None,
             contents: flag(get, "MARQUEE_UI_CONTENTS", &mut warnings),
             hints: flag(get, "MARQUEE_UI_HINTS", &mut warnings),
             html: choice(get, "MARQUEE_RENDER_HTML", &mut warnings),
@@ -216,6 +232,29 @@ fn number(
     }
 }
 
+
+/// Expand a leading `~` to the reader's home directory.
+///
+/// Only for `[theme] watch`, and only leading: these are paths somebody writes
+/// by hand into a configuration file, where `~/.local/state/...` is what they
+/// will write, and a list that silently watched a directory literally named
+/// `~` would be a setting that appears to work and does nothing. Every other
+/// path in this program arrives from a shell that has already done this.
+fn expand_tilde(path: &str) -> PathBuf {
+    let Some(rest) = path.strip_prefix('~') else {
+        return PathBuf::from(path);
+    };
+    // `~otheruser` is somebody else's home and not something to guess at, so
+    // it is left alone rather than resolved to this reader's.
+    if !(rest.is_empty() || rest.starts_with('/') || rest.starts_with('\\')) {
+        return PathBuf::from(path);
+    }
+    match dirs::home_dir() {
+        Some(home) => home.join(rest.trim_start_matches(['/', '\\'])),
+        None => PathBuf::from(path),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -231,6 +270,48 @@ mod tests {
                 .find(|(key, _)| key == name)
                 .map(|(_, value)| value.clone())
         }
+    }
+
+    #[test]
+    fn a_leading_tilde_in_a_watched_path_becomes_the_home_directory() {
+        // The path a reader will actually write. A list that watched a
+        // directory literally named `~` would be a setting that looks right
+        // and silently never fires.
+        let Some(home) = dirs::home_dir() else {
+            return;
+        };
+        assert_eq!(
+            expand_tilde("~/.local/state/omarchy/current/theme"),
+            home.join(".local/state/omarchy/current/theme")
+        );
+        assert_eq!(expand_tilde("~"), home);
+    }
+
+    #[test]
+    fn only_a_leading_tilde_is_expanded() {
+        // `~otheruser` is somebody else's home and not this reader's, and a
+        // tilde in the middle of a path is an ordinary character.
+        assert_eq!(expand_tilde("~root/x"), PathBuf::from("~root/x"));
+        assert_eq!(expand_tilde("/tmp/~/x"), PathBuf::from("/tmp/~/x"));
+        assert_eq!(expand_tilde("/absolute"), PathBuf::from("/absolute"));
+        assert_eq!(expand_tilde(""), PathBuf::from(""));
+    }
+
+    #[test]
+    fn watched_theme_paths_come_from_the_file_and_nowhere_else() {
+        // Deliberately absent from the environment and the command line: the
+        // setting describes the machine, and a machine does not need to say so
+        // once per shell.
+        let file = Layer::from_env(&env(&[("MARQUEE_THEME_WATCH", "/somewhere")]));
+        assert_eq!(file.0.theme_watch, None);
+        assert!(file.1.is_empty(), "{:?}", file.1);
+    }
+
+    #[test]
+    fn no_theme_path_is_watched_unless_one_was_named() {
+        // No desktop's directory layout is compiled in, because there is no
+        // version of that list that stays right.
+        assert_eq!(Layer::defaults().theme_watch, Some(Vec::new()));
     }
 
     #[test]

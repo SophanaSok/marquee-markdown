@@ -124,7 +124,10 @@ doc/         Document state with no terminal in it: the layout cache, the
              heading tree, search, links, the scroll position, the file watch.
 browser/     The file list with no terminal in it: the walk, the filter, the
              selection.
-app/         State, input, and the loop.
+app/         State, input, and the loop. `gate.rs` is what lets exactly one
+             thread read the terminal at a time; `external.rs` and
+             `recolor.rs` are the two things that take that gate — one to hand
+             the terminal to another program, one to ask it a question.
 ui/          Draw-only widgets, each taking &App.
 util/        The things with no home: the OSC exchange that asks the terminal
              about its colors, and the small shared helpers.

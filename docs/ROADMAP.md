@@ -37,7 +37,25 @@ scroll-tracking table-of-contents sidebar and in-document search.
   different mechanism from the `/dev/tty` exchange in `src/util/osc.rs` rather
   than a variation on it. Windows Terminal does answer these questions, so
   this is worth writing; until it is, `system` falls back to a shipped
-  palette, as it does for any terminal that stays quiet.
+  palette, as it does for any terminal that stays quiet. It also means the
+  Windows console never becomes a terminal worth re-asking, which the
+  follow-the-terminal path below gets right for free.
+
+- **`--style system` follows the terminal by inference, not by being told.**
+  DEC mode 2031 is the terminal-native way to be told a palette changed, and
+  Ghostty and kitty both implement it. It is not used, because crossterm 0.29
+  cannot receive it: `parse_csi` handles only `u` and `c` after `CSI ?`, and
+  its own comment says `Ok(None)` means *wait for more bytes* — so a
+  `CSI ?997;1n` notification does not degrade, it stalls the parser on a
+  buffer that never completes and swallows every later keystroke. That is
+  crossterm #1104, filed independently; the fix (#1106) and mode 2031 support
+  (#1052) are both open and unmerged, and crossterm's last release is 0.29.0
+  from April 2025.
+
+  Until that lands, `src/app/recolor.rs` infers instead: a focus regain, a
+  watched path, `SIGUSR1` or the `R` key, each answered with a two-sequence
+  probe. When crossterm can parse it, 2031 becomes one more trigger into the
+  same path and nothing else changes.
 
 ## What works today
 
@@ -50,9 +68,15 @@ status bar, a scrolling key reference rendered from the live keymap, the mouse
 wheel claimed from the terminal, light/dark switching, and a resize that keeps
 your place instead of teleporting you.
 
-805 tests and a doctest, plus five `#[ignore]`d live checks against the real
+`marquee-markdown -t -s system file.md` follows the terminal while you read:
+change the colorscheme, or the desktop theme behind it, and the page is
+repainted without a keystroke.
+
+825 tests and a doctest, plus five `#[ignore]`d live checks against the real
 forges; `cargo clippy --all-targets -- -D warnings` and `cargo doc --no-deps`
-clean.
+clean. Three pty checks under `scripts/` cover what a unit test cannot reach —
+handing an editor the terminal, claiming the wheel, and following a retint
+without eating the keyboard.
 
 ## How it got here
 
