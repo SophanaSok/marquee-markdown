@@ -6,6 +6,7 @@ pub mod frontmatter;
 pub mod kind;
 pub mod local;
 pub mod remote;
+pub mod text;
 
 use std::path::{Path, PathBuf};
 

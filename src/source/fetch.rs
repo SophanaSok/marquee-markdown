@@ -99,21 +99,30 @@ impl Fetcher for HttpFetcher {
             .and_then(|value| value.to_str().ok())
             .map(media_type);
 
-        let mut body = Vec::new();
-        response
-            .take(MAX_BODY)
-            .read_to_end(&mut body)
-            .with_context(|| format!("cannot read the body of {url}"))?;
-        if body.len() as u64 == MAX_BODY {
-            bail!("{url} is larger than {} MiB", MAX_BODY / 1024 / 1024);
-        }
+        let body = read_capped(response, url)?;
 
         Ok(Fetched {
-            body: String::from_utf8_lossy(&body).into_owned(),
+            body: crate::source::text::from_bytes(body, url)?,
             url: final_url,
             content_type,
         })
     }
+}
+
+/// Read a body of at most [`MAX_BODY`] bytes.
+///
+/// One byte past the cap is read so that a body of exactly the cap can be
+/// told apart from one that was cut off at it; only the latter is an error.
+fn read_capped(reader: impl Read, url: &str) -> Result<Vec<u8>> {
+    let mut body = Vec::new();
+    reader
+        .take(MAX_BODY + 1)
+        .read_to_end(&mut body)
+        .with_context(|| format!("cannot read the body of {url}"))?;
+    if body.len() as u64 > MAX_BODY {
+        bail!("{url} is larger than {} MiB", MAX_BODY / 1024 / 1024);
+    }
+    Ok(body)
 }
 
 /// The media type from a `Content-Type` header, lowercased, without the
@@ -196,6 +205,21 @@ impl Fetcher for FakeFetcher {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_body_of_exactly_the_cap_is_accepted() {
+        let body = read_capped(std::io::repeat(b'x').take(MAX_BODY), "https://x/big")
+            .expect("a body at the cap");
+        assert_eq!(body.len() as u64, MAX_BODY);
+    }
+
+    #[test]
+    fn a_body_past_the_cap_is_refused() {
+        let error = read_capped(std::io::repeat(b'x').take(MAX_BODY + 1), "https://x/big")
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("larger than 8 MiB"), "{error}");
+    }
 
     #[test]
     fn a_media_type_loses_its_parameters_and_its_case() {

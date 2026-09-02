@@ -44,18 +44,24 @@ pub fn find_readme(dir: &Path) -> Result<PathBuf> {
 }
 
 /// Read a file to a string with a path-qualified error.
+///
+/// Decoded the way a remote body is: tolerantly for text in the wrong
+/// encoding, with a plain refusal for binary data. Before this went through
+/// [`super::text`], a Latin-1 document was refused with "stream did not
+/// contain valid UTF-8" while the same bytes from a URL rendered fine.
 pub fn read(path: &Path) -> Result<String> {
-    std::fs::read_to_string(path).with_context(|| format!("cannot read {}", path.display()))
+    let bytes = std::fs::read(path).with_context(|| format!("cannot read {}", path.display()))?;
+    super::text::from_bytes(bytes, &path.display().to_string())
 }
 
 /// Read all of standard input.
 pub fn read_stdin() -> Result<String> {
     use std::io::Read;
-    let mut buf = String::new();
+    let mut buf = Vec::new();
     std::io::stdin()
-        .read_to_string(&mut buf)
+        .read_to_end(&mut buf)
         .context("cannot read standard input")?;
-    Ok(buf)
+    super::text::from_bytes(buf, "standard input")
 }
 
 #[cfg(test)]
@@ -103,6 +109,24 @@ mod tests {
         let dir = dir_with(&["notes.md"]);
         let err = find_readme(dir.path()).unwrap_err().to_string();
         assert!(err.contains("missing markdown source"), "{err}");
+    }
+
+    #[test]
+    fn a_file_in_the_wrong_encoding_still_renders() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("latin1.md");
+        std::fs::write(&path, b"# caf\xe9\n").expect("write");
+        let text = read(&path).expect("text");
+        assert!(text.contains("caf\u{FFFD}"), "{text}");
+    }
+
+    #[test]
+    fn a_binary_file_is_refused_with_a_reason() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("image.gif");
+        std::fs::write(&path, b"GIF89a\x00\x00\x01").expect("write");
+        let error = read(&path).unwrap_err().to_string();
+        assert!(error.contains("not a text file"), "{error}");
     }
 
     #[test]

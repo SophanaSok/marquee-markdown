@@ -25,10 +25,18 @@ Until 1.0 both halves may change.
 
 ### Fixed
 
+- **A local file in the wrong encoding renders instead of erroring.** A
+  Latin-1 document was refused with "stream did not contain valid UTF-8"
+  while the same bytes fetched from a URL rendered fine; both now render with
+  replacement characters. Actual binary data — an image opened by mistake —
+  gets "is not a text file" rather than either a decoder error or a screenful
+  of mojibake, from a file, a URL, or standard input alike.
 - **A document with no links no longer pays a full metadata scan every
   frame.** The link collector's memo tested its entries for emptiness to
   decide whether it had run, and a link-free document is also empty, so it
   re-collected once per keystroke.
+- **A remote document of exactly 8 MiB is accepted.** It used to be rejected
+  as "larger than 8 MiB", which it is not.
 
 ## [0.9.0] - 2026-09-01
 
