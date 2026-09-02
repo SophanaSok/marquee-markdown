@@ -232,7 +232,6 @@ fn number(
     }
 }
 
-
 /// Expand a leading `~` to the reader's home directory.
 ///
 /// Only for `[theme] watch`, and only leading: these are paths somebody writes
