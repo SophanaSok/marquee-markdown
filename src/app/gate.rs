@@ -63,12 +63,26 @@ pub fn join() -> Reader<'static> {
 
 #[derive(Debug)]
 struct State {
-    /// Whether readers have been asked to stand down.
-    closed: bool,
+    /// How many pauses are outstanding.
+    ///
+    /// A count rather than a flag: with a flag, the first of two overlapping
+    /// pauses to be dropped would reopen the gate under the second, and the
+    /// "provably not inside a read" guarantee would silently stop holding.
+    /// Today's two callers are driven serially from one place, but that is a
+    /// fact about the callers, and this is the module whose whole job is not
+    /// trusting facts about callers.
+    pauses: usize,
     /// How many readers are registered.
     live: usize,
     /// How many of those are parked, waiting to be let go.
     parked: usize,
+}
+
+impl State {
+    /// Whether readers have been asked to stand down.
+    const fn closed(&self) -> bool {
+        self.pauses > 0
+    }
 }
 
 /// A gate that readers park at.
@@ -87,7 +101,7 @@ impl Gate {
     pub const fn new() -> Self {
         Self {
             state: Mutex::new(State {
-                closed: false,
+                pauses: 0,
                 live: 0,
                 parked: 0,
             }),
@@ -114,7 +128,7 @@ impl Gate {
     /// Shut the gate and wait until every reader has parked.
     pub fn pause(&self) -> Paused<'_> {
         let mut state = self.lock();
-        state.closed = true;
+        state.pauses += 1;
         self.change.notify_all();
         // A reader that has gone — a closed input stream, a run with no
         // terminal at all — is not waited for, because it decremented `live`
@@ -132,7 +146,7 @@ impl Gate {
     #[must_use]
     pub fn snapshot(&self) -> (bool, usize, usize) {
         let state = self.lock();
-        (state.closed, state.live, state.parked)
+        (state.closed(), state.live, state.parked)
     }
 }
 
@@ -160,13 +174,13 @@ impl Reader<'_> {
     /// that is only true here.
     pub fn wait_while_paused(&self) {
         let mut state = self.gate.lock();
-        if !state.closed {
+        if !state.closed() {
             return;
         }
         state.parked += 1;
         // Release whoever is waiting on the handshake.
         self.gate.change.notify_all();
-        while state.closed {
+        while state.closed() {
             state = self
                 .gate
                 .change
@@ -194,7 +208,8 @@ pub struct Paused<'a> {
 
 impl Drop for Paused<'_> {
     fn drop(&mut self) {
-        self.gate.lock().closed = false;
+        // One pause fewer; the gate opens when the last one goes.
+        self.gate.lock().pauses -= 1;
         self.gate.change.notify_all();
     }
 }
@@ -393,6 +408,33 @@ mod tests {
             );
         }
         drop(paused);
+    }
+
+    #[test]
+    fn overlapping_pauses_keep_the_gate_shut_until_the_last_lets_go() {
+        // Two callers pausing at once is unreachable today — both are driven
+        // serially from `app::perform` — but the guarantee must not depend on
+        // that staying true. With a flag instead of a count, dropping the
+        // first pause would reopen the gate under the second.
+        let gate = gate();
+        let fake = Fake::start(gate);
+        fake.started();
+        let first = gate.pause();
+        let second = gate.pause();
+        drop(first);
+        assert!(gate.snapshot().0, "the gate reopened under a live pause");
+        let stopped = fake.rounds();
+        thread::sleep(Duration::from_millis(20));
+        assert_eq!(
+            fake.rounds(),
+            stopped,
+            "a reader resumed under a live pause"
+        );
+        drop(second);
+        assert!(!gate.snapshot().0);
+        while fake.rounds() == stopped {
+            thread::yield_now();
+        }
     }
 
     #[test]

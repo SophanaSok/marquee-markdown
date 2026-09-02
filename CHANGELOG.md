@@ -56,6 +56,11 @@ Until 1.0 both halves may change.
 - **Two READMEs whose names differ only in case pick the same file every
   run.** The choice fell to whichever name the directory listing happened to
   yield first; byte order now breaks the tie the priority list cannot.
+- **Overlapping terminal pauses can no longer reopen the gate early.** The
+  handshake that stands the terminal reader down tracked "paused" as a flag,
+  so the first of two overlapping pauses to end would have resumed input
+  under the second. Unreachable with today's callers, but that was a fact
+  about the callers, not a guarantee; it is a count now.
 
 ## [0.9.0] - 2026-09-01
 
