@@ -22,6 +22,11 @@ Until 1.0 both halves may change.
   exactly the content width, so the width bounds the output size directly:
   `-w 65535` turned a 33 KB document into 48 MB of mostly spaces. The flag
   refuses larger values; a config file's `width` is clamped.
+- **Only `http:`, `https:`, and `mailto:` links, and local paths, are handed
+  to the system opener.** A link with any other scheme — `file:`, a protocol
+  handler some application registered — is refused with a message: a scheme
+  picks which program runs, and a document does not get to pick programs,
+  however deliberate the keypress that followed it.
 
 ### Fixed
 

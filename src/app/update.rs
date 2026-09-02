@@ -257,6 +257,10 @@ fn open_link(app: &mut App) {
     match target {
         LinkTarget::Anchor(slug) => jump_to_anchor(app, &slug),
         LinkTarget::External(url) => {
+            if let Some(refusal) = open_refusal(&url) {
+                app.message = Some(refusal);
+                return;
+            }
             // Opening hands off to another program entirely; that it failed
             // is worth saying, but never worth ending the session over.
             match open::that_detached(&url) {
@@ -265,6 +269,38 @@ fn open_link(app: &mut App) {
             }
         }
     }
+}
+
+/// Why this address will not be handed to the system opener, if it won't be.
+///
+/// Links name documents and pages: web addresses, mail addresses, and paths
+/// resolved against the document. A scheme beyond those picks which program
+/// runs — `file:` handlers, protocol handlers some application registered,
+/// `ms-msdt:` and its relatives — and a document does not get to pick
+/// programs, however deliberate the keypress that followed it. Local paths
+/// have no scheme and pass; a lone letter before the colon is a Windows drive,
+/// not a scheme.
+fn open_refusal(target: &str) -> Option<String> {
+    if target.starts_with("\\\\") || target.starts_with("//") {
+        return Some("network share links are not opened".to_owned());
+    }
+    let (scheme, _) = target.split_once(':')?;
+    let named_scheme = scheme.len() > 1
+        && scheme
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_alphabetic())
+        && scheme
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '+' | '.' | '-'));
+    if !named_scheme {
+        return None;
+    }
+    let scheme = scheme.to_ascii_lowercase();
+    if matches!(scheme.as_str(), "http" | "https" | "mailto") {
+        return None;
+    }
+    Some(format!("{scheme}: links are not opened"))
 }
 
 /// Scroll to the heading a `#slug` link names.
@@ -918,6 +954,34 @@ mod tests {
 
     fn press(app: &mut App, code: KeyCode) {
         handle(app, Event::Key(KeyEvent::new(code, KeyModifiers::NONE)));
+    }
+
+    #[test]
+    fn web_mail_and_path_links_may_open_and_nothing_else_may() {
+        for allowed in [
+            "https://example.com/guide",
+            "http://example.com/guide",
+            "HTTPS://EXAMPLE.COM",
+            "mailto:someone@example.com",
+            "docs/notes.md",
+            "/home/reader/notes.md",
+            r"C:\notes\doc.md",
+        ] {
+            assert_eq!(open_refusal(allowed), None, "{allowed} was refused");
+        }
+        for refused in [
+            "file:///etc/passwd",
+            "javascript:alert(1)",
+            "ms-msdt:/id/PCWDiagnostic",
+            "vscode://file/etc/hosts",
+            r"\\host\share\doc.md",
+            "//host/share/doc.md",
+        ] {
+            assert!(
+                open_refusal(refused).is_some(),
+                "{refused} would have been opened"
+            );
+        }
     }
 
     #[test]
