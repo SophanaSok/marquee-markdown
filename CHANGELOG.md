@@ -15,6 +15,13 @@ Until 1.0 both halves may change.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A document with no links no longer pays a full metadata scan every
+  frame.** The link collector's memo tested its entries for emptiness to
+  decide whether it had run, and a link-free document is also empty, so it
+  re-collected once per keystroke.
+
 ## [0.9.0] - 2026-09-01
 
 `--style system` stops being a snapshot. It asked the terminal what colors it

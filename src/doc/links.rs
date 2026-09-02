@@ -29,6 +29,11 @@ pub struct Links {
     selected: Option<usize>,
     /// Layout revision the entries were collected at.
     revision: u64,
+    /// Whether a collection has happened at all. A flag rather than testing
+    /// `entries` for emptiness: a document with no links is also empty, and
+    /// mistaking it for "never collected" would re-scan every line of it on
+    /// every frame.
+    collected: bool,
 }
 
 impl Links {
@@ -37,11 +42,12 @@ impl Links {
     /// Re-laying out moves every link to a different line, but not to a
     /// different place in the document, so the selection survives by index.
     pub fn refresh(&mut self, doc: &RenderedDoc, revision: u64) {
-        if revision == self.revision && !self.entries.is_empty() {
+        if self.collected && revision == self.revision {
             return;
         }
         self.entries = collect(doc);
         self.revision = revision;
+        self.collected = true;
         self.selected = self.selected.filter(|&index| index < self.entries.len());
     }
 
@@ -231,6 +237,27 @@ mod tests {
         assert_eq!(links.step(1, 0), None);
         assert!(links.selected().is_none());
         assert!(links.selected_url(&doc).is_none());
+    }
+
+    #[test]
+    fn a_document_with_no_links_is_not_rescanned_every_frame() {
+        let doc = doc("Just prose, no links at all.\n", 60);
+        let mut links = Links::default();
+        links.refresh(&doc, 1);
+        // A sentinel a re-collection would erase. Refreshing at the same
+        // revision must return before touching the entries; this runs once
+        // per frame, and a link-free document must not pay a full scan each
+        // time.
+        links.entries.push(Link {
+            line: 0,
+            cols: 0..1,
+            target: 0,
+        });
+        links.refresh(&doc, 1);
+        assert_eq!(links.entries.len(), 1, "an unchanged layout was re-scanned");
+        // A new layout revision collects for real.
+        links.refresh(&doc, 2);
+        assert!(links.entries.is_empty());
     }
 
     #[test]
