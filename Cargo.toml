@@ -15,7 +15,12 @@ homepage = "https://github.com/SophanaSok/marquee-markdown"
 readme = "README.md"
 keywords = ["markdown", "tui", "viewer", "terminal", "reader"]
 categories = ["command-line-utilities", "text-processing"]
-exclude = ["/.github", "/packaging"]
+# The demo GIF is tracked for the README on GitHub and deliberately not
+# shipped in the crate: it is a megabyte of animation that `cargo install` and
+# docs.rs would download to never show anyone. Everything else under `docs/`
+# stays — `tests/docs.rs` reads several of them, and a file excluded out from
+# under a test compiles here and fails for whoever downloads it.
+exclude = ["/.github", "/packaging", "/docs/demo.gif"]
 
 [[bin]]
 name = "marquee-markdown"
