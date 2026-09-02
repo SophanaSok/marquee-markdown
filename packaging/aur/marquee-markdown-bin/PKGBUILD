@@ -10,7 +10,7 @@
 
 pkgname=marquee-markdown-bin
 _pkgname=marquee-markdown
-pkgver=0.8.0
+pkgver=0.9.0
 pkgrel=1
 pkgdesc="TUI markdown reader that renders documents like Claude artifacts (prebuilt binary)"
 arch=('x86_64')
@@ -22,7 +22,7 @@ conflicts=('marquee-markdown')
 options=('!strip')
 source_x86_64=("$pkgname-$pkgver-x86_64.tar.gz::$url/releases/download/v$pkgver/$_pkgname-v$pkgver-x86_64-linux.tar.gz")
 # From the release's `checksums.txt`, which the release workflow writes.
-sha256sums_x86_64=('098a36b597e5ff44fcad4376b7e757010f8608f01ad453bab3cf0422940d9ce2')
+sha256sums_x86_64=('504411f72b3e173c48263759cb258214ece1938dc27643d3c61441471082bdbf')
 
 package() {
   cd "$_pkgname-v$pkgver-x86_64-linux"
