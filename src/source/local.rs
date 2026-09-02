@@ -23,24 +23,46 @@ pub fn find_readme(dir: &Path) -> Result<PathBuf> {
     let entries = std::fs::read_dir(dir)
         .with_context(|| format!("cannot read directory {}", dir.display()))?;
 
-    let mut by_lowercase = std::collections::HashMap::new();
+    let mut names = Vec::new();
     for entry in entries.flatten() {
         if entry.file_type().is_ok_and(|t| t.is_dir()) {
             continue;
         }
-        let name = entry.file_name();
-        let Some(name) = name.to_str() else { continue };
-        by_lowercase
-            .entry(name.to_ascii_lowercase())
-            .or_insert_with(|| name.to_owned());
-    }
-
-    for candidate in README_CANDIDATES {
-        if let Some(actual) = by_lowercase.get(&candidate.to_ascii_lowercase()) {
-            return Ok(dir.join(actual));
+        if let Some(name) = entry.file_name().to_str() {
+            names.push(name.to_owned());
         }
     }
-    bail!("missing markdown source in {}", dir.display())
+
+    match pick_readme(&names) {
+        Some(name) => Ok(dir.join(name)),
+        None => bail!("missing markdown source in {}", dir.display()),
+    }
+}
+
+/// Choose the README among `names`, deterministically.
+///
+/// The declared priority order decides first, matched exactly; a spelling not
+/// on the list is then matched case-insensitively. Two names the priority list
+/// cannot separate — `ReadMe.md` next to `README.MD`, possible on any
+/// case-sensitive filesystem — are decided by byte order rather than by
+/// whichever the directory happened to yield first, so every run over the same
+/// directory opens the same file.
+fn pick_readme(names: &[String]) -> Option<String> {
+    for candidate in README_CANDIDATES {
+        if names.iter().any(|name| name == candidate) {
+            return Some((*candidate).to_owned());
+        }
+    }
+    for candidate in README_CANDIDATES {
+        if let Some(best) = names
+            .iter()
+            .filter(|name| name.eq_ignore_ascii_case(candidate))
+            .min()
+        {
+            return Some(best.clone());
+        }
+    }
+    None
 }
 
 /// Read a file to a string with a path-qualified error.
@@ -96,6 +118,18 @@ mod tests {
         let dir = dir_with(&["ReAdMe.Md"]);
         let found = find_readme(dir.path()).expect("readme");
         assert_eq!(found.file_name().unwrap(), "ReAdMe.Md");
+    }
+
+    #[test]
+    fn names_differing_only_in_case_pick_the_same_one_every_run() {
+        // Both spellings can exist side by side on a case-sensitive
+        // filesystem, and neither is on the priority list exactly. The pure
+        // picker is what is tested — writing both files would collapse to one
+        // on a case-insensitive filesystem and vacuously pass there.
+        let one = vec!["ReadMe.md".to_owned(), "README.MD".to_owned()];
+        let other = vec!["README.MD".to_owned(), "ReadMe.md".to_owned()];
+        assert_eq!(pick_readme(&one).as_deref(), Some("README.MD"));
+        assert_eq!(pick_readme(&one), pick_readme(&other), "order-dependent");
     }
 
     #[test]

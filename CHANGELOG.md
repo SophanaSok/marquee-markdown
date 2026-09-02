@@ -37,6 +37,9 @@ Until 1.0 both halves may change.
   re-collected once per keystroke.
 - **A remote document of exactly 8 MiB is accepted.** It used to be rejected
   as "larger than 8 MiB", which it is not.
+- **Two READMEs whose names differ only in case pick the same file every
+  run.** The choice fell to whichever name the directory listing happened to
+  yield first; byte order now breaks the tie the priority list cannot.
 
 ## [0.9.0] - 2026-09-01
 
