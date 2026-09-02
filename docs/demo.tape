@@ -59,10 +59,18 @@ Tab
 Sleep 700ms
 
 # Search narrows as you type, and highlights in place without re-laying out.
+#
+# `enter` is not decoration: a prompt binds almost nothing, so every printable
+# key reaches the text being typed. Without it the `n`s below land in the query
+# — `cardnn`, the word this recorded before anyone watched it back — and the
+# demo ends on "no matches". And the query has to be a word the document says
+# more than once, or `n` walks a single hit and appears to do nothing.
 Type "/"
 Sleep 500ms
-Type@140ms "card"
-Sleep 1800ms
+Type@140ms "the"
+Sleep 1500ms
+Enter
+Sleep 800ms
 Type "n"
 Sleep 900ms
 Type "n"
