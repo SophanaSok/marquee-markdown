@@ -15,6 +15,12 @@ Until 1.0 both halves may change.
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-09-03
+
+Nothing in the reader changed. The project has a website, and the places
+that name a homepage now point at it; crates.io only reads that field at
+publish time, so it takes a release to move the link.
+
 ### Changed
 
 - **The project's homepage is now <https://marquee-markdown.com/>.** The
@@ -1219,7 +1225,8 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
 - Resizing re-lays out on every event; a large document dragged by a window
   edge will work harder than it needs to until a debounce lands.
 
-[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.11.1...HEAD
+[0.11.1]: https://github.com/SophanaSok/marquee-markdown/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.8.0...v0.9.0
