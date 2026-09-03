@@ -19,16 +19,16 @@
 
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "marquee-markdown";
-  version = "0.10.0";
+  version = "0.11.0";
 
   src = fetchFromGitHub {
     owner = "SophanaSok";
     repo = "marquee-markdown";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-ijTZ0qmAWdt9viBgtqhXKbdZrcU3moIhCYKgr0WYNtc=";
+    hash = "sha256-I4zQwkVL7BCOoHLYlFKXdyiHAi8MsvsIW9rZGLYBVPk=";
   };
 
-  cargoHash = "sha256-j4hm2jfVuNakfsBHpV7fiiNUrCxVvXtxwqfMMWyqFFM=";
+  cargoHash = "sha256-X/G7/Ep1kz6sR+PWyLPhSW7JU/ObuEhoNbPhHRtz55s=";
 
   nativeBuildInputs = [ installShellFiles ];
 
