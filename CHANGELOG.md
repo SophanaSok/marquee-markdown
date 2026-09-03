@@ -15,6 +15,15 @@ Until 1.0 both halves may change.
 
 ## [Unreleased]
 
+### Changed
+
+- **The project's homepage is now <https://marquee-markdown.com/>.** The
+  crate, the Homebrew formula, the Scoop manifest and the nix derivation all
+  pointed at the GitHub repository, which stays as `repository`. The crate
+  also gains a `documentation` link to the same site, which crates.io shows
+  beside Homepage and Repository. The AUR packages keep `url` on GitHub
+  because their `source` arrays are built from it.
+
 ## [0.11.0] - 2026-09-02
 
 HTML in a README stops being a second-class document. A `<table>` and a

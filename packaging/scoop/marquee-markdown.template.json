@@ -2,7 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/ScoopInstaller/Scoop/master/schema.json",
   "version": "@VERSION@",
   "description": "TUI markdown reader that renders documents like Claude artifacts",
-  "homepage": "https://github.com/SophanaSok/marquee-markdown",
+  "homepage": "https://marquee-markdown.com/",
   "license": "MIT",
   "architecture": {
     "64bit": {

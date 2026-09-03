@@ -13,7 +13,7 @@
 # `url` at all through four releases.
 class MarqueeMarkdown < Formula
   desc "TUI markdown reader that renders documents like Claude artifacts"
-  homepage "https://github.com/SophanaSok/marquee-markdown"
+  homepage "https://marquee-markdown.com/"
   url "https://github.com/SophanaSok/marquee-markdown/archive/refs/tags/v0.11.0.tar.gz"
   sha256 "8761c8110e959e6acf51f12048734a4f65f59b5f39fb68932e8d11e12259ba38"
   license "MIT"

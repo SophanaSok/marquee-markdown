@@ -72,7 +72,7 @@ rustPlatform.buildRustPackage (finalAttrs: {
       Installs two commands, marquee-markdown and mmd, which are the same
       program under a shorter name.
     '';
-    homepage = "https://github.com/SophanaSok/marquee-markdown";
+    homepage = "https://marquee-markdown.com/";
     changelog = "https://github.com/SophanaSok/marquee-markdown/blob/v${finalAttrs.version}/CHANGELOG.md";
     license = lib.licenses.mit;
     # Required for a new package, and deliberately unresolvable until the
