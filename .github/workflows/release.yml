@@ -126,7 +126,7 @@ jobs:
           cp -r dist/man dist/completions "$name/"
           7z a "$name.zip" "$name"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.name }}
           path: |
@@ -161,7 +161,7 @@ jobs:
           gzip -9n dist/man/*.1
       - run: cargo deb --no-build
       - run: cargo generate-rpm
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: linux-packages
           path: |
@@ -198,7 +198,7 @@ jobs:
       contents: write # creates the GitHub release
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           path: artifacts
       - name: Collect and checksum
@@ -251,7 +251,7 @@ jobs:
           echo "body<<$delim" >> "$GITHUB_OUTPUT"
           cat notes.md >> "$GITHUB_OUTPUT"
           echo "$delim" >> "$GITHUB_OUTPUT"
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           body: ${{ steps.notes.outputs.body }}
           files: release/*
