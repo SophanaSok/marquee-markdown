@@ -148,18 +148,6 @@ scoop bucket add marquee https://github.com/SophanaSok/scoop-marquee
 scoop install marquee-markdown
 ```
 
-### Nix
-
-Submitted to nixpkgs
-([NixOS/nixpkgs#558998](https://github.com/NixOS/nixpkgs/pull/558998)) and
-waiting for review, so
-`nix-shell -p marquee-markdown` is not a thing yet. Until it is, the derivation
-builds from a checkout:
-
-```sh
-nix-build -E 'with import <nixpkgs> {}; callPackage ./packaging/nix/default.nix {}'
-```
-
 ### Arch Linux
 
 Not available, and not for want of a package. Both PKGBUILDs are written and
