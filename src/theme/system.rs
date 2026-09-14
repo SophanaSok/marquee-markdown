@@ -6,7 +6,7 @@
 //! in their hues rather than Claude's.
 //!
 //! Everything here is a pure function of [`TerminalColors`], which is what the
-//! terminal answered. Asking is [`crate::util::osc`]'s job, and keeping the
+//! terminal answered. Asking is the job of the reader's `util::osc` module, and keeping the
 //! two apart is what lets every rule below be tested against a synthetic
 //! answer with no terminal in sight.
 //!

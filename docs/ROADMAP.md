@@ -3,6 +3,12 @@
 Where the project is and what comes next. Effort is in relative units where
 1 ≈ half a day.
 
+1.0 was a stability release rather than a feature one: every phase below was
+done by 0.11, so 1.0 froze the library surface to `render` and `theme`,
+turned the remaining documentation promises into tests, and changed nothing a
+reader sees. What is left is the backlog under
+[Deferred deliberately](#deferred-deliberately) and the gaps listed next.
+
 ## Goal
 
 A terminal markdown reader with full `glow` feature parity, rendered in the
@@ -80,7 +86,7 @@ your place instead of teleporting you.
 change the colorscheme, or the desktop theme behind it, and the page is
 repainted without a keystroke.
 
-891 tests and a doctest, plus five `#[ignore]`d live checks against the real
+894 tests and a doctest, plus five `#[ignore]`d live checks against the real
 forges; `cargo clippy --all-targets -- -D warnings` and `cargo doc --no-deps`
 clean. Three pty checks under `scripts/` cover what a unit test cannot reach —
 handing an editor the terminal, claiming the wheel, and following a retint
@@ -88,7 +94,7 @@ without eating the keyboard.
 
 ## How it got here
 
-The pre-1.0 launch runbook, kept because each item records what it cost:
+The launch runbook, kept because each item records what it cost:
 
 1. **Push to GitHub and watch CI go green.** Worth what it cost:
    the first four runs found a licence to allow, two advisories (removed by
@@ -97,7 +103,7 @@ The pre-1.0 launch runbook, kept because each item records what it cost:
    as a path separator, a macOS file-watch test asserting a precision FSEvents
    does not offer — and a real bug in which a named source was silently
    ignored in favour of redirected standard input.
-2. **Both pre-1.0 decisions are now made**, and implemented:
+2. **Both launch decisions are made**, and implemented:
    - **The short alias is `mmd`**, installed alongside `marquee-markdown` by
      every install method. Both binaries are stubs over `cli::run`, so they
      cannot drift, and the generated man page and completions are named after
@@ -109,6 +115,10 @@ The pre-1.0 launch runbook, kept because each item records what it cost:
      split possible: parse-once-lay-out-many is the thing a consumer actually
      needs, and having it opaque means the block tree never has to be frozen.
      `cargo semver-checks` now runs in CI against the published version.
+     At 1.0 the reader's own modules — `app`, `cli`, `config` and the rest —
+     were hidden the same way, so the surface that check holds is exactly
+     `render` and `theme`, and `missing_docs` keeps every item of it
+     documented.
 3. **Tag `v0.1.0` and publish.** On crates.io and GitHub releases,
    verified by installing from both. The release workflow's first run found
    the retired Intel macOS runners; the Intel build is now cross-compiled.

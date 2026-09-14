@@ -10,7 +10,7 @@ What is here, and what fills in the blanks.
 | `aur/marquee-markdown-bin/PKGBUILD` | by hand after the tag, from `checksums.txt` |
 | `nix/default.nix` | by hand after the tag; nix prints both hashes |
 
-Two of the four are now published, at 0.9.0:
+Two of the four are published, and follow each release:
 
 | Channel | Where |
 | --- | --- |

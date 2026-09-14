@@ -22,12 +22,15 @@ use ratatui::style::{Modifier, Style};
 pub use palette::{Alerts, Appearance, Icons, Palette, Rgb, ThemeFile};
 
 /// Which palette to draw with.
+///
+/// The default is [`Slate`](Self::Slate), the same palette the reader opens
+/// with when nothing names a style.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ThemeVariant {
     /// Warm off-white page — Claude's light artifact surface.
-    #[default]
     Paper,
     /// Warm near-black page — Claude's dark artifact surface.
+    #[default]
     Slate,
 }
 
@@ -174,6 +177,7 @@ pub struct Theme {
     pub appearance: Appearance,
     /// Bundled syntect theme used for code blocks.
     pub syntax: String,
+    /// The colors the page is painted with.
     pub palette: Palette,
     /// Glyphs for callout heads and image placeholders.
     pub icons: Icons,
@@ -568,10 +572,15 @@ impl Theme {
 /// The five GitHub-flavored alert kinds, parsed from `> [!NOTE]`-style markers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AlertKind {
+    /// `> [!NOTE]`: information the reader should notice.
     Note,
+    /// `> [!TIP]`: optional advice.
     Tip,
+    /// `> [!IMPORTANT]`: information the reader needs.
     Important,
+    /// `> [!WARNING]`: something that needs attention now.
     Warning,
+    /// `> [!CAUTION]`: a risk or a negative outcome.
     Caution,
 }
 
@@ -604,6 +613,15 @@ impl AlertKind {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_default_variant_is_the_reader_default() {
+        // A library consumer's `Theme::default()` and a reader started with no
+        // style used to disagree: this said paper while the reader opened in
+        // slate. The config layer asserts its half against this one.
+        assert_eq!(ThemeVariant::default(), ThemeVariant::Slate);
+        assert_eq!(Theme::default().name, "slate");
+    }
 
     #[test]
     fn variant_round_trips_through_its_name() {

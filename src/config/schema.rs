@@ -21,7 +21,9 @@ use std::collections::BTreeMap;
 #[serde(default)]
 #[non_exhaustive]
 pub struct File {
-    /// Settings that also have a command-line flag.
+    /// Settings for a run. Those glow has a flag for keep that flag here;
+    /// `update-check` and `terminal-query` are machine preferences with no
+    /// flag, and every one of them has a `MARQUEE_` variable.
     pub general: General,
     /// How the reader is laid out.
     pub ui: Ui,
@@ -64,8 +66,8 @@ pub struct General {
 
 /// `[theme]`.
 ///
-/// Not `[general]`, whose doc comment promises every setting there also has a
-/// command-line flag. This has none on purpose: it describes where a *desktop*
+/// Not `[general]`, which holds glow's flags and the per-run preferences
+/// beside them. This has no flag on purpose: it describes where a *desktop*
 /// keeps its theme state, which is a property of the machine rather than of a
 /// run, and a flag would invite it onto a command line that is then wrong on
 /// the next machine.
@@ -87,8 +89,8 @@ pub struct ThemeSection {
 
 /// `[render]`.
 ///
-/// Not `[general]`, whose doc comment promises every setting there also has a
-/// command-line flag. This one deliberately has none: `src/cli` keeps glow's
+/// Not `[general]`, which holds glow's flags and the per-run preferences
+/// beside them. This one deliberately has no flag: `src/cli` keeps glow's
 /// flag surface, and glow has no equivalent to mirror.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[serde(default, rename_all = "kebab-case")]

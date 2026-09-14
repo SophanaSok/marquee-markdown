@@ -4,20 +4,20 @@
 <rect x="0.0" y="252.0" width="840.0" height="18.0" fill="#1f1e1d"/>
 <rect x="0.0" y="270.0" width="840.0" height="18.0" fill="#1f1e1d"/>
 <text x="0.0" y="13.5" fill="#d97757" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">▎</text>
-<text x="8.4" y="13.5" fill="#f5f4ef" textLength="823.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> CHANGELOG.md                                                                             just now</text>
-<text x="0.0" y="31.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  AGENTS.md                                                                                 27m ago</text>
-<text x="0.0" y="49.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  README.md                                                                                 31m ago</text>
-<text x="0.0" y="67.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  docs/KEYBINDINGS.md                                                                       34m ago</text>
-<text x="0.0" y="85.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  packaging/nix/README.md                                                                   52m ago</text>
-<text x="0.0" y="103.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  docs/ROADMAP.md                                                                            2h ago</text>
-<text x="0.0" y="121.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  docs/THEMES.md                                                                             2h ago</text>
-<text x="0.0" y="139.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  packaging/README.md                                                                        2h ago</text>
-<text x="0.0" y="157.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  docs/ARCHITECTURE.md                                                                       6d ago</text>
-<text x="0.0" y="175.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  tests/fixtures/kitchen-sink.md                                                             1w ago</text>
-<text x="0.0" y="193.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  docs/compare.md                                                                            1w ago</text>
-<text x="0.0" y="211.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  CONTRIBUTING.md                                                                            1w ago</text>
-<text x="0.0" y="229.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  docs/demo.md                                                                               1w ago</text>
-<text x="0.0" y="247.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  SECURITY.md                                                                                1w ago</text>
+<text x="8.4" y="13.5" fill="#f5f4ef" textLength="823.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> docs/ROADMAP.md                                                                            6m ago</text>
+<text x="0.0" y="31.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  packaging/README.md                                                                        6m ago</text>
+<text x="0.0" y="49.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  packaging/nix/README.md                                                                    6m ago</text>
+<text x="0.0" y="67.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  CONTRIBUTING.md                                                                            7m ago</text>
+<text x="0.0" y="85.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  CHANGELOG.md                                                                               7m ago</text>
+<text x="0.0" y="103.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  docs/ARCHITECTURE.md                                                                       7m ago</text>
+<text x="0.0" y="121.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  SECURITY.md                                                                                7m ago</text>
+<text x="0.0" y="139.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  README.md                                                                                  7m ago</text>
+<text x="0.0" y="157.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  tests/fixtures/kitchen-sink.md                                                             1w ago</text>
+<text x="0.0" y="175.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  AGENTS.md                                                                                  1w ago</text>
+<text x="0.0" y="193.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  docs/KEYBINDINGS.md                                                                        1w ago</text>
+<text x="0.0" y="211.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  packaging/omarchy/README.md                                                                1w ago</text>
+<text x="0.0" y="229.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  docs/THEMES.md                                                                             1w ago</text>
+<text x="0.0" y="247.5" fill="#87867f" textLength="831.6" lengthAdjust="spacingAndGlyphs" xml:space="preserve">  docs/compare.md                                                                            3w ago</text>
 <text x="8.4" y="265.5" fill="#d97757" textLength="25.2" lengthAdjust="spacingAndGlyphs" xml:space="preserve">j/k</text>
 <text x="33.6" y="265.5" fill="#87867f" textLength="58.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> move ·</text>
 <text x="100.8" y="265.5" fill="#d97757" textLength="42.0" lengthAdjust="spacingAndGlyphs" xml:space="preserve">enter</text>
@@ -31,5 +31,5 @@
 <text x="453.6" y="265.5" fill="#d97757" textLength="8.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">H</text>
 <text x="462.0" y="265.5" fill="#87867f" textLength="50.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> hints</text>
 <text x="0.0" y="283.5" fill="#f5f4ef" font-weight="bold" textLength="16.8" lengthAdjust="spacingAndGlyphs" xml:space="preserve"> .</text>
-<text x="25.2" y="283.5" fill="#87867f" textLength="806.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">                                                                                        15 files</text>
+<text x="25.2" y="283.5" fill="#87867f" textLength="806.4" lengthAdjust="spacingAndGlyphs" xml:space="preserve">                                                                                        16 files</text>
 </svg>

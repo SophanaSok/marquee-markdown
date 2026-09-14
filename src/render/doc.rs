@@ -31,6 +31,7 @@ pub struct RenderedDoc {
 /// Metadata for one rendered line.
 #[derive(Debug, Clone, Default)]
 pub struct LineMeta {
+    /// What the line is, for styling overlays and navigation.
     pub kind: LineKind,
     /// Byte range of the markdown source this line came from; used to restore
     /// the reading position across re-layout.
@@ -47,24 +48,38 @@ pub struct LineMeta {
 }
 
 /// What a rendered line is, for styling overlays and navigation.
+///
+/// Non-exhaustive: a new construct can gain a kind of its own in a minor
+/// release, so a `match` over it needs a wildcard arm.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub enum LineKind {
     #[default]
+    /// Empty vertical space between blocks.
     Blank,
+    /// Paragraph text.
     Body,
+    /// A heading row, carrying its level from 1 to 6.
     Heading(u8),
+    /// A thematic break's hairline.
     Rule,
     /// Interior row of code block `block` (0-based among code blocks).
     Code {
+        /// Code block index.
         block: u32,
     },
     /// Border row (top/bottom) of code block `block`.
     CodeBorder {
+        /// Code block index.
         block: u32,
     },
+    /// Any row of a table, framed or laid out as cards.
     Table,
+    /// Text inside a blockquote or callout.
     Quote,
+    /// A list item's text or marker.
     List,
+    /// Raw HTML shown as literal markup, because no emitter interprets it.
     Html,
 }
 

@@ -30,6 +30,10 @@ rustPlatform.buildRustPackage (finalAttrs: {
 
   cargoHash = "sha256-qcp3AyCYUZD3TsL5PZch4dObFN8qQTTwFIXjUgDN5x8=";
 
+  # nixpkgs-vet requires it of every new package: attributes reach the builder
+  # as a JSON file and typed shell variables rather than as flat strings.
+  __structuredAttrs = true;
+
   nativeBuildInputs = [ installShellFiles ];
 
   # Syntax highlighting uses a pure-Rust regex backend on purpose, so there is
