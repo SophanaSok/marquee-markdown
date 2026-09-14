@@ -386,6 +386,16 @@ mod tests {
     }
 
     #[test]
+    fn the_default_style_is_the_libraries_default_theme() {
+        // Spelled out as `Slate` in `defaults` on purpose, and tied to the
+        // theme module's `Default` here, so neither can move without the other.
+        assert_eq!(
+            Layer::defaults().style.as_deref(),
+            Some(ThemeVariant::default().name())
+        );
+    }
+
+    #[test]
     fn the_wheel_is_claimed_unless_something_says_otherwise() {
         // Not a preference. A terminal left holding the wheel answers it with
         // synthetic arrow keys, which arrive as ordinary keystrokes and scroll

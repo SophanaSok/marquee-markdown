@@ -5,15 +5,78 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-The library API is in two halves. **Stable**, and covered by semver from 1.0:
+The library API is in two halves. **Stable**, and covered by semver:
 `render::{render, render_with, Document, RenderedDoc, LineMeta, LineKind,
 Anchor, LayoutOptions, ParseOptions, HtmlMode}`, `render::{ansi, tui, overlay,
 measure}`, and all of `theme`. **Internal**, marked `#[doc(hidden)]` and free
 to change in any release: the pipeline — `parse`, `block`, `frag`, `wrap`,
-`sink`, `layout`, `highlight`, `html`.
-Until 1.0 both halves may change.
+`sink`, `layout`, `highlight`, `html` — and the reader — `app`, `browser`,
+`cli`, `config`, `doc`, `oneshot`, `source`, `ui`, `update_check`, `util`.
+Changes to the internal half are noted here but never drive a version bump.
+Behaviour the reader shows its users — flags, configuration keys, key
+bindings, action names — is held to the same versioning as the stable API.
 
 ## [Unreleased]
+
+## [1.0.0] - 2026-09-14
+
+Nothing a reader sees changed. Every phase on the roadmap was done by 0.11,
+so 1.0 is a promise rather than a feature: the library surface is now exactly
+the one the documentation always described, and the rules that kept it that
+way by convention are now checked by the build.
+
+Until now only the render pipeline was hidden. The reader's own modules —
+`app`, `cli`, `config` and the rest — were public and fully documented, so
+`cargo semver-checks` would have held every one of them to semver from here
+on, and they have changed shape in most minor releases. They are now
+`#[doc(hidden)]` like the pipeline, and the documented crate is `render` and
+`theme`, every item of which carries documentation that `missing_docs` keeps
+there.
+
+A major rather than a minor, because hiding a module is a breaking change and
+so are the two stable-surface corrections below. `cargo semver-checks`
+against v0.11.1, assuming a minor, reports six failures: `LineKind` gaining
+`#[non_exhaustive]`, and five kinds of item in the shell modules becoming
+hidden. Nothing else in `render` or `theme` moved.
+
+894 tests and a doctest, up from 891.
+
+### Breaking
+
+- **The reader's modules are hidden from the library's documentation and its
+  semver promise.** `app`, `browser`, `cli`, `config`, `doc`, `oneshot`,
+  `source`, `ui`, `update_check` and `util` stay reachable, because the two
+  binaries and the tests use them, and may change in any release.
+- **`Theme::default()` is `slate`**, as `ThemeVariant::default()` now is.
+  It was `paper`, while the reader opens in `slate` when no style is named, so a
+  library consumer's default and a reader's default disagreed. Tests on both
+  sides now tie them together.
+- **`LineKind` is `#[non_exhaustive]`.** A new construct can gain a line kind
+  in a minor release; a `match` outside the crate needs a wildcard arm. Doing
+  this later would itself have been a major.
+
+### Changed
+
+- **The stable API is documented item by item**, and `missing_docs` is on, so
+  an undocumented public field fails CI. The forty that were missing — mostly
+  palette fields, alert kinds and line kinds — are written.
+- **A test holds the theme roster.** Every shipped palette has to appear in the
+  README and in `docs/THEMES.md`, and the counts the README spells out — "Ten
+  themes", "Eight ports" — have to be the counts that ship. A comment in
+  `src/theme/bundled.rs` claimed a test like this existed; now one does.
+- **The README says what the update check sends** — one request to the
+  crates.io API with the program's name and version as its user agent — and
+  lists the four places the reader deliberately differs from glow: `config`
+  prints rather than opens an editor, configuration is TOML and `GLOW_`
+  variables are not read, `-w` stops at 1000, and the wheel is on by default.
+  It links the website and the Homebrew tap.
+- **rustls 0.23.45**, for RUSTSEC-2026-0285.
+- The nix derivation sets `__structuredAttrs`, which nixpkgs requires of a new
+  package.
+- Wording that described the project as pre-1.0 — the security policy, the
+  roadmap, the architecture notes, the changelog's own preamble — is updated,
+  and the comparison screenshot's caption names the version it was taken
+  with.
 
 ## [0.11.1] - 2026-09-03
 
@@ -1225,7 +1288,8 @@ Behaviors that differ from `glow`, verified against glow 3.0.0:
 - Resizing re-lays out on every event; a large document dragged by a window
   edge will work harder than it needs to until a debounce lands.
 
-[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v0.11.1...HEAD
+[Unreleased]: https://github.com/SophanaSok/marquee-markdown/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.11.1...v1.0.0
 [0.11.1]: https://github.com/SophanaSok/marquee-markdown/compare/v0.11.0...v0.11.1
 [0.11.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/SophanaSok/marquee-markdown/compare/v0.9.0...v0.10.0

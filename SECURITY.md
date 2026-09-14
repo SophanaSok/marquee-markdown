@@ -2,8 +2,9 @@
 
 ## Supported versions
 
-This project is pre-1.0. Security fixes go into the latest release; there are
-no maintained older lines.
+Security fixes go into the latest release; there are no maintained older
+lines. A fix that needs a breaking change still ships, in a new major
+version, with the reason in the changelog.
 
 ## Reporting a vulnerability
 

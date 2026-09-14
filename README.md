@@ -26,9 +26,9 @@
   it. Recorded with <code>vhs docs/demo.tape</code>.
 </sub></p>
 
-> **Released and in use.** Everything documented here works today; the badge
-> above is the current version. See [docs/ROADMAP.md](docs/ROADMAP.md) for what
-> is planned before 1.0.
+> **Stable.** Everything documented here works today; the badge above is the
+> current version. The website, <https://marquee-markdown.com/>, carries the
+> same guides. See [docs/ROADMAP.md](docs/ROADMAP.md) for what comes next.
 
 ## What it does
 
@@ -138,6 +138,9 @@ cargo binstall marquee-markdown
 brew install SophanaSok/marquee/marquee-markdown
 ```
 
+The formula lives in its own tap,
+[SophanaSok/homebrew-marquee](https://github.com/SophanaSok/homebrew-marquee).
+
 ### Scoop
 
 ```powershell
@@ -147,8 +150,9 @@ scoop install marquee-markdown
 
 ### Nix
 
-Submitted to nixpkgs and in review
-([NixOS/nixpkgs#558998](https://github.com/NixOS/nixpkgs/pull/558998)), so
+Submitted to nixpkgs
+([NixOS/nixpkgs#558998](https://github.com/NixOS/nixpkgs/pull/558998)) and
+waiting for review, so
 `nix-shell -p marquee-markdown` is not a thing yet. Until it is, the derivation
 builds from a checkout:
 
@@ -193,6 +197,11 @@ command. It stays quiet in scripts and builds: the notice only appears when
 standard error is a terminal, and never when `CI` is set. Turn it off for
 good with `update-check = false` in the configuration file, or
 `MARQUEE_UPDATE_CHECK=0` in the environment.
+
+The check is one HTTPS request to the crates.io API for this crate's newest
+version, with a user agent naming the program and its version. Nothing about
+you, your files, or your usage is sent, and the answer is cached in your
+cache directory.
 
 ## Contents
 
@@ -250,7 +259,19 @@ closing the pipe early (`… | head`) stops quietly rather than erroring.
 `marquee-markdown doc.md | less -R` keeps its color.
 
 Every flag `glow` takes is accepted and means the same thing:
-`-a -l -m -n -p -s -t -w`.
+`-a -l -m -n -p -s -t -w`. Four differences are deliberate:
+
+- `config` prints the settings in force rather than opening an editor, so the
+  output can be saved as a configuration file.
+- Configuration is TOML read from `MARQUEE_` variables and
+  `~/.config/marquee-markdown/`; glow's YAML file and `GLOW_` variables are not
+  read.
+- `-w` accepts up to 1000 columns.
+- The mouse wheel is on by default, for the reason given under
+  [Reading](#reading).
+
+As in glow, `-s notty` renders without styling; `plain` and `none` are the
+same thing.
 
 ## Reading
 
@@ -258,7 +279,7 @@ Every flag `glow` takes is accepted and means the same thing:
 table-of-contents pane beside it, and a status bar that says where you are.
 Keys follow glow, so muscle memory carries over; `?` shows the list, rendered
 from the keymap that is actually in force rather than from a fixed page, so it
-stays honest once keys become rebindable.
+stays honest when keys are rebound.
 
 The wheel moves whichever pane has the keys — the document, the contents pane,
 the file list, the key reference — three steps a tick, on every terminal. This is
@@ -733,8 +754,7 @@ bytes with real OSC 8 hyperlinks.
 
 ### What is stable
 
-The promised API is deliberately small, and from 1.0 it follows semantic
-versioning:
+The promised API is deliberately small, and it follows semantic versioning:
 
 - `render::{render, render_with, Document, RenderedDoc, LineMeta, LineKind, Anchor}`
 - `render::{LayoutOptions, ParseOptions, HtmlMode}`
@@ -747,6 +767,10 @@ and because it is worth reading, but it is marked `#[doc(hidden)]` and may
 change in any release. `Document` is opaque for exactly this reason: it is the
 part of the pipeline a consumer genuinely needs, without freezing the shape of
 what is behind it.
+
+The reader's own modules — `app`, `cli`, `config`, `browser` and the rest —
+are hidden the same way. They are reachable, because the binaries and the
+tests use them, but they are not part of the promise.
 
 If you find yourself reaching for a hidden module, please open an issue — it
 means the stable surface is missing something.

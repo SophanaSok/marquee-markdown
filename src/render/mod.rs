@@ -10,12 +10,13 @@
 //! [`render_with`], [`Document`], [`RenderedDoc`] and the metadata hanging off
 //! it, [`LayoutOptions`], [`ParseOptions`], [`HtmlMode`], the two serializers
 //! ([`ansi`] and [`tui`]), [`overlay`], [`measure`], and the whole of
-//! [`theme`](crate::theme). From 1.0 those follow semantic versioning.
+//! [`theme`](crate::theme). Those follow semantic versioning.
 //!
 //! The pipeline behind them — parsing, fragmentation, wrapping, the block
 //! tree, the per-block emitters — is public so the binary and the tests can
 //! reach it, and because it is worth reading. It is marked `#[doc(hidden)]`
-//! and may change in any release. If you find yourself needing something from
+//! and may change in any release, as is every module of the reader outside
+//! `render` and `theme`. If you find yourself needing something from
 //! it, that is worth an issue: it probably means the stable surface is missing
 //! something.
 //!

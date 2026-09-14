@@ -5,6 +5,7 @@
 //! catch an undocumented addition without objecting to prose edits.
 
 use marquee_markdown::app::keymap::{Keymap, Mode};
+use marquee_markdown::theme::{ThemeVariant, bundled};
 
 #[test]
 fn the_readme_documents_every_key_the_reader_binds() {
@@ -18,6 +19,85 @@ fn the_readme_documents_every_key_the_reader_binds() {
             );
         }
     }
+}
+
+/// Every theme the binary ships is listed in the README and in the themes
+/// guide, and the counts the README spells out are the counts that ship.
+///
+/// The roster lives in three places a new palette has to reach: `themes/`,
+/// the README, and `docs/THEMES.md`. Adding the file and the `bundled::ALL`
+/// line is enough to build and pass every other test, so without this a
+/// theme could ship unlisted — and "Ten themes" would quietly become wrong on
+/// the eleventh. The site build checks the guide's table against `themes/`
+/// in detail; this holds the README to the same roster.
+#[test]
+fn the_readme_and_the_themes_guide_list_every_shipped_theme() {
+    const WORDS: [&str; 21] = [
+        "Zero",
+        "One",
+        "Two",
+        "Three",
+        "Four",
+        "Five",
+        "Six",
+        "Seven",
+        "Eight",
+        "Nine",
+        "Ten",
+        "Eleven",
+        "Twelve",
+        "Thirteen",
+        "Fourteen",
+        "Fifteen",
+        "Sixteen",
+        "Seventeen",
+        "Eighteen",
+        "Nineteen",
+        "Twenty",
+    ];
+    let readme = include_str!("../README.md");
+    let guide = include_str!("../docs/THEMES.md");
+
+    let ports: Vec<&str> = bundled::ALL.iter().map(|b| b.name).collect();
+    let names: Vec<&str> = ThemeVariant::all()
+        .iter()
+        .map(|v| v.name())
+        .chain(ports.iter().copied())
+        .collect();
+
+    for name in &names {
+        assert!(
+            readme.contains(&format!("`{name}`")),
+            "`{name}` ships but the README does not list it"
+        );
+        assert!(
+            guide.contains(&format!("| `{name}` |")),
+            "`{name}` ships but docs/THEMES.md has no row for it"
+        );
+    }
+    let rows = guide.lines().filter(|l| l.starts_with("| `")).count();
+    assert_eq!(
+        rows,
+        names.len(),
+        "docs/THEMES.md has {rows} theme rows for {} shipped themes",
+        names.len()
+    );
+
+    let spell = |n: usize| {
+        *WORDS
+            .get(n)
+            .unwrap_or_else(|| panic!("{n} themes: extend WORDS to spell the new count"))
+    };
+    let total = spell(names.len());
+    assert!(
+        readme.contains(&format!("**{total} themes**")),
+        "the README should say **{total} themes**"
+    );
+    let ports_word = spell(ports.len());
+    assert!(
+        readme.contains(&format!("{ports_word} ports of established colorschemes")),
+        "the README should say {ports_word} ports of established colorschemes"
+    );
 }
 
 #[test]

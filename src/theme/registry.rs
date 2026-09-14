@@ -23,7 +23,9 @@ pub fn user_theme_dir() -> Option<PathBuf> {
 /// A theme that is available to select, and where it came from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry {
+    /// Selectable name, as given to `--style`.
     pub name: String,
+    /// Where the theme was found.
     pub origin: Origin,
 }
 
@@ -96,8 +98,8 @@ pub const SYSTEM: &str = "system";
 /// Whether resolving `style` consults what the terminal answered.
 ///
 /// The single definition of "this palette is the terminal's", asked by
-/// [`crate::cli`] before the screen is taken and by
-/// [`crate::app::recolor`] every time something suggests it was retinted. One
+/// the command line before the screen is taken and by the reader's recolor
+/// path every time something suggests it was retinted. One
 /// answer, so a style cannot be worth querying for in one place and not the
 /// other.
 #[must_use]

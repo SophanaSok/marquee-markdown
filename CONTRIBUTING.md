@@ -22,9 +22,15 @@ it first.
 ## What CI checks
 
 Format, clippy with warnings denied, the full test suite on Linux, macOS and
-Windows, `cargo doc` with warnings denied, a build at the minimum supported
-Rust version, and `cargo package`. All of it runs locally with the commands
-above.
+Windows, `cargo doc` with warnings denied, a smoke test of the release binary,
+the three pseudo-terminal checks under `scripts/`, a build at the minimum
+supported Rust version, `cargo package`, `cargo semver-checks` against the
+published release, and `cargo deny check`. All of it runs locally with the
+commands above, plus `cargo install cargo-semver-checks cargo-deny`.
+
+The library documents every public item: `missing_docs` is on, and CI turns
+the warning into a failure. Releases follow the sequence in
+[`packaging/README.md`](packaging/README.md#cutting-a-release).
 
 **No test may touch the network.** Live checks against the real forges live in
 `tests/network.rs` behind `#[ignore]`; run them deliberately with

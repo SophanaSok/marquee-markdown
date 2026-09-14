@@ -69,8 +69,9 @@ layout. It is opaque: the block tree behind it is the renderer's working
 representation and changes as the pipeline does, and keeping it behind a type
 is what lets the promised API stay small. That split is the stability boundary
 — `render::{render, Document, RenderedDoc, LayoutOptions, ansi, tui, overlay,
-measure}` and `theme` are stable from 1.0; the pipeline modules are
-`#[doc(hidden)]` and free to change.
+measure}` and `theme` are the stable API, covered by semantic versioning; the
+pipeline modules, and every module of the reader outside `render` and
+`theme`, are `#[doc(hidden)]` and free to change.
 
 Two serializers take it from there: `tui.rs` writes into a ratatui buffer for
 the reader, `ansi.rs` writes SGR bytes and real OSC 8 hyperlinks for standard

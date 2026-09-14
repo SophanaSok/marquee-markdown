@@ -84,17 +84,24 @@ impl Serialize for Rgb {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Appearance {
+    /// For a light terminal background.
     Light,
+    /// For a dark terminal background.
     Dark,
 }
 
 /// Callout hues for the five GFM alert kinds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Alerts {
+    /// Hue of a `[!NOTE]` callout.
     pub note: Rgb,
+    /// Hue of a `[!TIP]` callout.
     pub tip: Rgb,
+    /// Hue of an `[!IMPORTANT]` callout.
     pub important: Rgb,
+    /// Hue of a `[!WARNING]` callout.
     pub warning: Rgb,
+    /// Hue of a `[!CAUTION]` callout.
     pub caution: Rgb,
 }
 
@@ -105,11 +112,17 @@ pub struct Palette {
     pub bg: Rgb,
     /// Raised fill for code cards, inline chips, and table headers.
     pub surface: Rgb,
+    /// Body text.
     pub fg: Rgb,
+    /// Gutters, line numbers, and metadata.
     pub muted: Rgb,
+    /// Headings, links, and the cursor.
     pub accent: Rgb,
+    /// Secondary accents.
     pub accent_soft: Rgb,
+    /// Card and table rules.
     pub border: Rgb,
+    /// Callout hues, one per GFM alert kind.
     pub alerts: Alerts,
 }
 
@@ -122,10 +135,15 @@ pub struct Palette {
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(default)]
 pub struct Icons {
+    /// Glyph in front of a `[!NOTE]` title.
     pub note: String,
+    /// Glyph in front of a `[!TIP]` title.
     pub tip: String,
+    /// Glyph in front of an `[!IMPORTANT]` title.
     pub important: String,
+    /// Glyph in front of a `[!WARNING]` title.
     pub warning: String,
+    /// Glyph in front of a `[!CAUTION]` title.
     pub caution: String,
     /// Placeholder in front of an image's alt text.
     pub image: String,
@@ -147,10 +165,13 @@ impl Default for Icons {
 /// A theme as written in a file.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct ThemeFile {
+    /// Selectable name, as given to `--style`.
     pub name: String,
+    /// Whether the palette targets a light or dark terminal.
     pub appearance: Appearance,
     /// Bundled syntect theme used for code blocks.
     pub syntax: String,
+    /// The colors the page is painted with.
     pub palette: Palette,
     /// Optional; a file that says nothing gets glyphs any font can draw.
     #[serde(default)]

@@ -7,8 +7,10 @@
 //! and the first person to contribute a theme discovers it.
 //!
 //! Adding one is a file and a line in [`ALL`]. `themes_parse` in the tests
-//! below fails the build if the file does not parse, and `docs.rs` fails it if
-//! the README does not list it.
+//! below fails the build if the file does not parse, and
+//! `the_readme_and_the_themes_guide_list_every_shipped_theme` in
+//! `tests/docs.rs` fails it if the README or `docs/THEMES.md` does not list
+//! it, or if the count the README spells out is no longer true.
 //!
 //! Each palette names one of the seven syntect themes that ship with the
 //! highlighter. Only Solarized has an exact counterpart there; the rest are

@@ -26,7 +26,7 @@ form of the same thing.
 
 ## The two hashes
 
-Both are real as of 0.8.0. They go stale on the next release, and the way to
+Both are real for the release `default.nix` pins. They go stale on the next release, and the way to
 refresh one is to put the conventional row of `A`s back: nix fails the build
 and prints the hash it actually computed, and that is the value to paste in.
 Two builds, because the second hash is only reached once the first is right.
