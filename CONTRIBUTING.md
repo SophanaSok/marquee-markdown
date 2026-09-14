@@ -28,6 +28,11 @@ supported Rust version, `cargo package`, `cargo semver-checks` against the
 published release, and `cargo deny check`. All of it runs locally with the
 commands above, plus `cargo install cargo-semver-checks cargo-deny`.
 
+Advisories are also checked on the 1st and 15th of each month by
+`.github/workflows/audit.yml`, because a new advisory can land against an
+unchanged lockfile. When that run fails, the fix is usually a
+`cargo update -p <crate>` in its own pull request.
+
 The library documents every public item: `missing_docs` is on, and CI turns
 the warning into a failure. Releases follow the sequence in
 [`packaging/README.md`](packaging/README.md#cutting-a-release).
