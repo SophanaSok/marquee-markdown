@@ -383,14 +383,13 @@ fn the_homebrew_formula_points_at_a_real_release() {
 /// time, and how far behind the changelog each is allowed to be.
 ///
 /// Homebrew has its own test above, because it also has a `sha256` to check.
-/// These three are the same problem in a different file: a version that has to
+/// These two are the same problem in a different file: a version that has to
 /// be written down, and so can be forgotten. All of them are bumped *after*
 /// the tag — a source tarball's hash cannot exist before the tag it is made
 /// from — so one release of lag is the process and two is a forgotten bump.
 const PINNED: &[(&str, &str)] = &[
     ("packaging/aur/marquee-markdown/PKGBUILD", "pkgver="),
     ("packaging/aur/marquee-markdown-bin/PKGBUILD", "pkgver="),
-    ("packaging/nix/default.nix", "version = \""),
 ];
 
 #[test]

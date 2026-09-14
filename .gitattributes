@@ -12,7 +12,7 @@
 # `Cargo.toml`, and the bundled themes.
 #
 # Nothing here wants CRLF — there are no batch or PowerShell files, and the
-# shell scripts, PKGBUILDs and nix derivation would break with it — so the
+# shell scripts and PKGBUILDs would break with it — so the
 # rule is simply LF everywhere, in the repository and in the working tree on
 # every platform. Git decides what is text by content; the exceptions below
 # name the binaries it should not inspect at all.

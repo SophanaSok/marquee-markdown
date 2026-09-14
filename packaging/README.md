@@ -8,24 +8,15 @@ What is here, and what fills in the blanks.
 | `scoop/marquee-markdown.template.json` | the release workflow, from `checksums.txt` |
 | `aur/marquee-markdown/PKGBUILD` | by hand after the tag, from the source tarball |
 | `aur/marquee-markdown-bin/PKGBUILD` | by hand after the tag, from `checksums.txt` |
-| `nix/default.nix` | by hand after the tag; nix prints both hashes |
 
-Two of the four are published, and follow each release:
+Two of the three channels are published, and follow each release:
 
 | Channel | Where |
 | --- | --- |
 | Homebrew | [SophanaSok/homebrew-marquee](https://github.com/SophanaSok/homebrew-marquee) |
 | Scoop | [SophanaSok/scoop-marquee](https://github.com/SophanaSok/scoop-marquee) |
 
-The other two are not published, for different reasons:
-
-- **nixpkgs** is submitted and in review:
-  [NixOS/nixpkgs#558998](https://github.com/NixOS/nixpkgs/pull/558998), opened
-  as a draft. nixpkgs requires a `meta.maintainers` entry, so the pull request
-  carries the package and the `maintainers/maintainer-list.nix` addition
-  together. Its [automation/AI policy] requires an `Assisted-by:` trailer on
-  any LLM-assisted commit and says a `Co-authored-by:` trailer does not
-  satisfy it.
+The AUR is not published:
 
 - **The AUR has nowhere to publish to.** It has been closed to new accounts
   since 15 June 2026, after a supply-chain attack that hijacked more than a
@@ -35,23 +26,17 @@ The other two are not published, for different reasons:
   each the day it reopens. Do not go looking for a way around this — it is an
   active security control, not a queue.
 
-[automation/AI policy]: https://github.com/NixOS/nixpkgs/blob/master/CONTRIBUTING.md#automationai-policy
-
 What each remaining channel needs, when it can be done:
 
 | Channel | What to do | Then |
 | --- | --- | --- |
 | AUR | register an SSH key with an AUR account, once registration reopens | `git push` each PKGBUILD to `ssh://aur@aur.archlinux.org/<name>.git`, with a `.SRCINFO` from `makepkg --printsrcinfo` |
-| nixpkgs | review the draft and mark it ready | the policy holds the submitter accountable for the contribution and for answering reviewers directly |
 | homebrew-core | submit once the project clears its notability bar — for a self-submission that is **90 forks, 90 watchers, or 225 stars, and a repository at least 30 days old** ([Package Acceptance Policy](https://github.com/Homebrew/brew/blob/master/docs/Package-Acceptance-Policy.md#notability); `brew audit --strict --new --online` checks both) | the tap stops being the only route |
 
 The AUR pair is deliberately two packages: `marquee-markdown` builds from
 source and runs the test suite, `marquee-markdown-bin` unpacks the release
 archive for anyone who does not want a Rust toolchain to read a markdown file.
 They conflict, because both install the same two binaries.
-
-`nix/README.md` covers the two placeholder hashes and why they cannot be
-filled before the tag.
 
 The Scoop manifest is **not** kept here — only the template is. A manifest
 pins a hash, and a hash cannot exist before the archive it describes, so a
@@ -187,15 +172,13 @@ ships inside it, and the GIF alone took the packaged crate from 374 KiB to
 2. Bump `version` in `Cargo.toml`, and run `cargo check` so `Cargo.lock`
    follows.
 3. Commit, tag `vX.Y.Z`, and push the tag.
-4. Once the tag is up, bump the four manifests that pin a version and a hash:
+4. Once the tag is up, bump the three manifests that pin a version and a hash:
 
    - `homebrew/marquee-markdown.rb`, with `brew bump-formula-pr --version=X.Y.Z`
    - `aur/marquee-markdown/PKGBUILD` — `pkgver`, and `sha256sums` from
      `makepkg -g`
    - `aur/marquee-markdown-bin/PKGBUILD` — `pkgver`, and `sha256sums_x86_64`
      from the release's `checksums.txt`
-   - `nix/default.nix` — `version`, then let nix print `src.hash` and
-     `cargoHash` and paste them back
 
    These are last rather than part of the release commit because each pins the
    hash of the tag's source tarball, which does not exist until the tag is
@@ -207,8 +190,8 @@ ships inside it, and the GIF alone took the packaged crate from 374 KiB to
    skipping one shows up as a red test on the *next* release rather than as an
    install of the wrong version. `the_homebrew_formula_points_at_a_real_release`
    covers the formula, which also has a hash to check;
-   `every_pinned_package_manifest_points_at_a_real_release` covers the other
-   three.
+   `every_pinned_package_manifest_points_at_a_real_release` covers the two
+   PKGBUILDs.
 
 Steps 1 to 3 are the whole of the release itself. The workflow does the
 rest, in an order that cannot leave the two sides disagreeing: it first

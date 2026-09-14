@@ -18,6 +18,13 @@ bindings, action names — is held to the same versioning as the stable API.
 
 ## [Unreleased]
 
+### Removed
+
+- **The nix derivation and the nixpkgs submission.** `packaging/nix/` is gone,
+  the README no longer has a Nix install section, and the draft nixpkgs pull
+  request is closed. Homebrew, Scoop, the prebuilt archives, the `.deb` and
+  `.rpm` packages, and `cargo install` are unchanged.
+
 ## [1.0.0] - 2026-09-14
 
 Nothing a reader sees changed. Every phase on the roadmap was done by 0.11,
