@@ -14,8 +14,8 @@
 class MarqueeMarkdown < Formula
   desc "TUI markdown reader that renders documents like Claude artifacts"
   homepage "https://marquee-markdown.com/"
-  url "https://github.com/SophanaSok/marquee-markdown/archive/refs/tags/v0.11.1.tar.gz"
-  sha256 "99e928ca9f38292e50fd88ae07da0f9d2ad5b1100962fdafd4c47cca39e69dd7"
+  url "https://github.com/SophanaSok/marquee-markdown/archive/refs/tags/v1.0.0.tar.gz"
+  sha256 "03fe872e144113a39eb3e2db64098dc940b51486dfe963dd9c4e0ad76403d37d"
   license "MIT"
   head "https://github.com/SophanaSok/marquee-markdown.git", branch: "main"
 

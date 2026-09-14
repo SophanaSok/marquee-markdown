@@ -19,16 +19,16 @@
 
 rustPlatform.buildRustPackage (finalAttrs: {
   pname = "marquee-markdown";
-  version = "0.11.1";
+  version = "1.0.0";
 
   src = fetchFromGitHub {
     owner = "SophanaSok";
     repo = "marquee-markdown";
     tag = "v${finalAttrs.version}";
-    hash = "sha256-ZnJG8KuPxZpk7wcMo4/n5nj++JzpKDQ8dU3N7MCgo8E=";
+    hash = "sha256-n+0/qTwyGUnquk5UnF9ZHjwmUBSSg7SVn6AdBVe1ppE=";
   };
 
-  cargoHash = "sha256-qcp3AyCYUZD3TsL5PZch4dObFN8qQTTwFIXjUgDN5x8=";
+  cargoHash = "sha256-AsCCOJ23ZKsg0OuHFl3MTFQfewmuMTEG5Q9ccasDXuM=";
 
   # nixpkgs-vet requires it of every new package: attributes reach the builder
   # as a JSON file and typed shell variables rather than as flat strings.
